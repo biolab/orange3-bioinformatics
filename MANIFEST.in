@@ -1,0 +1,4 @@
+include orangecontrib/bioinformatics/widgets/icons/*
+
+include README.md
+include requirements.txt

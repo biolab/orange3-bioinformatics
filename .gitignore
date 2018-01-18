@@ -1,0 +1,25 @@
+# Build files
+build
+dist
+docs/build
+*.so
+*.pyd
+*.pyc
+*.pyo
+MANIFEST
+*.egg-info
+*.egg
+distribute*.tar.gz
+
+# Cython generated files
+__pycache__
+
+# Editor files
+.idea
+.idea/*
+*~
+*swp
+.project
+.pydevproject
+.settings/*
+.DS_Store
