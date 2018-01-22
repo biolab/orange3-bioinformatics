@@ -15,10 +15,17 @@ DEFAULT_URL = 'https://dictyexpress.research.bcm.edu'
 
 
 class GenAPI:
-    """ Python module that leverages Genesis PyAPI (Python API for accsess to DictyExpress database).
-    It supports connection to the server and data retrieval functionalities.
-    """
+
     def __init__(self, email=DEFAULT_EMAIL, password=DEFAULT_PASSWD, url=DEFAULT_URL):
+        """ Python module that leverages Genesis PyAPI (Python API for accsess to DictyExpress database).
+
+        It supports connection to the server and data retrieval functionalities.
+
+        Args:
+            email (str):
+            password (str):
+            url (str):
+        """
 
         self._gen = Genesis(email, password, url)
         self.email = email
@@ -27,7 +34,7 @@ class GenAPI:
         """ Function downloads all available :obj:`GenData` etc objects from DictyExpress database.
 
         Returns:
-            :obj:`list`: of :obj:`GenData` objects
+            :obj:`list`: :obj:`GenData` objects
 
         """
 

@@ -1,4 +1,4 @@
-""" Tools """
+""" Utils """
 from Orange.data import ContinuousVariable, StringVariable, TimeVariable, Domain, Table
 
 
@@ -31,6 +31,7 @@ def etc_to_table(etc_json, time_var=False):
     Args:
         etc_json (dict): Data in json like format from genesis
         time_var (bool): Create column of time points. Default is set to False.
+
     Returns:
         :obj:`Orange.data.Table`
     """
