@@ -1,19 +1,17 @@
 """ NCBI GeneInformation module """
 import pickle
 
-from collections import defaultdict
+from collections import namedtuple
 from typing import List
 
-from .config import *
-from .utils import GeneInfoDB
+from orangecontrib.bioinformatics.ncbi.gene.config import *
+from orangecontrib.bioinformatics.ncbi.gene.utils import GeneInfoDB, parse_sources, parse_synonyms
 from orangecontrib.bioinformatics.utils import serverfiles
 
 
 _no_hits, _single_hit, _multiple_hits = 0, 1, 2
-_source, _symbol, _synonym = 'External source id match', 'Symbol match', 'Synonym match'
-
-
-def tax_mapper(): return defaultdict(list)
+_source, _symbol, _synonym = 'External reference', 'Symbol', 'Synonym'
+gene_matcher_tuple = namedtuple('gene_matcher_tuple', MATCHER_TUPLE_TAGS)
 
 
 class NoGeneNamesException(Exception):
@@ -52,6 +50,11 @@ class Gene:
 
         info = GeneInfoDB().select_gene_info(self.ncbi_id)
         for attr, value in zip(self.__slots__, info):
+            if attr == 'db_refs':
+                value = parse_sources(value)
+            elif attr == 'synonyms':
+                value = parse_synonyms(value)
+
             setattr(self, attr, value)
 
 
@@ -84,13 +87,12 @@ class GeneInfo(dict):
 
 class GeneMatcher:
 
-    def __init__(self,  organism):  # type: (int) -> None
-        self.organism = int(organism)
+    def __init__(self,  organism):  # type: (str) -> None
+        assert isinstance(organism, str), 'Wrong variable type {}'.format(organism)
+        self.organism = organism
         self._genes = []
 
-        self._source_map = self.load_matcher_file(DOMAIN, SOURCE_MAPPER_FILENAME)
-        self._symbol_map = self.load_matcher_file(DOMAIN, SYMBOL_MAPPER_FILENAME)
-        self._synonym_map = self.load_matcher_file(DOMAIN, SYNONYM_MAPPER_FILENAME)
+        self._matcher = self.load_matcher_file(DOMAIN, MATCHER_FILENAME.format(organism))
 
     @property
     def genes(self):
@@ -107,9 +109,14 @@ class GeneMatcher:
         return {gene.input_name: gene.ncbi_id for gene in self.genes}
 
     def run_matcher(self, progress_callback=None):
-        """
-        :param progress_callback: Used for progress bar in widgets. It emits the signal back to main thread
-        :return:
+        """ This will try to match genes, with ncbi ids, based on provided input of genes.
+
+
+        Args:
+            progress_callback: Used for progress bar in widgets. It emits the signal back to main thread
+
+        Returns:
+
         """
         if progress_callback:
             self._match(callback=progress_callback.emit)
@@ -119,29 +126,32 @@ class GeneMatcher:
     def _match(self, **kwargs):
         callback = kwargs.get("callback", None)
 
+        def match_input(mapper, input_name):
+            return mapper[input_name]
+
         for gene in self.genes:
             if callback:
                 callback()
 
-            source_match = self._match_source(self._source_map, gene.input_name)
+            source_match = match_input(self._matcher[MAP_SOURCES], gene.input_name)
             # ids from different sources are unique. We do not expect to get multiple hits here.
             # There is exceptions with organism 3702. It has same source id from Araport or TAIR databases.
             if source_match:
-                gene.ncbi_id = source_match[0]
+                gene.ncbi_id = source_match[0].gene_id
                 gene.type_of_match = _source
                 continue
 
-            symbol_match = self._match_symbol(self._symbol_map, gene.input_name)
+            symbol_match = match_input(self._matcher[MAP_SYMBOLS], gene.input_name)
             if len(symbol_match) == _single_hit:
-                gene.ncbi_id = symbol_match[0]
+                gene.ncbi_id = symbol_match[0].gene_id
                 gene.type_of_match = _symbol
                 continue
             elif len(symbol_match) >= _multiple_hits:
                 gene.possible_hits = symbol_match
 
-            synonym_match = self._match_synonym(self._synonym_map, gene.input_name)
+            synonym_match = match_input(self._matcher[MAP_SYNONYMS], gene.input_name)
             if len(synonym_match) == _single_hit:
-                gene.ncbi_id = synonym_match[0]
+                gene.ncbi_id = synonym_match[0].gene_id
                 gene.type_of_match = _synonym
                 continue
             elif len(synonym_match) >= _multiple_hits:
@@ -155,11 +165,10 @@ class GeneMatcher:
         with open(file_path, 'rb') as pickle_file:
             return pickle.load(pickle_file)
 
-    def _match_source(self, source_map, gene):
-        return source_map[gene][self.organism]
 
-    def _match_symbol(self, symbol_map, gene):
-        return symbol_map[gene][self.organism]
-
-    def _match_synonym(self, synonym_map, gene):
-        return synonym_map[gene][self.organism]
+if __name__ == "__main__":
+    g = Gene()
+    g.ncbi_id = 1
+    g.load_ncbi_info()
+    print(g.__slots__)
+    print(g.ncbi_id, g.description, g.db_refs, g.synonyms)

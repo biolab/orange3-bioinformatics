@@ -12,6 +12,42 @@ class GeneInfoFileNotFound(Exception):
     pass
 
 
+def parse_synonyms(values):
+    return [val for val in values.split('|') if val]
+
+
+def parse_sources(values):
+    """ Parse source string from NCBI gene info.
+
+    ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/README:
+
+    bar-delimited set of identifiers in other databases
+    for this gene.  The unit of the set is database:value.
+    Note that HGNC and MGI include 'HGNC' and 'MGI', respectively,
+    in the value part of their identifier.
+
+    Consequently, dbXrefs for these databases will appear like: HGNC:HGNC:1100
+    This would be interpreted as database='HGNC', value='HGNC:1100'
+
+
+    Args:
+        values (str): string of gene sources
+
+    Returns:
+        :obj:`dict`: Keys are source names, values are source ids
+
+    """
+    external_ids = values.split('|')
+    out_dict = {}
+
+    for ref in external_ids:
+        if ref != '-':
+            source_dest, source_id = ref.split(':', 1)
+            out_dict[source_dest] = source_id
+
+    return out_dict
+
+
 class GeneInfoDB:
 
     def __init__(self):
@@ -33,6 +69,11 @@ class GeneInfoDB:
     def select_genes_by_organism(self, organism):
         with closing(self._db_con.cursor()) as cursor:
             return cursor.execute('SELECT * FROM gene_info WHERE tax_id = ?', (organism,)).fetchall()
+
+    def select_gene_matcher_data(self, organism):
+        with closing(self._db_con.cursor()) as cursor:
+            return cursor.execute('SELECT tax_id, gene_id, symbol, synonyms, db_refs FROM gene_info where tax_id = ?',
+                                  (organism,)).fetchall()
 
     '''def has_external_reference(self, gene_id):
         with closing(self._db_con.cursor()) as cursor:
@@ -63,7 +104,7 @@ class GeneInfoDB:
 if __name__ == "__main__":
     def main():
         test = GeneInfoDB()
-        genes = test.select_genes_by_organism("9606")
+        genes = test.select_gene_matcher_data("9606")
         print(type(genes), len(genes), genes[0])
 
     main()

@@ -28,20 +28,14 @@ GENE_INFO_TAGS = ['tax_id',
 
 GENE_MATCHER_TAGS = ['input_name', 'type_of_match', 'ncbi_id', '_possible_hits']
 
-# PICKLED NAME MAPPER
-TITLE_SOURCE_MAPPER = 'Gene mapper from source id to ncbi id'
-TAGS_SOURCE_MAPPER = ['source id', 'map', 'ncbi id']
-SOURCE_MAPPER_FILENAME = 'source_mapper.pck'
+# PICKLED GENE MAPPER
+MATCHER_FILENAME = 'gene_mapper_{}'
+MATCHER_TITLE = 'Gene mapper'
+MATCHER_TAGS = ['source id', 'ncbi id', 'symbols', 'synonyms', 'genes', 'mapping']
 
-TITLE_SYMBOL_MAPPER = 'Gene mapper from symbol to ncbi id'
-TAGS_SYMBOL_MAPPER = ['source id', 'map', 'ncbi id']
-SYMBOL_MAPPER_FILENAME = 'symbol_mapper.pck'
-
-TITLE_SYNONYM_MAPPER = 'Gene mapper from synonym to ncbi id'
-TAGS_SYNONYM_MAPPER = ['source id', 'map', 'ncbi id']
-SYNONYM_MAPPER_FILENAME = 'synonym_mapper.pck'
-
-MAPPER_GENE_TAGS = ['tax_id', 'gene_id', 'symbol', 'synonyms', 'source']
-
-GENE_MATCHER_REQUIRED_FILES = [SOURCE_MAPPER_FILENAME, SYMBOL_MAPPER_FILENAME, SYNONYM_MAPPER_FILENAME]
+MATCHER_TUPLE_TAGS = ['tax_id', 'gene_id', 'symbol', 'synonyms', 'sources']
+MAP_GENE_IDS = 'gene_ids'
+MAP_SOURCES = 'sources'
+MAP_SYMBOLS = 'symbols'
+MAP_SYNONYMS = 'synonyms'
 
