@@ -2,4 +2,7 @@
 
 # Data hints variables
 TAX_ID = 'Taxonomy_id'
-GENES_IN_ROWS = 'genes_in_rows'
+
+# Will be set to True if gene names are represented as attribute names.
+# If gene names are in rows, we set this value to False. (user must select proper column index)
+GENE_NAME = 'gene_as_attribute_name'

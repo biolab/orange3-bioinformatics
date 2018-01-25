@@ -29,7 +29,7 @@ from Orange.widgets.utils.datacaching import data_hints
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics import geo
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
-from orangecontrib.bioinformatics.widgets.utils.data import GENES_IN_ROWS, TAX_ID
+from orangecontrib.bioinformatics.widgets.utils.data import GENE_NAME, TAX_ID
 
 
 TextFilterRole = next(gui.OrangeUserRole)
@@ -577,8 +577,8 @@ class OWGEODatasets(OWWidget):
         if message is not None:
             self.warning(0, message)
 
-        data_hints.set_hint(data, TAX_ID, self.currentGds.get("taxid", ""), 10.0)
-        data_hints.set_hint(data, GENES_IN_ROWS, self.outputRows, 10.0)
+        data_hints.set_hint(data, TAX_ID, self.currentGds.get("taxid", ""))
+        data_hints.set_hint(data, GENE_NAME, bool(self.outputRows))
 
         data.name = data_name
         self.send("Expression Data", data)
