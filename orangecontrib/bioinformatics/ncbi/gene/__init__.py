@@ -87,12 +87,20 @@ class GeneInfo(dict):
 
 class GeneMatcher:
 
-    def __init__(self,  organism):  # type: (str) -> None
-        assert isinstance(organism, str), 'Wrong variable type {}'.format(organism)
-        self.organism = organism
+    def __init__(self,  organism):
+        self._organism = organism
         self._genes = []
-
         self._matcher = self.load_matcher_file(DOMAIN, MATCHER_FILENAME.format(organism))
+
+    @property
+    def organism(self):
+        return self._organism
+
+    @organism.setter
+    def organism(self, tax_id):  # type: (str) -> None
+        assert isinstance(tax_id, str), 'Wrong variable type {}'.format(tax_id)
+        self._organism = tax_id
+        self._matcher = self.load_matcher_file(DOMAIN, MATCHER_FILENAME.format(tax_id))
 
     @property
     def genes(self):
@@ -106,7 +114,7 @@ class GeneMatcher:
         return [gene for gene in self.genes if gene.ncbi_id]
 
     def map_input_to_ncbi(self):
-        return {gene.input_name: gene.ncbi_id for gene in self.genes}
+        return {gene.input_name: gene.ncbi_id for gene in self.genes if gene.ncbi_id}
 
     def run_matcher(self, progress_callback=None):
         """ This will try to match genes, with ncbi ids, based on provided input of genes.
