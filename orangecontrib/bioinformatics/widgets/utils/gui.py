@@ -1,32 +1,13 @@
 import warnings
 import re
-import Orange.data
 
-
-from xml.sax.saxutils import escape
-from contextlib import contextmanager
-from itertools import starmap, chain
+from itertools import chain
 from collections import defaultdict
 from functools import singledispatch
 
 from AnyQt import QtGui, QtCore, QtWidgets
 from AnyQt.QtWidgets import QCompleter
 from AnyQt.QtCore import Qt, QObject, QStringListModel, pyqtSignal as Signal
-
-from Orange.widgets.utils import itemmodels
-from Orange.widgets import gui as _gui
-
-
-@contextmanager
-def blocked_signals(qobj):
-    """ Context manager blocking the `qobj` signals.
-    """
-    state = qobj.signalsBlocked()
-    qobj.blockSignals(True)
-    try:
-        yield qobj
-    finally:
-        qobj.blockSignals(state)
 
 
 @singledispatch
@@ -35,69 +16,6 @@ def standarditem_from(obj):
     item.setData(obj, Qt.UserRole)
     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
     return item
-
-
-@standarditem_from.register(Orange.data.Variable)
-def standarditem_from_var(var):
-    item = QtGui.QStandardItem(var.name)
-    _, icon = _gui.attributeItem(var)
-    item.setIcon(icon)
-    item.setToolTip(itemmodels.Variable)
-
-
-def variable_tooltip(var):
-    if isinstance(var, Orange.data.DiscreteVariable):
-        return discrete_variable_tooltip(var)
-    elif isinstance(Orange.data.ContinuousVariable):
-        return continuous_variable_toltip(var)
-    elif isinstance(var, Orange.data.StringVariable):
-        return string_variable_tooltip(var)
-
-
-def variable_labels_tooltip(var):
-    text = ""
-    if var.attributes:
-        items = [(escape(key), escape(value))
-                 for key, value in var.attributes.items()]
-        labels = list(starmap("{!s} = {!s}".format, items))
-        text += "<br/>Variable Labels:<br/>"
-        text += "<br/>".join(labels)
-    return text
-
-
-def discrete_variable_tooltip(var):
-    text = "<b>%s</b><br/>Discrete with %i values: " %\
-           (escape(var.name), len(var.values))
-    text += ", ".join("%r" % escape(v) for v in var.values)
-    text += variable_labels_tooltip(var)
-    return text
-
-
-def continuous_variable_toltip(var):
-    text = "<b>%s</b><br/>Continuous" % escape(var.name)
-    text += variable_labels_tooltip(var)
-    return text
-
-
-def string_variable_tooltip(var):
-    text = "<b>%s</b><br/>String" % escape(var.name)
-    text += variable_labels_tooltip(var)
-    return text
-
-
-def python_variable_tooltip(var):
-    text = "<b>%s</b><br/>Python" % escape(var.name)
-    text += variable_labels_tooltip(var)
-    return text
-
-
-def group_model(rowgroups, columngroups):
-    model = QtGui.QStandardItemModel()
-    for key, values in rowgroups:
-        item = standarditem_from(key)
-        values = [standarditem_from(value) for value in values]
-        item.appendRows(values)
-        model.addRow(item)
 
 
 class LabelSelectionWidget(QtWidgets.QWidget):
@@ -516,51 +434,3 @@ class TokenListCompleter(QCompleter):
         if tokenList != self.__tokenList:
             self.__tokenList = tokenList
             self.__updateEffectiveCompleterModel()
-
-
-import unittest
-
-
-class TestCompleter(unittest.TestCase):
-    def test_TokenListCompleter(self):
-        from Orange.widgets.utils.itemmodels import PyListModel
-        completer = TokenListCompleter()
-        completer.setTokenList(["foo", "bar", "baz"])
-        completer.setCompletionPrefix("foo b")
-
-        def completions(completer):
-            current = completer.currentRow()
-            items = []
-            for i in range(completer.completionCount()):
-                completer.setCurrentRow(i)
-                items.append(completer.currentCompletion())
-            completer.setCurrentRow(current)
-            return items
-
-        self.assertSequenceEqual(completions(completer),
-                                 ["foo bar", "foo baz"])
-        completer.setModel(None)
-        self.assertSequenceEqual(completer.tokenList(), [])
-        self.assertSequenceEqual(completions(completer), [])
-
-        completer.setModel(QStringListModel(["a", "ab", "b"]))
-        self.assertSequenceEqual(completer.tokenList(), ["a", "ab", "b"])
-        completer.setCompletionPrefix("a a")
-        self.assertSequenceEqual(completions(completer), ["a a", "a ab"])
-
-        completer.setModel(PyListModel(["a", "aa", "ab", "ad"]))
-        self.assertSequenceEqual(completer.tokenList(),
-                                 ["a", "aa", "ab", "ad"])
-
-        completer.model()[-1] = "z"
-        self.assertSequenceEqual(completer.tokenList(),
-                                 ["a", "aa", "ab", "z"])
-
-        completer.model()[-2:] = ["ax", "az"]
-        self.assertSequenceEqual(completer.tokenList(),
-                                 ["a", "aa", "ax", "az"])
-
-        completer.setSeparator(",")
-        completer.setCompletionPrefix("a, a")
-        self.assertSequenceEqual(completions(completer),
-                                 ["a, a", "a, aa", "a, ax", "a, az"])

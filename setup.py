@@ -63,6 +63,8 @@ ENTRY_POINTS = {
 
 NAMESPACE_PACAKGES = ["orangecontrib"]
 
+TEST_SUITE = "orangecontrib.bioinformatics.tests.suite"
+
 if __name__ == '__main__':
     setup(
         name=NAME,
@@ -80,6 +82,7 @@ if __name__ == '__main__':
         install_requires=INSTALL_REQUIRES,
         entry_points=ENTRY_POINTS,
         namespace_packages=NAMESPACE_PACAKGES,
+        test_suite=TEST_SUITE,
         include_package_data=True,
         zip_safe=False,
     )
