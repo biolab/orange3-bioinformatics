@@ -1,6 +1,5 @@
-DOMAIN = "Taxonomy"
-FILENAME = "ncbi-common-taxonomy.sqlite"
-FILENAME_ALL = "ncbi-taxonomy.sqlite"
+DOMAIN = "taxonomy"
+FILENAME = "ncbi-taxonomy.sqlite"
 TAXDUMP_URL = "http://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
 
 COMMON_NAMES = (

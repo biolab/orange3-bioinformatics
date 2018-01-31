@@ -11,7 +11,7 @@ import os
 from collections import namedtuple
 from urllib.request import urlopen
 from orangecontrib.bioinformatics.utils import serverfiles
-from .config import DOMAIN, FILENAME, FILENAME_ALL, TAXDUMP_URL
+from .config import DOMAIN, FILENAME, TAXDUMP_URL
 
 
 def namedtuple_repr_pretty(self, p, cycle):
@@ -47,22 +47,14 @@ class UnknownSpeciesIdentifier(Exception):
 
 class Taxonomy:
 
-    def __init__(self, all_organisms=False):
-        """ In orange-bio environment we typically work with organisms commonly used in molecular research projects
-        listed here: https://www.ncbi.nlm.nih.gov/taxonomy
-
-        For any advanced use, you must set parameter 'all_organism' which downloads around half a million taxonomy
-        records locally.
-
-        Parameters
-        ----------
-        all_organisms: bool
-            Flag that indicates that you want to work with all organisms in NCBI taxonomy database.
+    def __init__(self):
         """
-        file_name = FILENAME_ALL if all_organisms else FILENAME
+        In orange-bio environment we typically work with organisms commonly used in molecular research projects
+        listed here: https://www.ncbi.nlm.nih.gov/taxonomy
+        """
 
         # Ensure the taxonomy db is downloaded.
-        file_path = serverfiles.localpath_download(DOMAIN, file_name)
+        file_path = serverfiles.localpath_download(DOMAIN, FILENAME)
         self._tax = TaxonomyDB(file_path)
 
     def get_entry(self, id):
@@ -143,57 +135,6 @@ class TaxonomyDB(collections.Mapping):
         self._db_path = taxdb
         self._con = sqlite3.connect(taxdb, timeout=15)
         self._con.execute("CREATE INDEX IF NOT EXISTS index_names_tax_id ON names(tax_id)")
-
-    def commonly_used_organisms(self, new_db_path):
-        from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids
-
-        con = sqlite3.connect(new_db_path, timeout=15)
-        cursor = con.cursor()
-
-        tax_ids = tuple([int(tax_id) for tax_id in common_taxids()])
-
-        sql_query_ranks = 'SELECT rank_id, rank FROM ranks'
-
-        sql_query_nodes = ('WITH results as ( '
-                           'SELECT tax_id, parent_tax_id, rank_id FROM nodes WHERE tax_id IN {} '
-                           'UNION ALL '
-                           'SELECT n.tax_id, n.parent_tax_id, n.rank_id  FROM nodes n INNER JOIN results res '
-                           'ON res.parent_tax_id = n.tax_id AND n.tax_id<>res.tax_id '
-                           ')SELECT DISTINCT tax_id, parent_tax_id, rank_id '
-                           'FROM results ORDER BY tax_id').format(tax_ids)
-
-        data_ranks = self._con.execute(sql_query_ranks)
-
-        data_nodes = self._con.execute(sql_query_nodes)
-        nodes = [(int(tax_id), int(parent_tax_id), rank_id) for tax_id, parent_tax_id, rank_id in data_nodes]
-        node_ids = tuple([tax_id for tax_id, _, _ in nodes])
-
-        sql_query_classes = "SELECT name_class_id, name_class FROM name_classes"
-
-        sql_query_names = ("SELECT tax_id, name, name_class_id FROM names "
-                           "WHERE tax_id IN {} ").format(node_ids)
-
-        data_classes = self._con.execute(sql_query_classes)
-        data_names = self._con.execute(sql_query_names)
-
-        cursor.executescript(_INIT_TABLES)
-
-        cursor.executemany("INSERT INTO ranks VALUES (?, ?)",
-                           ((int(rank_id), rank) for rank_id, rank in data_ranks))
-
-        cursor.executemany("INSERT INTO nodes VALUES (?, ?, ?)",
-                           ((int(tax_id), int(parent_tax_id), rank_id)
-                            for tax_id, parent_tax_id, rank_id in nodes))
-
-        cursor.executemany("INSERT INTO name_classes VALUES (?, ?)",
-                           ((int(name_class_id), name_class_) for name_class_id, name_class_ in data_classes))
-
-        cursor.executemany("INSERT INTO names VALUES (?, ?, ?)",
-                           ((int(tax_id), name, int(name_class_id))
-                            for tax_id, name, name_class_id in data_names))
-
-        con.commit()
-        con.close()
 
     def __node_query(self, tax_id):
         c = self._con.execute("""
