@@ -4,7 +4,7 @@ import serverfiles
 
 from orangecontrib.bioinformatics.utils import serverfile_path
 
-server_url = "http://orange.biolab.si/serverfiles-bio/"
+server_url = "http://orange.biolab.si/serverfiles-bio2/"
 
 
 class ServerFiles(serverfiles.ServerFiles):
