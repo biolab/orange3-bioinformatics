@@ -1,5 +1,5 @@
-DOMAIN = 'GeneInfo'
-FILENAME = 'NCBI_GeneInfo.sqlite'
+DOMAIN = 'gene_info'
+FILENAME = 'gene_info.sqlite'
 TITLE = 'NCBI Gene Information'
 TAGS = ['NCBI', 'Gene names', 'Gene Ids', 'Description', 'Essential']
 FTP_FILENAME = 'gene_info.gz'
@@ -33,9 +33,10 @@ MATCHER_FILENAME = 'gene_mapper_{}'
 MATCHER_TITLE = 'Gene mapper'
 MATCHER_TAGS = ['source id', 'ncbi id', 'symbols', 'synonyms', 'genes', 'mapping']
 
-MATCHER_TUPLE_TAGS = ['tax_id', 'gene_id', 'symbol', 'synonyms', 'sources']
+MATCHER_TUPLE_TAGS = ['tax_id', 'gene_id', 'symbol', 'synonyms', 'sources', 'locus_tag']
 MAP_GENE_IDS = 'gene_ids'
 MAP_SOURCES = 'sources'
 MAP_SYMBOLS = 'symbols'
 MAP_SYNONYMS = 'synonyms'
+MAP_LOCUS = 'locus_tag'
 

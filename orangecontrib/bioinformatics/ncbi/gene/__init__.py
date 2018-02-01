@@ -10,7 +10,7 @@ from orangecontrib.bioinformatics.utils import serverfiles
 
 
 _no_hits, _single_hit, _multiple_hits = 0, 1, 2
-_source, _symbol, _synonym = 'External reference', 'Symbol', 'Synonym'
+_source, _symbol, _synonym, _locus = 'External reference', 'Symbol', 'Synonym', 'Locus tag'
 gene_matcher_tuple = namedtuple('gene_matcher_tuple', MATCHER_TUPLE_TAGS)
 
 
@@ -156,6 +156,14 @@ class GeneMatcher:
                 continue
             elif len(symbol_match) >= _multiple_hits:
                 gene.possible_hits = symbol_match
+
+            locus_match = match_input(self._matcher[MAP_LOCUS], gene.input_name)
+            if len(locus_match) == _single_hit:
+                gene.ncbi_id = locus_match[0].gene_id
+                gene.type_of_match = _locus
+                continue
+            elif len(symbol_match) >= _multiple_hits:
+                gene.possible_hits = locus_match
 
             synonym_match = match_input(self._matcher[MAP_SYNONYMS], gene.input_name)
             if len(synonym_match) == _single_hit:

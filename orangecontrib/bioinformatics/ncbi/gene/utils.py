@@ -62,18 +62,32 @@ class GeneInfoDB:
         with closing(self._db_con.cursor()) as cursor:
             return cursor.execute('SELECT COUNT(gene_id) FROM gene_info').fetchone()[0]
 
+    @staticmethod
+    def _fetch_organism_strains(organism):
+        """  Return a list of taxonomy ids for given organism and all its strains.
+        """
+        from orangecontrib.bioinformatics.ncbi.taxonomy.utils import Taxonomy
+        tax_obj = Taxonomy()
+        strains = tax_obj.subnodes(organism)
+        # append parent tax_id
+        strains.append(organism)
+        return strains
+
     def select_gene_info(self, gene_id):
         with closing(self._db_con.cursor()) as cursor:
             return cursor.execute('SELECT * FROM gene_info WHERE gene_id = ?', (gene_id,)).fetchone()
 
     def select_genes_by_organism(self, organism):
+        strains = self._fetch_organism_strains(organism)
         with closing(self._db_con.cursor()) as cursor:
-            return cursor.execute('SELECT * FROM gene_info WHERE tax_id = ?', (organism,)).fetchall()
+            return cursor.execute('SELECT * FROM gene_info '
+                                  'WHERE tax_id in ({})'.format(', '.join('?' for _ in strains)), strains).fetchall()
 
     def select_gene_matcher_data(self, organism):
+        strains = self._fetch_organism_strains(organism)
         with closing(self._db_con.cursor()) as cursor:
-            return cursor.execute('SELECT tax_id, gene_id, symbol, synonyms, db_refs FROM gene_info where tax_id = ?',
-                                  (organism,)).fetchall()
+            return cursor.execute('SELECT tax_id, gene_id, symbol, synonyms, db_refs, locus_tag FROM gene_info '
+                                  'WHERE tax_id in ({})'.format(', '.join('?' for _ in strains)), strains).fetchall()
 
     '''def has_external_reference(self, gene_id):
         with closing(self._db_con.cursor()) as cursor:
@@ -104,7 +118,7 @@ class GeneInfoDB:
 if __name__ == "__main__":
     def main():
         test = GeneInfoDB()
-        genes = test.select_gene_matcher_data("9606")
+        genes = test.select_gene_matcher_data("4932")
         print(type(genes), len(genes), genes[0])
 
     main()
