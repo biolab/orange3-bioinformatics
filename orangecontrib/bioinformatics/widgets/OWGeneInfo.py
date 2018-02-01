@@ -108,7 +108,7 @@ def get_ncbi_info(taxid):
 
 
 def ncbi_info(taxid, genes, advance=None):
-    ensure_downloaded("GeneInfo", "NCBI_GeneInfo.sqlite", advance)
+    ensure_downloaded(gene.DOMAIN, gene.FILENAME, advance)
     info = get_ncbi_info(taxid)
 
     gene_matcher = gene.GeneMatcher(str(taxid))
