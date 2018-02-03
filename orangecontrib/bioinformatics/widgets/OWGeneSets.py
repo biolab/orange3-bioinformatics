@@ -1,82 +1,44 @@
 """ GeneSets """
 import threading
 import numpy as np
-import operator
 
 
 from requests.exceptions import ConnectionError
-from functools import reduce
 from collections import defaultdict
 
 from AnyQt.QtWidgets import (
-    QTreeView, QTableView, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QButtonGroup, QGridLayout,
-    QStackedWidget, QHeaderView, QCheckBox, QItemDelegate, QCompleter
+    QTreeView, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator
 )
 from AnyQt.QtCore import (
-    Qt, QObject, pyqtSignal, QRunnable, QSize, pyqtSlot, QModelIndex, QStringListModel, QThread, QThreadPool,
-    Slot, QSortFilterProxyModel
+    Qt, QSize, QThreadPool, QSortFilterProxyModel
 )
 from AnyQt.QtGui import (
-    QBrush, QColor, QFont, QStandardItemModel, QStandardItem
+    QColor, QStandardItemModel, QStandardItem
 )
 
 from Orange.widgets.gui import (
-    vBox, comboBox, lineEdit, ProgressBar, rubber, button, widgetBox, LinkRole, LinkStyledItemDelegate,
+    vBox, comboBox, lineEdit, ProgressBar, widgetBox, LinkRole, LinkStyledItemDelegate,
     auto_commit, widgetLabel, checkBox, attributeItem
 )
 
 from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets.utils import itemmodels
-from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandler
+from Orange.widgets.settings import Setting, ContextSetting
 from Orange.widgets.utils.datacaching import data_hints
 from Orange.widgets.utils.signals import Output, Input
 
-from Orange.data import ContinuousVariable, DiscreteVariable, StringVariable, Domain, Table
+from Orange.data import DiscreteVariable, StringVariable, Domain, Table
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_NAME
+from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.ncbi import gene, taxonomy
-from orangecontrib.bioinformatics import geneset, utils
+from orangecontrib.bioinformatics import geneset
 
 
 CATEGORY, GENES, MATCHED, TERM = range(4)
 DATA_HEADER_LABELS = ["Category", "Genes", "Matched", "Term"]
 HIERARCHY_HEADER_LABELS = ["Category"]
-
-
-class Signals(QObject):
-    finished = pyqtSignal()
-    error = pyqtSignal(Exception)
-    result = pyqtSignal(object)
-    progress = pyqtSignal()
-
-
-class Worker(QRunnable):
-    """ Worker thread
-    """
-
-    def __init__(self, fn, *args, **kwargs):
-        super(Worker, self).__init__()
-        # Store constructor arguments (re-used for processing)
-        self.fn = fn
-        self.args = args
-        self.kwargs = kwargs
-        self.signals = Signals()
-
-        if self.kwargs:
-            if self.kwargs['progress_callback']:
-                self.kwargs['progress_callback'] = self.signals.progress
-
-    @pyqtSlot()
-    def run(self):
-        try:
-            result = self.fn(*self.args, **self.kwargs)
-        except Exception as e:
-            self.signals.error.emit(e)
-        else:
-            self.signals.result.emit(result)
-        finally:
-            self.signals.finished.emit()
 
 
 def hierarchy_tree(tax_id, gene_sets):
@@ -100,7 +62,7 @@ def download_gene_sets(tax_id, gene_sets, progress_callback):
     # get only those sets that are not already downloaded
     for hierarchy, tax_id in [(hierarchy, tax_id) for hierarchy, tax_id, local in gene_sets if not local]:
 
-        serverfiles.localpath_download(geneset.sfdomain, geneset.filename(hierarchy, tax_id),
+        serverfiles.localpath_download(geneset.DOMAIN, geneset.filename(hierarchy, tax_id),
                                        callback=progress_callback.emit)
 
     return tax_id, gene_sets

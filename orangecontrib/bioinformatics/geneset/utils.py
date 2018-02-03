@@ -44,9 +44,8 @@ def filename_parse(fn):
 def list_gene_sets():
     """ Returns available gene sets from the server files repository: a list of (hierarchy, organism, on_local)
     """
-    # TODO: uncomment this
-    #return [filename_parse(f_name) + (False,) for domain, f_name in serverfiles.ServerFiles().listfiles(DOMAIN)]
-    return [filename_parse(f_name) + (False,) for f_name in serverfiles.listfiles(DOMAIN)]
+
+    return [filename_parse(f_name) + (False,) for domain, f_name in serverfiles.ServerFiles().listfiles(DOMAIN)]
 
 
 def only_option(a):
@@ -101,7 +100,7 @@ def gmt_file_loader(contents, name):
     return GeneSets(_handle_ne_lines(contents, _hline))
 
 
-class GeneSet(object):
+class GeneSet:
     """ A single set of genes.
     """
 

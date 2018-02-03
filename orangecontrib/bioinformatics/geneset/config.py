@@ -1,5 +1,4 @@
-DOMAIN = 'geneSets'
-sfdomain = 'gene_sets'
+DOMAIN = 'gene_sets'
 
 # cytoband
 CYTOBAND_DOWNLOAD_LINK = 'http://statweb.stanford.edu/~tibs/GSA/cytobands-stanford.gmt'
