@@ -11,7 +11,7 @@ import os
 from collections import namedtuple
 from urllib.request import urlopen
 from orangecontrib.bioinformatics.utils import serverfiles
-from .config import DOMAIN, FILENAME, TAXDUMP_URL
+from orangecontrib.bioinformatics.ncbi.taxonomy.config import DOMAIN, FILENAME, TAXDUMP_URL
 
 
 def namedtuple_repr_pretty(self, p, cycle):
@@ -99,8 +99,8 @@ class Taxonomy:
     def lineage(self, taxid):
         return self._tax.lineage(taxid)
 
-    def get_parent_hierarchy(self):
-        pass
+    def get_all_strains(self, tax_id):
+        return self._tax.strains(tax_id)
 
 
 _INIT_TABLES = textwrap.dedent('''
@@ -194,6 +194,21 @@ class TaxonomyDB(collections.Mapping):
             WHERE names.name {operator} ?
             """.format(operator=operator), (name,))
         return (str(r[0]) for r in c)
+
+    def strains(self, tax_id):
+        """ recursively select all strains for given organism
+        """
+        c = self._con.execute("""
+            WITH results as (
+                SELECT tax_id, parent_tax_id, rank_id FROM nodes WHERE parent_tax_id = ?
+                UNION ALL
+                SELECT n.tax_id, n.parent_tax_id, n.rank_id  FROM nodes n INNER JOIN results res
+                ON res.tax_id = n.parent_tax_id)
+            SELECT DISTINCT tax_id, parent_tax_id, rank_id
+            FROM results ORDER BY tax_id
+            """, (tax_id, ))
+
+        return [str(result[0]) for result in c]
 
     def lineage(self, tax_id):
         lineage = []
@@ -322,3 +337,12 @@ class TaxonomyDB(collections.Mapping):
 
         con.commit()
         con.close()
+
+
+if __name__ == "__main__":
+    def main():
+        test = Taxonomy()
+        strains = test.get_all_strains("562")
+        print(strains)
+
+    main()
