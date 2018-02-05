@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 NAME = 'Orange-bioinformatics'
 DOCUMENTATION_NAME = 'Orange Bioinformatics'
-VERSION = '3.0.0'
+VERSION = '0.0.1'
 
 DESCRIPTION = 'Orange Bioinformatics add-on for Orange data mining software package.'
 LONG_DESCRIPTION = open(os.path.join(os.path.dirname(__file__), 'README.md')).read()
@@ -19,7 +19,7 @@ LICENSE = 'GPL3+'
 KEYWORDS = (
     # [PyPi](https://pypi.python.org) packages with keyword "orange3 add-on"
     # can be installed using the Orange Add-on Manager
-    # 'orange3 add-on'
+    'orange3 add-on'
 )
 
 CLASSIFIERS = (
