@@ -408,6 +408,7 @@ class GeneEntry(entry.DBEntry):
         ("ORGANISM", fields.DBSimpleField),
         ("PATHWAY", fields.DBPathway),
         ("MODULE", fields.DBSimpleField),
+        ("BRITE", fields.DBSimpleField),
         ("DISEASE", fields.DBSimpleField),
         ("DRUG_TARGET", fields.DBSimpleField),
         ("CLASS", fields.DBSimpleField),
