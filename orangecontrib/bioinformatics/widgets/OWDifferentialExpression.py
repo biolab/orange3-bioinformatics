@@ -5,14 +5,15 @@ import pyqtgraph as pg
 import scipy.special
 import scipy.stats
 import Orange.data
-import itertools
 
 
-from collections import defaultdict, namedtuple
 from types import SimpleNamespace as namespace
-from AnyQt.QtCore import Qt, QLineF, QSize, QRectF, Signal, Slot
-from AnyQt.QtGui import QStandardItemModel, QPen
-
+from PyQt5.QtGui import (
+    QStandardItemModel, QPen
+)
+from PyQt5.QtCore import (
+    Qt, pyqtSignal as Signal, pyqtSlot as Slot, QSize, QRectF, QLineF
+)
 
 from Orange.canvas.report import report
 from Orange.preprocess import transformation
@@ -22,6 +23,7 @@ from Orange.widgets.utils.datacaching import data_hints
 
 from orangecontrib.bioinformatics.widgets.utils.settings import SetContextHandler
 from orangecontrib.bioinformatics.widgets.utils import gui as guiutils
+from orangecontrib.bioinformatics.widgets.utils.data import GENE_NAME
 
 
 def score_fold_change(a, b, axis=0):
@@ -509,53 +511,6 @@ def test_middle(array, low, high):
     return (array <= high) | (array >= low)
 
 
-ColumnGroup = namedtuple("ColumnGroup", ["name", "key", "values"])
-RowGroup = namedtuple("RowGroup", ["name", "var", "values"])
-
-
-def group_candidates(data):
-    items = [attr.attributes.items() for attr in data.domain.attributes]
-    items = list(itertools.chain(*items))
-
-    targets = defaultdict(set)
-    for label, value in items:
-        targets[label].add(value)
-
-    # Need at least 2 distinct values or key
-    targets = [(key, sorted(vals)) for key, vals in targets.items() if len(vals) >= 2]
-
-    column_groups = [ColumnGroup(key, key, values)
-                     for key, values in sorted(targets)]
-    disc_vars = [var for var in data.domain.class_vars + data.domain.metas
-                 if isinstance(var, Orange.data.DiscreteVariable)
-                 and len(var.values) >= 2]
-
-    row_groups = [RowGroup(var.name, var, var.values)
-                  for var in disc_vars]
-    return column_groups, row_groups
-
-
-def group_selection_mask(data, group, indices):
-    """ Return the selection masks for the group.
-    """
-    if isinstance(group, ColumnGroup):
-        selected = [group.values[i] for i in indices]
-        target = set([(group.key, value) for value in selected])
-        I = [bool(set(var.attributes.items()).intersection(target))
-             for var in data.domain.attributes]
-        return np.array(I, dtype=bool)
-    elif isinstance(group, RowGroup):
-        target = set(indices)
-        X, _ = data.get_column_view(group.var)
-        I = np.zeros_like(X, dtype=bool)
-        for i in target:
-            I |= X == i
-        return I
-    else:
-        raise TypeError("ColumnGroup or RowGroup expected, got {}"
-                        .format(type(group).__name__))
-
-
 class OWDifferentialExpression(widget.OWWidget):
     name = "Differential Expression"
     description = "Gene selection by differential expression analysis."
@@ -765,7 +720,8 @@ class OWDifferentialExpression(widget.OWWidget):
 
     def initialize(self, data):
         """Initialize widget state from the data."""
-        col_targets, row_targets = group_candidates(data)
+
+        col_targets, row_targets = guiutils.group_candidates(data)
         modelitems = [guiutils.standarditem_from(obj)
                       for obj in col_targets + row_targets]
 
@@ -813,11 +769,12 @@ class OWDifferentialExpression(widget.OWWidget):
             # Initialize the selected groups/labels.
             # Default selected group key
             index = 0
-            rowshint = data_hints.get_hint(data, "genesinrows", False)
+            rowshint = data_hints.get_hint(data, GENE_NAME, False)
+
             if not rowshint:
                 # Select the first row group split candidate (if available)
                 indices = [i for i, grp in enumerate(self.targets)
-                           if isinstance(grp, RowGroup)]
+                           if isinstance(grp, guiutils.RowGroup)]
                 if indices:
                     index = indices[0]
 
@@ -827,6 +784,7 @@ class OWDifferentialExpression(widget.OWWidget):
             items = {(grp.name, val)
                      for grp in self.targets for val in grp.values}
             self.openContext(items)
+
             # Restore current group / selection
             model = self.label_selection_widget.model()
             selection = [model.index(i, 0, model.index(keyind, 0))
@@ -871,24 +829,24 @@ class OWDifferentialExpression(widget.OWWidget):
             split_ind = np.cumsum([len(ind) for ind in group_indices])
             return np.split(joined, split_ind[:-1])
 
-        if isinstance(grp, RowGroup):
+        if isinstance(grp, guiutils.RowGroup):
             axis = 0
         else:
             axis = 1
 
         if test_type == OWDifferentialExpression.TwoSampleTest:
-            G1 = group_selection_mask(
+            G1 = guiutils.group_selection_mask(
                 self.data, grp, split_selection)
             G2 = ~G1
             indices = [np.flatnonzero(G1), np.flatnonzero(G2)]
         elif test_type == self.VarSampleTest:
-            indices = [group_selection_mask(self.data, grp, [i])
+            indices = [guiutils.group_selection_mask(self.data, grp, [i])
                        for i in range(len(grp.values))]
             indices = [np.flatnonzero(ind) for ind in indices]
         else:
             assert False
 
-        if not all(np.count_nonzero(ind) > 0 for ind in indices):
+        if not all(ind.size > 0 for ind in indices):
             self.error(0, "Target labels most exclude/include at least one "
                           "value.")
             self.scores = None
@@ -1106,7 +1064,8 @@ class OWDifferentialExpression(widget.OWWidget):
         if self.data is not None:
             samples, genes = len(self.data), len(self.data.domain.attributes)
             grp, indices = self.selected_split()
-            if isinstance(grp, ColumnGroup):
+
+            if isinstance(grp, guiutils.ColumnGroup):
                 samples, genes = genes, samples
 
             target_labels = [grp.values[i] for i in indices]
@@ -1260,7 +1219,7 @@ class OWDifferentialExpression(widget.OWWidget):
             return
 
         grp, _ = self.selected_split()
-        if isinstance(grp, RowGroup):
+        if isinstance(grp, guiutils.RowGroup):
             axis = 1
         else:
             axis = 0
