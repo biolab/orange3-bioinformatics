@@ -1,38 +1,72 @@
 """ GO Enrichment Analysis """
 import sys
+import itertools
 import math
 import gc
 import webbrowser
 import operator
 import numpy
 import Orange.data
+import logging
 
 
 from requests.exceptions import ConnectTimeout
 from collections import defaultdict
 from functools import reduce
+from concurrent.futures import Future
+from types import SimpleNamespace
+from typing import Dict, List, Tuple
+from requests.exceptions import ConnectTimeout, RequestException
 
 from AnyQt.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QTreeView, QMenu, QCheckBox, QSplitter,
     QDialog, QVBoxLayout, QLabel, QItemDelegate
 )
 from AnyQt.QtGui import QBrush
-from AnyQt.QtCore import Qt, QSize
+from AnyQt.QtCore import Qt, QSize, QThread, QTimer
+from AnyQt.QtCore import pyqtSlot as Slot, Signal
 
+
+from Orange.widgets.utils.concurrent import (
+    ThreadExecutor, FutureWatcher, methodinvoke
+)
+from Orange.widgets.utils.concurrent import Task
 from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils.datacaching import data_hints
-from Orange.widgets.utils.concurrent import ThreadExecutor
-
 from orangecontrib.bioinformatics import go
 from orangecontrib.bioinformatics.ncbi import taxonomy
 from orangecontrib.bioinformatics.utils import serverfiles, statistics
 from orangecontrib.bioinformatics.widgets.utils.data import GENE_NAME, TAX_ID
-from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY
+from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY, FILENAME_ANNOTATION
+
+
+class EnsureDownloaded(Task):
+    advance = Signal()
+    progress = Signal(float)
+
+    def __init__(self, files_list, parent=None):
+        Task.__init__(self, parent)
+        self.files_list = files_list
+
+    def run(self):
+        nfiles = len(self.files_list)
+        count = 100 * nfiles
+        counter = itertools.count()
+
+        def advance():
+            self.advance.emit()
+            self.progress.emit(100.0 * next(counter) / count)
+
+        for domain, filename in self.files_list:
+            ensure_downloaded(domain, filename, advance=advance)
+
+
+def ensure_downloaded(domain, filename, advance=None):
+    serverfiles.localpath_download(domain, filename, callback=advance)
 
 
 def isstring(var):
     return isinstance(var, Orange.data.StringVariable)
-
 
 def listAvailable():
     taxids = taxonomy.common_taxids()
@@ -60,6 +94,19 @@ class GOTreeWidget(QTreeWidget):
         if isinstance(term, go.Term):
             term = term.id
         webbrowser.open("http://amigo.geneontology.org/cgi-bin/amigo/term-details.cgi?term="+term)
+
+
+class State:
+    #: Ready to run
+    Ready = 1
+    #: Downloading datasets needed to run.
+    Downloading = 2
+    #: Running the enrichment task
+    Running = 4
+    #: The current executing task is stale. Need to reschedule another update
+    #: once this one completes.
+    #: Only applicable with Downloading and Running
+    Stale = 8
 
 
 class OWGOBrowser(widget.OWWidget):
@@ -99,8 +146,6 @@ class OWGOBrowser(widget.OWWidget):
     selectionDisjoint = settings.Setting(0)
     selectionAddTermAsClass = settings.Setting(0)
 
-    Ready, Initializing, Running = 0, 1, 2
-
     def __init__(self, parent=None):
         super().__init__(self, parent)
 
@@ -108,15 +153,15 @@ class OWGOBrowser(widget.OWWidget):
         self.referenceDataset = None
         self.ontology = None
         self.annotations = None
-        self.loadedAnnotationCode = "---"
+        self.loadedAnnotationCode = None
         self.treeStructRootKey = None
         self.probFunctions = [statistics.Binomial(), statistics.Hypergeometric()]
         self.selectedTerms = []
 
         self.selectionChanging = 0
-        self.__state = OWGOBrowser.Initializing
-
-        self.annotationCodes = []
+        self.__state = State.Ready
+        self.__scheduletimer = QTimer(self, singleShot=True)
+        self.__scheduletimer.timeout.connect(self.__update)
 
         #############
         # GUI
@@ -133,38 +178,41 @@ class OWGOBrowser(widget.OWWidget):
 
         box = gui.widgetBox(self.inputTab, "Organism")
         self.annotationComboBox = gui.comboBox(
-            box, self, "annotationIndex", items=self.annotationCodes,
-            callback=self._updateEnrichment, tooltip="Select organism")
+            box, self, "annotationIndex", items=[],
+            callback=self.__invalidateAnnotations, tooltip="Select organism"
+        )
 
         genebox = gui.widgetBox(self.inputTab, "Gene Names")
         self.geneAttrIndexCombo = gui.comboBox(
-            genebox, self, "geneAttrIndex", callback=self._updateEnrichment,
+            genebox, self, "geneAttrIndex", callback=self.__invalidate,
             tooltip="Use this attribute to extract gene names from input data")
         self.geneAttrIndexCombo.setDisabled(self.useAttrNames)
 
+
         self.useAttrNames_checkbox = gui.checkBox(genebox, self, "useAttrNames", "Use column names",
                                                   tooltip="Use column names for gene names",
-                                                  callback=self._updateEnrichment)
+                                                  callback=self.__invalidate)
         self.useAttrNames_checkbox.toggled[bool].connect(self.geneAttrIndexCombo.setDisabled)
+
 
         self.referenceRadioBox = gui.radioButtonsInBox(
             self.inputTab, self, "useReferenceDataset",
             ["Entire genome", "Reference set (input)"],
             tooltips=["Use entire genome for reference",
                       "Use genes from Referece Examples input signal as reference"],
-            box="Reference", callback=self._updateEnrichment)
+            box="Reference", callback=self.__invalidate)
 
         self.referenceRadioBox.buttons[1].setDisabled(True)
         gui.radioButtonsInBox(
             self.inputTab, self, "aspectIndex",
             ["Biological process", "Cellular component", "Molecular function"],
-            box="Aspect", callback=self._updateEnrichment)
+            box="Aspect", callback=self.__invalidate)
 
         # Filter tab
         self.filterTab = gui.createTabPage(self.tabs, "Filter")
         box = gui.widgetBox(self.filterTab, "Filter GO Term Nodes")
         gui.checkBox(box, self, "filterByNumOfInstances", "Genes",
-                     callback=self.FilterAndDisplayGraph, 
+                     callback=self.FilterAndDisplayGraph,
                      tooltip="Filter by number of input genes mapped to a term")
         ibox = gui.indentedBox(box)
         gui.spin(ibox, self, 'minNumOfInstances', 1, 100,
@@ -198,7 +246,7 @@ class OWGOBrowser(widget.OWWidget):
         gui.radioButtonsInBox(box, self, "probFunc", ["Binomial", "Hypergeometric"],
                               tooltips=["Use binomial distribution test",
                                         "Use hypergeometric distribution test"],
-                              callback=self._updateEnrichment)
+                              callback=self.__invalidate)  # TODO: only update the p values
         box = gui.widgetBox(self.filterTab, "Evidence codes in annotation",
                               addSpace=True)
         self.evidenceCheckBoxDict = {}
@@ -225,7 +273,7 @@ class OWGOBrowser(widget.OWWidget):
                        "Term-specific genes",
                        "Common term genes"],
             tooltips=["Outputs genes annotated to all selected GO terms",
-                      "Outputs genes that appear in only one of selected GO terms", 
+                      "Outputs genes that appear in only one of selected GO terms",
                       "Outputs genes common to all selected GO terms"],
             callback=[self.ExampleSelection,
                       self.UpdateAddClassButton])
@@ -270,40 +318,51 @@ class OWGOBrowser(widget.OWWidget):
 
         self.sigTableTermsSorted = []
         self.graph = {}
+        self.originalGraph = None
 
         self.inputTab.layout().addStretch(1)
         self.filterTab.layout().addStretch(1)
         self.selectTab.layout().addStretch(1)
 
-        self.__initialize_finish()
+        class AnnotationSlot(SimpleNamespace):
+            taxid = ...  # type: str
+            name = ...   # type: str
+            filename = ...  # type:str
+
+            @staticmethod
+            def parse_tax_id(f_name):
+                return f_name.split('.')[1]
+
+        available_annotations = [
+            AnnotationSlot(
+                taxid=AnnotationSlot.parse_tax_id(annotation_file),
+                name=taxonomy.common_taxid_to_name(AnnotationSlot.parse_tax_id(annotation_file)),
+                filename=FILENAME_ANNOTATION.format(AnnotationSlot.parse_tax_id(annotation_file))
+            )
+            for _, annotation_file in serverfiles.ServerFiles().listfiles(DOMAIN)
+            if annotation_file != FILENAME_ONTOLOGY
+
+        ]
+        self.availableAnnotations = sorted(
+            available_annotations, key=lambda a: a.name
+        )
+        self.annotationComboBox.clear()
+
+        for a in self.availableAnnotations:
+            self.annotationComboBox.addItem(a.name)
+
+        self.annotationComboBox.setCurrentIndex(self.annotationIndex)
+        self.annotationIndex = self.annotationComboBox.currentIndex()
+
+        self._executor = ThreadExecutor()
 
     def sizeHint(self):
         return QSize(1000, 700)
 
-    def __initialize_finish(self):
-        self.setBlocking(False)
-
-        try:
-            self.annotationFiles = listAvailable()
-        except ConnectTimeout:
-            self.error(2, "Internet connection error, unable to load data. " + \
-                          "Check connection and create a new GO Browser widget.")
-            self.filterTab.setEnabled(False)
-            self.inputTab.setEnabled(False)
-            self.selectTab.setEnabled(False)
-            self.listView.setEnabled(False)
-            self.sigTerms.setEnabled(False)
-        else:
-            self.annotationCodes = sorted(self.annotationFiles.keys())
-            self.annotationComboBox.clear()
-            self.annotationComboBox.addItems(self.annotationCodes)
-            self.annotationComboBox.setCurrentIndex(self.annotationIndex)
-            self.__state = OWGOBrowser.Ready
-
     def __on_evidenceChanged(self):
         for etype, cb in self.evidenceCheckBoxDict.items():
             self.useEvidenceType[etype] = cb.isChecked()
-        self._updateEnrichment()
+        self.__invalidate()
 
     def clear(self):
         self.infoLabel.setText("No data on input\n")
@@ -316,9 +375,8 @@ class OWGOBrowser(widget.OWWidget):
         self.send("Enrichment Report", None)
 
     def setDataset(self, data=None):
-        if self.__state == OWGOBrowser.Initializing:
-            self.__initialize_finish()
 
+        self.closeContext()
         self.clear()
         self.clusterDataset = data
 
@@ -330,13 +388,14 @@ class OWGOBrowser(widget.OWWidget):
             self.geneAttrIndexCombo.clear()
             for var in self.candidateGeneAttrs:
                 self.geneAttrIndexCombo.addItem(*gui.attributeItem(var))
-            taxid = data_hints.get_hint(data, TAX_ID, '')
 
-            if taxid is not None:
-                filename = "gene_association.%s" % taxid
-                if filename in self.annotationFiles.values():
-                    self.annotationIndex = [i for i, name in enumerate(self.annotationCodes)
-                                            if self.annotationFiles[name] == filename].pop()
+            tax_id = data_hints.get_hint(data, TAX_ID, '')
+            if tax_id is not None:
+                _c2i = {a.taxid: i for i, a in enumerate(self.availableAnnotations)}
+                try:
+                    self.annotationIndex = _c2i[tax_id]
+                except KeyError:
+                    pass
 
             self.useAttrNames = data_hints.get_hint(data, GENE_NAME, default=self.useAttrNames)
 
@@ -347,7 +406,7 @@ class OWGOBrowser(widget.OWWidget):
             elif self.geneAttrIndex < len(self.candidateGeneAttrs):
                 self.geneAttrIndex = len(self.candidateGeneAttrs) - 1
 
-            self._updateEnrichment()
+            self.__invalidate()
 
     def setReferenceDataset(self, data=None):
         self.referenceDataset = data
@@ -355,31 +414,65 @@ class OWGOBrowser(widget.OWWidget):
         self.referenceRadioBox.buttons[1].setText("Reference set")
         if self.clusterDataset is not None and self.useReferenceDataset:
             self.useReferenceDataset = 0 if not data else 1
-            graph = self.Enrichment()
-            self.SetGraph(graph)
+            self.__invalidate()
         elif self.clusterDataset:
             self.__updateReferenceSetButton()
 
     def handleNewSignals(self):
         super().handleNewSignals()
+        self.__update()
 
-    def _updateEnrichment(self):
-        if self.clusterDataset is not None and \
-                self.__state == OWGOBrowser.Ready:
-            pb = gui.ProgressBar(self, 100)
-            self.Load(pb=pb)
-            graph = self.Enrichment(pb=pb)
-            self.SetGraph(graph)
+    @Slot()
+    def __invalidate(self):
+        # Invalidate the current results or pending task and schedule an
+        # update.
+        self.__scheduletimer.start()
+        if self.__state != State.Ready:
+            self.__state |= State.Stale
+
+        self.SetGraph({})
+        self.referenceGenes = None
+        self.clusterGenes = None
+
+    def __invalidateAnnotations(self):
+        self.annotations = None
+        self.loadedAnnotationCode = None
+        if self.clusterDataset:
+            self.infoLabel.setText("...\n")
+        self.__updateReferenceSetButton()
+        self.__invalidate()
+
+    @Slot()
+    def __update(self):
+        self.__scheduletimer.stop()
+        if self.clusterDataset is None:
+            return
+
+        if self.__state & State.Running:
+            self.__state |= State.Stale
+        elif self.__state & State.Downloading:
+            self.__state |= State.Stale
+        elif self.__state & State.Ready:
+            if self.__ensure_data():
+                self.Load()
+                self.Enrichment()
+            else:
+                assert self.__state & State.Downloading
+                assert self.isBlocking()
 
     def __updateReferenceSetButton(self):
-        allgenes, refgenes = None, []
-        if self.referenceDataset:
+        allgenes, refgenes = None, None
+        if self.referenceDataset and self.annotations is not None:
+
             try:
                 allgenes = self.genesFromTable(self.referenceDataset)
             except Exception:
                 allgenes = []
+
         self.referenceRadioBox.buttons[1].setDisabled(not bool(allgenes))
-        self.referenceRadioBox.buttons[1].setText("Reference set " + ("(%i genes, %i matched)" % (len(allgenes), len(refgenes)) if allgenes and refgenes else ""))
+        self.referenceRadioBox.buttons[1].setText(
+            "Reference set " + ("(%i genes, %i matched)" % (len(allgenes), len(refgenes))
+            if allgenes and refgenes else ""))
 
     def genesFromTable(self, data):
         if self.useAttrNames:
@@ -396,62 +489,98 @@ class OWGOBrowser(widget.OWWidget):
         matchedgenes = self.annotations.get_gene_names_translator(genes).values()
         return matchedgenes, [gene for gene in genes if gene not in matchedgenes]
 
-    def Load(self, pb=None):
+    def __start_download(self, files_list):
+        # type: (List[Tuple[str, str]]) -> None
+        task = EnsureDownloaded(files_list)
+        task.progress.connect(self._progressBarSet)
 
-        if self.__state == OWGOBrowser.Ready:
-            go_files, tax_files = serverfiles.listfiles("GO"), serverfiles.listfiles("Taxonomy")
-            calls = []
-            pb, finish = (gui.ProgressBar(self, 0), True) if pb is None else (pb, False)
-            count = 0
-            if not tax_files:
-                calls.append((taxonomy.DOMAIN, taxonomy.FILENAME))
-                count += 1
-            org = self.annotationCodes[min(self.annotationIndex, len(self.annotationCodes)-1)]
-            if org != self.loadedAnnotationCode:
-                count += 1
-                if self.annotationFiles[org] not in go_files:
-                    calls.append(("GO", self.annotationFiles[org]))
-                    count += 1
+        f = self._executor.submit(task)
+        fw = FutureWatcher(f, self)
+        fw.finished.connect(self.__download_finish)
+        fw.finished.connect(fw.deleteLater)
+        fw.resultReady.connect(self.__invalidate)
 
-            if FILENAME_ONTOLOGY not in go_files:
-                calls.append((DOMAIN, FILENAME_ONTOLOGY))
-                count += 1
-            if not self.ontology:
-                count += 1
-            pb.iter += count * 100
+        self.progressBarInit(processEvents=None)
+        self.setBlocking(True)
+        self.setStatusMessage("Downloading")
+        self.__state = State.Downloading
 
-            for args in calls:
-                serverfiles.localpath_download(*args, **dict(callback=pb.advance))
+    @Slot(Future)
+    def __download_finish(self, result):
+        # type: (Future[None]) -> None
+        assert QThread.currentThread() is self.thread()
+        assert result.done()
+        self.setBlocking(False)
+        self.setStatusMessage("")
+        self.progressBarFinished(processEvents=False)
+        try:
+            result.result()
+        except ConnectTimeout:
+            logging.getLogger(__name__).error("Error:")
+            self.error(2, "Internet connection error, unable to load data. " +
+                       "Check connection and create a new GO Browser widget.")
+        except RequestException as err:
+            logging.getLogger(__name__).error("Error:")
+            self.error(2, "Internet error:\n" + str(err))
+        except BaseException as err:
+            logging.getLogger(__name__).error("Error:")
+            self.error(2, "Error:\n" + str(err))
+            raise
+        else:
+            self.error(2)
+        finally:
+            self.__state = State.Ready
 
-            i = len(calls)
-            if not self.ontology:
-                self.ontology = go.Ontology(progress_callback=lambda value: pb.advance())
-                i += 1
+    def __ensure_data(self):
+        # Ensure that all required database (ontology and annotations for
+        # the current selected organism are present. If not start a download in
+        # the background. Return True if all dbs are present and false
+        # otherwise
+        assert self.__state == State.Ready
+        annotation = self.availableAnnotations[self.annotationIndex]
+        go_files = serverfiles.listfiles(DOMAIN)
+        files = []
 
-            if org != self.loadedAnnotationCode:
-                self.annotations = None
-                gc.collect()  # Force run garbage collection
-                code = self.annotationFiles[org].split('.')[-1]
-                self.annotations = go.Annotations(code, progress_callback=lambda value: pb.advance())
-                i += 1
-                self.loadedAnnotationCode = org
-                count = defaultdict(int)
-                geneSets = defaultdict(set)
+        if annotation.filename not in go_files:
+            files.append(("GO", annotation.filename))
 
-                for anno in self.annotations.annotations:
-                    count[anno.evidence] += 1
-                    geneSets[anno.evidence].add(anno.gene_id)
-                for etype in go.evidenceTypesOrdered:
-                    ecb = self.evidenceCheckBoxDict[etype]
-                    ecb.setEnabled(bool(count[etype]))
-                    ecb.setText(etype + ": %i annots(%i genes)" % (count[etype], len(geneSets[etype])))
-            if finish:
-                pb.finish()
+        if FILENAME_ONTOLOGY not in go_files:
+            files.append((DOMAIN, FILENAME_ONTOLOGY))
+        if files:
+            self.__start_download(files)
+            assert self.__state == State.Downloading
+            return False
+        else:
+            return True
 
-    def Enrichment(self, pb=None):
+    def Load(self):
+        a = self.availableAnnotations[self.annotationIndex]
+
+        if self.ontology is None:
+            self.ontology = go.Ontology()
+
+        if a.taxid != self.loadedAnnotationCode:
+            self.annotations = None
+            gc.collect()  # Force run garbage collection
+            self.annotations = go.Annotations(a.taxid)
+            self.loadedAnnotationCode = a.taxid
+            count = defaultdict(int)
+            geneSets = defaultdict(set)
+
+            for anno in self.annotations.annotations:
+                count[anno.evidence] += 1
+                geneSets[anno.evidence].add(anno.gene_id)
+            for etype in go.evidenceTypesOrdered:
+                ecb = self.evidenceCheckBoxDict[etype]
+                ecb.setEnabled(bool(count[etype]))
+                ecb.setText(etype + ": %i annots(%i genes)" % (count[etype], len(geneSets[etype])))
+
+            self.__updateReferenceSetButton()
+
+    def Enrichment(self):
         assert self.clusterDataset is not None
+        assert self.__state == State.Ready
 
-        pb = gui.ProgressBar(self, 100) if pb is None else pb
         if not self.annotations.ontology:
             self.annotations.ontology = self.ontology
 
@@ -529,26 +658,63 @@ class OWGOBrowser(widget.OWWidget):
                 evidences.append(etype)
         aspect = ['Process', 'Component', 'Function'][self.aspectIndex]
 
+        self.progressBarInit(processEvents=False)
+        self.setBlocking(True)
+        self.__state = State.Running
+
         if clusterGenes:
-            self.terms = terms = self.annotations.get_enriched_terms(
+            f = self._executor.submit(
+                self.annotations.get_enriched_terms,
                 clusterGenes, referenceGenes, evidences, aspect=aspect,
                 prob=self.probFunctions[self.probFunc], use_fdr=False,
-                progress_callback=lambda value: pb.advance())
-            ids = []
-            pvals = []
-            for i, d in self.terms.items():
-                ids.append(i)
-                pvals.append(d[1])
-            for i, fdr in zip(ids, statistics.FDR(pvals)):  # save FDR as the last part of the tuple
-                terms[i] = tuple(list(terms[i]) + [fdr])
+
+                progress_callback=methodinvoke(
+                    self, "_progressBarSet", (float,))
+            )
+            fw = FutureWatcher(f, parent=self)
+            fw.done.connect(self.__on_enrichment_done)
+            fw.done.connect(fw.deleteLater)
+            return
         else:
-            self.terms = terms = {}
+            f = Future()
+            f.set_result({})
+            self.__on_enrichment_done(f)
+
+    def __on_enrichment_done(self, results):
+        # type: (Future[Dict[str, tuple]]) -> None
+        self.progressBarFinished(processEvents=False)
+        self.setBlocking(False)
+        self.setStatusMessage("")
+        if self.__state & State.Stale:
+            self.__state = State.Ready
+            self.__invalidate()
+            return
+
+        self.__state = State.Ready
+        try:
+            results = results.result()  # type: Dict[str, tuple]
+        except Exception as ex:
+            results = {}
+            error = str(ex)
+            self.error(1, error)
+
+        if results:
+            terms = list(results.items())
+            fdr_vals = statistics.FDR([d[1] for _, d in terms])
+            terms = [(key, d + (fdr,))
+                     for (key, d), fdr in zip(terms, fdr_vals)]
+            terms = dict(terms)
+
+        else:
+            terms = {}
+
+        self.terms = terms
+
         if not self.terms:
             self.warning(0, "No enriched terms found.")
         else:
             self.warning(0)
 
-        pb.finish()
         self.treeStructDict = {}
         ids = self.terms.keys()
 
@@ -567,8 +733,62 @@ class OWGOBrowser(widget.OWWidget):
             if not self.ontology[term].related and not getattr(self.ontology[term], "is_obsolete", False):
                 self.treeStructRootKey = term
 
-        # print(terms)
-        return terms
+        self.SetGraph(terms)
+        self._updateEnrichmentReportOutput()
+        self.commit()
+
+    def _updateEnrichmentReportOutput(self):
+        terms = sorted(self.terms.items(), key=lambda item: item[1][1])
+        # Create and send the enrichemnt report table.
+        termsDomain = Orange.data.Domain(
+            [], [],
+            # All is meta!
+            [Orange.data.StringVariable("GO Term Id"),
+             Orange.data.StringVariable("GO Term Name"),
+             Orange.data.ContinuousVariable("Cluster Frequency"),
+             Orange.data.ContinuousVariable("Genes in Cluster",
+                                            number_of_decimals=0),
+             Orange.data.ContinuousVariable("Reference Frequency"),
+             Orange.data.ContinuousVariable("Genes in Reference",
+                                            number_of_decimals=0),
+             Orange.data.ContinuousVariable("p-value"),
+             Orange.data.ContinuousVariable("FDR"),
+             Orange.data.ContinuousVariable("Enrichment"),
+             Orange.data.StringVariable("Genes")])
+
+        terms = [[t_id,
+                  self.ontology[t_id].name,
+                  len(genes) / len(self.clusterGenes),
+                  len(genes),
+                  r_count / len(self.referenceGenes),
+                  r_count,
+                  p_value,
+                  fdr,
+                  len(genes) / len(self.clusterGenes) * \
+                  len(self.referenceGenes) / r_count,
+                  ",".join(genes)
+                  ]
+                 for t_id, (genes, p_value, r_count, fdr) in terms
+                 if genes and r_count]
+
+        if terms:
+            X = numpy.empty((len(terms), 0))
+            M = numpy.array(terms, dtype=object)
+            termsTable = Orange.data.Table.from_numpy(termsDomain, X,
+                                                      metas=M)
+        else:
+            termsTable = None
+        self.send("Enrichment Report", termsTable)
+
+    @Slot(float)
+    def _progressBarSet(self, value):
+        assert QThread.currentThread() is self.thread()
+        self.progressBarSet(value, processEvents=None)
+
+    @Slot()
+    def _progressBarFinish(self):
+        assert QThread.currentThread() is self.thread()
+        self.progressBarFinished(processEvents=None)
 
     def FilterGraph(self, graph):
         if self.filterByPValue_nofdr:
@@ -580,7 +800,7 @@ class OWGOBrowser(widget.OWWidget):
         return graph
 
     def FilterAndDisplayGraph(self):
-        if self.clusterDataset:
+        if self.clusterDataset and self.originalGraph is not None:
             self.graph = self.FilterGraph(self.originalGraph)
             if self.originalGraph and not self.graph:
                 self.warning(1, "All found terms were filtered out.")
@@ -654,43 +874,6 @@ class OWGOBrowser(widget.OWWidget):
         self.listView.setColumnWidth(0, width)
         self.sigTerms.setColumnWidth(0, width)
 
-        # Create and send the enrichemnt report table.
-        termsDomain = Orange.data.Domain(
-            [], [],
-            # All is meta!
-            [Orange.data.StringVariable("GO Term Id"),
-             Orange.data.StringVariable("GO Term Name"),
-             Orange.data.ContinuousVariable("Cluster Frequency"),
-             Orange.data.ContinuousVariable("Genes in Cluster", number_of_decimals=0),
-             Orange.data.ContinuousVariable("Reference Frequency"),
-             Orange.data.ContinuousVariable("Genes in Reference", number_of_decimals=0),
-             Orange.data.ContinuousVariable("p-value"),
-             Orange.data.ContinuousVariable("FDR"),
-             Orange.data.ContinuousVariable("Enrichment"),
-             Orange.data.StringVariable("Genes")])
-
-        terms = [[t_id,
-                  self.ontology[t_id].name,
-                  len(genes) / len(self.clusterGenes),
-                  len(genes),
-                  r_count / len(self.referenceGenes),
-                  r_count,
-                  p_value,
-                  fdr,
-                  len(genes) / len(self.clusterGenes) * \
-                  len(self.referenceGenes) / r_count,
-                  ",".join(genes)
-                  ]
-                 for t_id, (genes, p_value, r_count, fdr) in terms]
-
-        if terms:
-            X = numpy.empty((len(terms), 0))
-            M = numpy.array(terms, dtype=object)
-            termsTable = Orange.data.Table.from_numpy(termsDomain, X, metas=M)
-        else:
-            termsTable = Orange.data.Table(termsDomain)
-        self.send("Enrichment Report", termsTable)
-
     def ViewSelectionChanged(self):
         if self.selectionChanging:
             return
@@ -725,9 +908,8 @@ class OWGOBrowser(widget.OWWidget):
                         lvi.setExpanded(True)
                 except RuntimeError:  # Underlying C/C++ object deleted
                     pass
-
-        self.ExampleSelection()
         self.selectionChanging = 0
+        self.ExampleSelection()
 
     def UpdateAddClassButton(self):
         self.addClassCB.setEnabled(self.selectionDisjoint == 1)
@@ -736,7 +918,10 @@ class OWGOBrowser(widget.OWWidget):
         self.commit()
 
     def commit(self):
-        if self.clusterDataset is None:
+        if self.clusterDataset is None or self.originalGraph is None or \
+                self.annotations is None:
+            return
+        if self.__state & State.Stale:
             return
 
         terms = set(self.selectedTerms)
@@ -746,8 +931,8 @@ class OWGOBrowser(widget.OWWidget):
         evidences = []
         for etype in go.evidenceTypesOrdered:
             if self.useEvidenceType[etype]:
-                #  if getattr(self, "useEvidence" + etype):
                 evidences.append(etype)
+
         allTerms = self.annotations.get_annotated_terms(
             genes, direct_annotation_only=self.selectionDirectAnnotation,
             evidence_codes=evidences)
@@ -854,7 +1039,7 @@ class GOTreeWidgetItem(QTreeWidgetItem):
         else:
             enrichment = numpy.nan
 
-        self.enrichment = enrichment  # = lambda t: len(t[0]) / t[2] * (nRefGenes / (nClusterGenes or 1))
+        self.enrichment = enrichment
 
         self.setText(0, term.name)
 
