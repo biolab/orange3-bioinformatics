@@ -1,19 +1,20 @@
 """ Multithreading widgets with QThreadPool """
 
-from AnyQt.QtCore import (
+from PyQt5.QtCore import (
     QObject, pyqtSignal, QRunnable, pyqtSlot
 )
 
 
 class Signals(QObject):
+    progress = pyqtSignal()
+    partial_result = pyqtSignal(object)
+    result = pyqtSignal(object)
     finished = pyqtSignal()
     error = pyqtSignal(Exception)
-    result = pyqtSignal(object)
-    progress = pyqtSignal()
 
 
 class Worker(QRunnable):
-    """ Worker thread
+    """ Worker runnable
     """
 
     def __init__(self, fn, *args, **kwargs):
@@ -24,9 +25,14 @@ class Worker(QRunnable):
         self.kwargs = kwargs
         self.signals = Signals()
 
-        if self.kwargs:
-            if self.kwargs['progress_callback']:
-                self.kwargs['progress_callback'] = self.signals.progress
+        is_callback = kwargs.get("progress_callback", None)
+        is_partial = kwargs.get("partial_result", None)
+
+        if is_callback:
+            self.kwargs['progress_callback'] = self.signals.progress
+
+        if is_partial:
+            self.kwargs['partial_result'] = self.signals.partial_result
 
     @pyqtSlot()
     def run(self):

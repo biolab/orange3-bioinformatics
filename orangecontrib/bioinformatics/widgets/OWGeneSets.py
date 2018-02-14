@@ -2,17 +2,16 @@
 import threading
 import numpy as np
 
-
 from requests.exceptions import ConnectionError
 from collections import defaultdict
 
-from AnyQt.QtWidgets import (
+from PyQt5.QtWidgets import (
     QTreeView, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator
 )
-from AnyQt.QtCore import (
+from PyQt5.QtCore import (
     Qt, QSize, QThreadPool, QSortFilterProxyModel
 )
-from AnyQt.QtGui import (
+from PyQt5.QtGui import (
     QColor, QStandardItemModel, QStandardItem
 )
 
@@ -57,7 +56,33 @@ def hierarchy_tree(tax_id, gene_sets):
     return tax_id, collection[tax_id]
 
 
-def download_gene_sets(tax_id, gene_sets, progress_callback):
+def get_collections(gene_sets, mapped_genes, partial_result, progress_callback):
+
+    for gene_set in gene_sets:
+        category_column = QStandardItem()
+        name_column = QStandardItem()
+        matched_column = QStandardItem()
+        genes_column = QStandardItem()
+
+        category_column.setData(", ".join(gene_set.hierarchy), Qt.DisplayRole)
+        name_column.setData(gene_set.name, Qt.DisplayRole)
+        name_column.setData(gene_set.name, Qt.ToolTipRole)
+        name_column.setData(gene_set.link, LinkRole)
+        name_column.setForeground(QColor(Qt.blue))
+
+        if mapped_genes:
+            matched_set = gene_set.genes & {ncbi_id for input_name, ncbi_id in mapped_genes.items()}
+            matched_column.setData(matched_set, Qt.UserRole)
+            matched_column.setData(len(matched_set), Qt.DisplayRole)
+
+        genes_column.setData(len(gene_set.genes), Qt.DisplayRole)
+        genes_column.setData(gene_set.genes, Qt.UserRole)  # store genes to get then on output on selection
+
+        progress_callback.emit()
+        partial_result.emit([category_column, genes_column, matched_column, name_column])
+
+
+def download_gene_sets(gene_sets, progress_callback):
 
     # get only those sets that are not already downloaded
     for hierarchy, tax_id in [(hierarchy, tax_id) for hierarchy, tax_id, local in gene_sets if not local]:
@@ -104,11 +129,13 @@ class OWGeneSets(OWWidget):
 
         # progress bar
         self.progress_bar = None
+        self.progress_bar_iterations = None
 
         # data
         self.input_data = None
         self.tax_id = None
         self.input_genes = None
+        self.mapped_genes = None
         self.organisms = list()
         self.input_info = None
 
@@ -133,16 +160,21 @@ class OWGeneSets(OWWidget):
         self.hierarchy_widget = None
         self.hierarchy_state = None
 
+        # input options
+        self.gene_columns = None
+        self.gene_column_combobox = None
+        self.attr_names_checkbox = None
+
         # threads
-        self.threadpool = QThreadPool()
+        self.threadpool = QThreadPool(self)
+        self.workers = None
 
         # gui
         self.setup_gui()
-
         self._get_available_organisms()
 
-        #self.handle_input(self.input_genes)
-        #self.on_organism_change()
+        # self.handle_input(self.input_genes)
+        # self.on_organism_change()
 
     def _progress_advance(self):
         # GUI should be updated in main thread. That's why we are calling advance method here
@@ -248,20 +280,57 @@ class OWGeneSets(OWWidget):
         # make sure this happens in the main thread.
         # Qt insists that widgets be created within the GUI(main) thread.
         assert threading.current_thread() == threading.main_thread()
+        self.progress_bar.finish()
+        self.setStatusMessage('')
 
         tax_id, sets = result
         self.set_hierarchy_model(self.hierarchy_widget, *hierarchy_tree(tax_id, sets))
 
         self.organism_select_combobox.setEnabled(True)  # re-enable combobox
-        self.progress_bar.finish()
-        self.setStatusMessage('')
+
+        self.update_info_box()
+        self.mapped_genes = self.gene_matcher.map_input_to_ncbi()
+        self.workers = defaultdict(list)
+        self.progress_bar_iterations = dict()
+
+        for selected_hierarchy in [*self.get_hierarchies()]:
+            gene_sets = geneset.load_gene_sets(selected_hierarchy)
+            worker = Worker(get_collections, gene_sets, self.mapped_genes, progress_callback=True, partial_result=True)
+            worker.signals.error.connect(self.handle_error)
+            worker.signals.finished.connect(self.handle_worker_finished)
+            worker.signals.progress.connect(self._progress_advance)
+            worker.signals.partial_result.connect(self.populate_data_model)
+            worker.setAutoDelete(False)
+
+            self.workers[selected_hierarchy] = worker
+            self.progress_bar_iterations[selected_hierarchy] = len(gene_sets)
+
+    def handle_worker_finished(self):
+        # We check if all workers have completed. If not, continue
+        # dirty hax, is this ok?
+        if self.progress_bar and self.progress_bar.widget.progressBarValue == 100:
+            self.progress_bar.finish()
+            self.setStatusMessage('')
+            self.hierarchy_widget.setDisabled(False)
+
+            # adjust column width
+            for i in range(len(DATA_HEADER_LABELS) - 1):
+
+                self.data_view.resizeColumnToContents(i)
+
+    def populate_data_model(self, partial_result):
+        assert threading.current_thread() == threading.main_thread()
+
+        if partial_result:
+            self.data_model.appendRow(partial_result)
 
     def set_hierarchy_model(self, model, tax_id, sets):
         # TODO: maybe optimize this code?
         for key, value in sets.items():
             item = QTreeWidgetItem(model, [key])
             item.setFlags(item.flags() & (Qt.ItemIsUserCheckable | ~Qt.ItemIsSelectable | Qt.ItemIsEnabled))
-            item.setData(0, Qt.CheckStateRole, Qt.Checked)
+            # item.setDisabled(True)
+            item.setData(0, Qt.CheckStateRole, Qt.Unchecked)
             item.setExpanded(True)
             item.tax_id = tax_id
             item.hierarchy = key
@@ -294,73 +363,61 @@ class OWGeneSets(OWWidget):
         # status message
         self.setStatusMessage('downloading sets')
 
-        worker = Worker(download_gene_sets, tax_id, gene_sets, progress_callback=True)
+        worker = Worker(download_gene_sets, gene_sets, progress_callback=True)
         worker.signals.progress.connect(self._progress_advance)
         worker.signals.result.connect(self.on_gene_sets_download)
-        worker.signals.finished.connect(self.generate_gene_sets)
         worker.signals.error.connect(self.handle_error)
 
         # move download process to worker thread
         self.threadpool.start(worker)
 
-    def generate_gene_sets(self):
-        worker = Worker(geneset.collections, *self.get_selected_hierarchies())
-        worker.signals.result.connect(self.display_gene_sets)
-        worker.signals.error.connect(self.handle_error)
+    def display_gene_sets(self):
+        self.init_item_model()
+        self.hierarchy_widget.setDisabled(True)
 
-        self.threadpool.start(worker)
+        only_selected_hier = [*self.get_hierarchies(only_selected=True)]
+
+        # init progress bar
+        iterations = sum([self.progress_bar_iterations[hier] for hier in only_selected_hier])
+        self.progress_bar = ProgressBar(self, iterations=iterations)
+        self.setStatusMessage('displaying gene sets')
+
+        for selected_hierarchy in only_selected_hier:
+            self.threadpool.start(self.workers[selected_hierarchy])
 
     def handle_error(self, ex):
         self.progress_bar.finish()
         self.setStatusMessage('')
+
         if isinstance(ex, ConnectionError):
             self.organism_select_combobox.setEnabled(True)  # re-enable combobox
             self.Error.cant_reach_host()
 
-    def display_gene_sets(self, result):
-        assert threading.current_thread() == threading.main_thread()
-        mapped_genes = self.gene_matcher.map_input_to_ncbi()
-        self.init_item_model()
-        self.update_info_box()
+        print(ex)
 
-        for gene_set in result:
-            category_column = QStandardItem()
-            name_column = QStandardItem()
-            matched_column = QStandardItem()
-            genes_column = QStandardItem()
-
-            category_column.setData(", ".join(gene_set.hierarchy), Qt.DisplayRole)
-            name_column.setData(gene_set.name, Qt.DisplayRole)
-            name_column.setData(gene_set.link, Qt.ToolTipRole)
-            name_column.setData(gene_set.link, LinkRole)
-            name_column.setForeground(QColor(Qt.blue))
-
-            if mapped_genes:
-                matched_set = gene_set.genes & {ncbi_id for input_name, ncbi_id in mapped_genes.items()}
-                matched_column.setData(matched_set, Qt.UserRole)
-                matched_column.setData(len(matched_set), Qt.DisplayRole)
-
-            genes_column.setData(len(gene_set.genes), Qt.DisplayRole)
-            genes_column.setData(gene_set.genes, Qt.UserRole)  # store genes to get then on output on selection
-
-            row = [category_column, genes_column, matched_column, name_column]
-            self.data_model.appendRow(row)
-
-        # adjust column width
-        for i in range(len(DATA_HEADER_LABELS)):
-            self.data_view.resizeColumnToContents(i)
-
-    def get_selected_hierarchies(self):
+    def get_hierarchies(self, **kwargs):
         """ return selected hierarchy
         """
+        only_selected = kwargs.get('only_selected', None)
+
         sets_to_display = list()
-        iterator = QTreeWidgetItemIterator(self.hierarchy_widget, QTreeWidgetItemIterator.Checked)
+
+        if only_selected:
+            iterator = QTreeWidgetItemIterator(self.hierarchy_widget, QTreeWidgetItemIterator.Checked)
+        else:
+            iterator = QTreeWidgetItemIterator(self.hierarchy_widget)
 
         while iterator.value():
             # note: if hierarchy value is not a tuple, then this is just top level qTreeWidgetItem that
             #       holds subcategories. We don't want to display all sets from category
             if type(iterator.value().hierarchy) is not str:
-                sets_to_display.append(iterator.value().hierarchy)
+
+                if not only_selected:
+                    sets_to_display.append(iterator.value().hierarchy)
+                else:
+                    if not iterator.value().isDisabled():
+                        sets_to_display.append(iterator.value().hierarchy)
+
             iterator += 1
 
         return sets_to_display
@@ -369,7 +426,7 @@ class OWGeneSets(OWWidget):
         selection_model = self.data_view.selectionModel()
 
         if selection_model:
-            #genes_from_set = selection_model.selectedRows(GENES)
+            # genes_from_set = selection_model.selectedRows(GENES)
             matched_genes = selection_model.selectedRows(MATCHED)
 
             if matched_genes and self.input_genes:
@@ -380,7 +437,7 @@ class OWGeneSets(OWWidget):
                                  in self.gene_matcher.map_input_to_ncbi().items()}
 
                 if self.use_attr_names:
-                    selected = [self.input_data.domain[ncbi_to_input[gene]] for gene in output_genes]
+                    selected = [self.input_data.domain[ncbi_to_input[output_gene]] for output_gene in output_genes]
                     domain = Domain(selected, self.input_data.domain.class_vars, self.input_data.domain.metas)
                     new_data = self.input_data.from_table(domain, self.input_data)
                     self.Outputs.matched_genes.send(new_data)
@@ -424,12 +481,12 @@ class OWGeneSets(OWWidget):
         self.hierarchy_widget = QTreeWidget(self)
         self.hierarchy_widget.setEditTriggers(QTreeView.NoEditTriggers)
         self.hierarchy_widget.setHeaderLabels(HIERARCHY_HEADER_LABELS)
-        self.hierarchy_widget.itemClicked.connect(self.generate_gene_sets)
+        self.hierarchy_widget.itemClicked.connect(self.display_gene_sets)
         hierarchy_box.layout().addWidget(self.hierarchy_widget)
 
         self.commit_button = auto_commit(self.controlArea, self, "auto_commit", "&Commit", box=False)
 
-        #rubber(self.controlArea)
+        # rubber(self.controlArea)
 
         # main area
         self.filter_proxy_model = QSortFilterProxyModel(self.data_view)
@@ -453,7 +510,11 @@ class OWGeneSets(OWWidget):
         self.mainArea.layout().addWidget(self.data_view)
 
     def init_item_model(self):
-        self.data_model = QStandardItemModel()
+        if self.data_model:
+            self.data_model.clear()
+        else:
+            self.data_model = QStandardItemModel()
+
         self.data_model.setSortRole(Qt.UserRole)
         self.data_model.setHorizontalHeaderLabels(DATA_HEADER_LABELS)
         self.filter_proxy_model.setSourceModel(self.data_model)
@@ -463,7 +524,7 @@ class OWGeneSets(OWWidget):
 
 
 if __name__ == "__main__":
-    from AnyQt.QtWidgets import QApplication
+    from PyQt5.QtWidgets import QApplication
     app = QApplication([])
     ow = OWGeneSets()
     ow.show()

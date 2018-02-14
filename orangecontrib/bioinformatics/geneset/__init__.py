@@ -33,6 +33,12 @@ def list_all(organism=None, local=None):
             if (local is None or is_local == local) and (organism is None or org == str(organism))]
 
 
+def load_gene_sets(hierarchy):
+    file_path = serverfiles.localpath_download(DOMAIN, filename(*hierarchy))
+    with open(file_path, 'rb') as file:
+        return pickle.load(file, encoding="latin1")
+
+
 def collections(*args):
     """ Load gene sets from various sources: GMT file, GO, KEGG, and others.
     Return an instance of :class:`GeneSets`.
@@ -43,12 +49,13 @@ def collections(*args):
     * a tuple (hierarchy, organism) (for example ``(("KEGG",), "10090")``), or
     * an instance of :class:`GeneSets`
     """
+
     result = GeneSets()
 
     for collection in args:
         try:
             result.update(collection)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
             if is_sequencens(collection):  # have a hierarchy, organism specification
                 new = load(*collection)
                 result.update(new)
@@ -83,7 +90,6 @@ def load(hierarchy, organism):
         hierd = _build_hierarchy_dict(files)
         out = GeneSets()
         matches = hierd[(hierarchy, organism)]
-
         if not matches:
             raise NoGeneSetsException('No gene sets for {} (org {} )'.format(str(hierarchy), str(organism)))
 
