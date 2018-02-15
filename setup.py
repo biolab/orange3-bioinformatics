@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 NAME = 'Orange-bioinformatics'
 DOCUMENTATION_NAME = 'Orange Bioinformatics'
-VERSION = '0.0.1'
+VERSION = '0.1.0'
 
 DESCRIPTION = 'Orange Bioinformatics add-on for Orange data mining software package.'
 LONG_DESCRIPTION = open(os.path.join(os.path.dirname(__file__), 'README.md')).read()
