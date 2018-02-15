@@ -6,7 +6,7 @@ from typing import List
 
 from orangecontrib.bioinformatics.ncbi.gene.config import *
 from orangecontrib.bioinformatics.ncbi.gene.utils import GeneInfoDB, parse_sources, parse_synonyms
-from orangecontrib.bioinformatics.utils import serverfiles
+from orangecontrib.bioinformatics.utils import serverfiles, ensure_type
 
 
 _no_hits, _single_hit, _multiple_hits = 0, 1, 2
@@ -87,19 +87,19 @@ class GeneInfo(dict):
 
 class GeneMatcher:
 
-    def __init__(self,  organism):
-        self._organism = organism
-        self._genes = []
-        self._matcher = self.load_matcher_file(DOMAIN, MATCHER_FILENAME.format(organism))
+    def __init__(self,  tax_id):
+        self._organism = ensure_type(tax_id, str)  # type: str
+        self._genes = []                           # type: (List[str])
+
+        self._matcher = self.load_matcher_file(DOMAIN, MATCHER_FILENAME.format(tax_id))
 
     @property
     def organism(self):
-        return self._organism
+        return self.organism
 
     @organism.setter
-    def organism(self, tax_id):  # type: (str) -> None
-        assert isinstance(tax_id, str), 'Wrong variable type {}'.format(tax_id)
-        self._organism = tax_id
+    def organism(self, tax_id):
+        self._organism = ensure_type(tax_id, str)
         self._matcher = self.load_matcher_file(DOMAIN, MATCHER_FILENAME.format(tax_id))
 
     @property

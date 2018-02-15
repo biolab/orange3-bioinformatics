@@ -17,3 +17,11 @@ def serverfile_path():
         return update_folder
     else:
         return buffer_folder
+
+
+def ensure_type(value, types):
+    if isinstance(value, types):
+        return value
+    else:
+        raise TypeError('Wrong variable type. {value} is {value_type}, but should be {types}'.format(
+            value=value, value_type=type(value), types=types))
