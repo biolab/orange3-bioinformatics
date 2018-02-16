@@ -1,4 +1,6 @@
-include orangecontrib/bioinformatics/widgets/icons/*
+recursive-include orangecontrib/bioinformatics/tests *.py
+recursive-include orangecontrib/bioinformatics *.svg *.png *.jpg
 
-include README.md
 include requirements.txt
+include README.md
+include LICENSE
