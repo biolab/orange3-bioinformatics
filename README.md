@@ -1,7 +1,7 @@
 Orange3-bioinformatics
-===================
+=======================
 
-Orange Bioinformatics extends Orange_, a data mining software
+Orange Bioinformatics extends Orange, a data mining software
 package, with common functionality for bioinformatics. The provided
 functionality can be accessed as a Python library or through a visual
 programming interface (Orange Canvas). The latter is also suitable for
