@@ -40,3 +40,7 @@ MAP_SYMBOLS = 'symbols'
 MAP_SYNONYMS = 'synonyms'
 MAP_LOCUS = 'locus_tag'
 
+# OWGeneInfo settings
+GENE_INFO_HEADER_LABELS = ['NCBI ID', 'Ensembl ID', 'Symbol', 'Locus Tag', 'Chromosome', 'Description', 'Synonyms', 'Nomenclature']
+NCBI_DETAIL_LINK = 'http://www.ncbi.nlm.nih.gov/sites/entrez?Db=gene&Cmd=ShowDetailView&TermToSearch={}'
+ENSEMBL_DETAIL_LINK = 'http://www.ensembl.org/id/{}'

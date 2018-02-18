@@ -2,6 +2,8 @@ DOMAIN = "taxonomy"
 FILENAME = "ncbi-taxonomy.sqlite"
 TAXDUMP_URL = "http://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
 
+DEFAULT_ORGANISM = '9606'
+
 COMMON_NAMES = (
     ("3702",   "Arabidopsis thaliana"),
     ("9913",   "Bos taurus"),

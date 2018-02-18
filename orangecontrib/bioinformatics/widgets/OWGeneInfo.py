@@ -5,7 +5,7 @@ import Orange
 import numpy as np
 
 from itertools import chain
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from functools import partial, lru_cache
 
 from AnyQt.QtWidgets import QTreeView
@@ -18,10 +18,12 @@ from AnyQt.QtCore import (
 from Orange.widgets.utils.datacaching import data_hints
 from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils.concurrent import ThreadExecutor, Task, methodinvoke
+from Orange.widgets.utils.signals import Output, Input
 
 from orangecontrib.bioinformatics.ncbi import gene, taxonomy
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_NAME
+from orangecontrib.bioinformatics.widgets.utils.data import append_columns
 
 
 def ensure_downloaded(domain, filename, advance=None):
@@ -41,14 +43,20 @@ class TreeModel(QAbstractItemModel):
             partial(defaultdict,
                     partial(defaultdict, lambda: None)))(self._roleData)
 
-    def setColumnLinks(self, column, links):
+        self.setColumnLinks()
+
+    def setColumnLinks(self):
         font = QFont()
         font.setUnderline(True)
 
-        for i, link in enumerate(links):
-            self._roleData[gui.LinkRole][i][column] = link
-            self._roleData[Qt.FontRole][i][column] = font
-            self._roleData[Qt.ForegroundRole][i][column] = QColor(Qt.blue)
+        for i, link in enumerate(self._data):
+            self._roleData[gui.LinkRole][i][0] = gene.NCBI_DETAIL_LINK.format(self._roleData[Qt.DisplayRole][i][0])
+            self._roleData[Qt.FontRole][i][0] = font
+            self._roleData[Qt.ForegroundRole][i][0] = QColor(Qt.blue)
+
+            self._roleData[gui.LinkRole][i][1] = gene.ENSEMBL_DETAIL_LINK.format(self._roleData[Qt.DisplayRole][i][1])
+            self._roleData[Qt.FontRole][i][1] = font
+            self._roleData[Qt.ForegroundRole][i][1] = QColor(Qt.blue)
 
     def setRoleData(self, role, row, col, data):
         self._roleData[role][row][col] = data
@@ -78,33 +86,12 @@ class TreeModel(QAbstractItemModel):
         return None
 
 
-class LinkFmt(object):
-
-    def __init__(self, link_fmt, name):
-        self.link_fmt = link_fmt
-        self.name = name
-
-    def format(self, *args, **kwargs):
-        return Link(self.link_fmt.format(*args, **kwargs), **kwargs)
-
-    def __repr__(self):
-        return "<LinkFmt " + repr(self.name) + " >"
-
-    def __str__(self):
-        return self.name
-
-
-class Link(object):
-
-    def __init__(self, link, text=None, **kwargs):
-        self.link = link
-        self.text = text if text is not None else "link"
-        self.__dict__.update(kwargs)
-
-
 @lru_cache(maxsize=2)
 def get_ncbi_info(taxid):
     return gene.GeneInfo(taxid)
+
+
+HEADER_SCHEMA = {label: index for index, label in enumerate(gene.GENE_INFO_HEADER_LABELS)}
 
 
 def ncbi_info(taxid, genes, advance=None):
@@ -115,30 +102,32 @@ def ncbi_info(taxid, genes, advance=None):
     gene_matcher.genes = genes
     gene_matcher.run_matcher()
 
-    schema_link = LinkFmt(
-        "http://www.ncbi.nlm.nih.gov/sites/entrez?Db=gene&Cmd=ShowDetailView&TermToSearch={gene_id}",
-        name="NCBI ID"
-    )
-
-    schema = [schema_link, "Symbol", "Locus Tag", "Chromosome", "Description", "Synonyms", "Nomenclature"]
+    map_input_to_ensembl = OrderedDict({input_name: '' for input_name in genes})
     ret = []
 
     for gene_obj in gene_matcher.get_known_genes():
         if gene_obj.ncbi_id:
             gi = info.get_gene_by_id(gene_obj.ncbi_id)
+
+            ensemble = ''
+            if 'Ensembl' in gi.db_refs:
+                ensemble = gi.db_refs['Ensembl']
+                map_input_to_ensembl[gene_obj.input_name] = ensemble
+
             ret.append((gene_obj.input_name,
-                        [schema_link.format(gene_id=str(gi.gene_id), text=str(gi.gene_id)),
-                            gi.symbol + " (%s)" % gene_obj.input_name if gene_obj.input_name != gi.symbol else gi.symbol,
-                            gi.locus_tag or "",
-                            gi.chromosome or "",
-                            gi.description or "",
-                            gi.synonyms,
-                            gi.symbol_from_nomenclature_authority or ""])
+                        [str(gi.gene_id),
+                         str(ensemble),
+                         gi.symbol + " (%s)" % gene_obj.input_name if gene_obj.input_name != gi.symbol else gi.symbol,
+                         gi.locus_tag or "",
+                         gi.chromosome or "",
+                         gi.description or "",
+                         gi.synonyms,
+                         gi.symbol_from_nomenclature_authority or ""])
                        )
         else:
             ret.append(None)
 
-    return schema, ret
+    return map_input_to_ensembl, ret
 
 
 class OWGeneInfo(widget.OWWidget):
@@ -147,8 +136,12 @@ class OWGeneInfo(widget.OWWidget):
     icon = "../widgets/icons/OWGeneInfo.svg"
     priority = 5
 
-    inputs = [("Data", Orange.data.Table, "setData")]
-    outputs = [("Data Subset", Orange.data.Table)]
+    class Inputs:
+        data = Input("Data", Orange.data.Table)
+
+    class Outputs:
+        selected_genes = Output("Selected Genes", Orange.data.Table)
+        data = Output("Data", Orange.data.Table)
 
     settingsHandler = settings.DomainContextHandler()
 
@@ -172,6 +165,7 @@ class OWGeneInfo(widget.OWWidget):
         self.initfuture = None
         self.itemsfuture = None
 
+        self.map_input_to_ensembl = None
         self.infoLabel = gui.widgetLabel(
             gui.widgetBox(self.controlArea, "Info", addSpace=True),
             "Initializing\n"
@@ -185,7 +179,6 @@ class OWGeneInfo(widget.OWWidget):
             self.organismBox, self, "organism_index",
             callback=self._onSelectedOrganismChanged)
 
-
         box = gui.widgetBox(self.controlArea, "Gene names", addSpace=True)
         self.geneAttrComboBox = gui.comboBox(
             box, self, "gene_attr",
@@ -193,7 +186,7 @@ class OWGeneInfo(widget.OWWidget):
         )
         self.geneAttrComboBox.setEnabled(not self.useAttr)
 
-        self.geneAttrCheckbox = gui.checkBox(box, self, "useAttr", "Use attribute names",
+        self.geneAttrCheckbox = gui.checkBox(box, self, "useAttr", "Use column names",
                                              callback=self.updateInfoItems)
         self.geneAttrCheckbox.toggled[bool].connect(self.geneAttrComboBox.setDisabled)
 
@@ -204,15 +197,17 @@ class OWGeneInfo(widget.OWWidget):
         gui.lineEdit(self.mainArea, self, "search_string", "Filter",
                      callbackOnType=True, callback=self.searchUpdate)
 
-        self.treeWidget = QTreeView(
-            self.mainArea,
-            selectionMode=QTreeView.ExtendedSelection,
-            rootIsDecorated=False,
-            uniformRowHeights=True,
-            sortingEnabled=True)
+        self.treeWidget = QTreeView(self.mainArea)
 
-        self.treeWidget.setItemDelegate(
-            gui.LinkStyledItemDelegate(self.treeWidget))
+        self.treeWidget.setAlternatingRowColors(True)
+        self.treeWidget.setSortingEnabled(True)
+        self.treeWidget.setSelectionMode(QTreeView.ExtendedSelection)
+        self.treeWidget.setUniformRowHeights(True)
+        self.treeWidget.setRootIsDecorated(False)
+
+        self.treeWidget.setItemDelegateForColumn(HEADER_SCHEMA['NCBI ID'], gui.LinkStyledItemDelegate(self.treeWidget))
+        self.treeWidget.setItemDelegateForColumn(HEADER_SCHEMA['Ensembl ID'], gui.LinkStyledItemDelegate(self.treeWidget))
+
         self.treeWidget.viewport().setMouseTracking(True)
         self.mainArea.layout().addWidget(self.treeWidget)
 
@@ -255,22 +250,23 @@ class OWGeneInfo(widget.OWWidget):
         self.progressBarSet(self.progressBarValue + 1,
                             processEvents=None)
 
+    def _get_available_organisms(self):
+        available_organism = sorted([(tax_id, taxonomy.name(tax_id)) for tax_id in taxonomy.common_taxids()],
+                                    key=lambda x: x[1])
+
+        self.organisms = [tax_id[0] for tax_id in available_organism]
+
+        self.organismComboBox.addItems([tax_id[1] for tax_id in available_organism])
+
     def initialize(self):
         if self.__initialized:
             # Already initialized
             return
         self.__initialized = True
 
-        self.organisms = sorted(set(taxonomy.common_taxids()))
-
-        self.organismComboBox.addItems(
-            [taxonomy.name(tax_id) for tax_id in self.organisms]
-        )
-        if self.taxid in self.organisms:
-            self.organism_index = self.organisms.index(self.taxid)
-        else:
-            self.organism_index = 0
-            self.taxid = self.organisms[self.organism_index]
+        self._get_available_organisms()
+        self.organism_index = self.organisms.index(taxonomy.DEFAULT_ORGANISM)
+        self.taxid = self.organisms[self.organism_index]
 
         self.infoLabel.setText("No data on input\n")
         self.initfuture = None
@@ -289,6 +285,7 @@ class OWGeneInfo(widget.OWWidget):
         if self.data is not None:
             self.updateInfoItems()
 
+    @Inputs.data
     def setData(self, data=None):
         if not self.__initialized:
             self.initfuture.result()
@@ -313,9 +310,6 @@ class OWGeneInfo(widget.OWWidget):
 
             if self.taxid in self.organisms:
                 self.organism_index = self.organisms.index(self.taxid)
-            else:
-                self.organism_index = 0
-                self.taxid = self.organisms[self.organism_index]
 
             self.updateInfoItems()
         else:
@@ -364,36 +358,33 @@ class OWGeneInfo(widget.OWWidget):
         self.setEnabled(True)
 
         try:
-            schema, geneinfo = self.itemsfuture.result()
+            self.map_input_to_ensembl, geneinfo = self.itemsfuture.result()
         finally:
             self.itemsfuture = None
 
         self.geneinfo = geneinfo
         self.cells = cells = []
         self.row2geneinfo = {}
-        links = []
+
         for i, (input_name, gi) in enumerate(geneinfo):
             if gi:
                 row = []
-                for _, item in zip(schema, gi):
-                    if isinstance(item, Link):
-                        # TODO: This should be handled by delegates
-                        row.append(item.text)
-                        links.append(item.link)
-                    else:
-                        row.append(item)
+                for item in gi:
+                    row.append(item)
+
+                # parse synonyms
+                row[HEADER_SCHEMA['Synonyms']] = ','.join(row[HEADER_SCHEMA['Synonyms']])
                 cells.append(row)
                 self.row2geneinfo[len(cells) - 1] = i
 
-        model = TreeModel(cells, [str(col) for col in schema], None)
+        model = TreeModel(cells, list(HEADER_SCHEMA.keys()), None)
 
-        model.setColumnLinks(0, links)
         proxyModel = QSortFilterProxyModel(self)
         proxyModel.setSourceModel(model)
         self.treeWidget.setModel(proxyModel)
         self.treeWidget.selectionModel().selectionChanged.connect(self.commit)
 
-        for i in range(7):
+        for i in range(len(HEADER_SCHEMA)):
             self.treeWidget.resizeColumnToContents(i)
             self.treeWidget.setColumnWidth(
                 i, min(self.treeWidget.columnWidth(i), 200)
@@ -403,6 +394,19 @@ class OWGeneInfo(widget.OWWidget):
                                (len(self.genes), len(cells)))
         self.matchedInfo = len(self.genes), len(cells)
 
+        if self.useAttr:
+            new_data = self.data.from_table(self.data.domain, self.data)
+
+            for gene_var in new_data.domain.attributes:
+                 gene_var.attributes['Ensembl ID'] = str(self.map_input_to_ensembl[gene_var.name])
+
+            self.Outputs.data.send(new_data)
+        elif self.attributes:
+            data_with_ensembl = append_columns(self.data,
+                                               metas=[(Orange.data.StringVariable('Ensembl ID'),
+                                                       list(self.map_input_to_ensembl.values()))])
+            self.Outputs.data.send(data_with_ensembl)
+
     def clear(self):
         self.infoLabel.setText("No data on input\n")
         self.treeWidget.setModel(
@@ -411,11 +415,12 @@ class OWGeneInfo(widget.OWWidget):
                            "Nomenclature"], self.treeWidget))
 
         self.geneAttrComboBox.clear()
-        self.send("Data Subset", None)
+        self.Outputs.selected_genes.send(None)
 
     def commit(self):
         if self.data is None:
-            self.send("Data Subset", None)
+            self.Outputs.selected_genes.send(None)
+            self.Outputs.data.send(None)
             return
 
         model = self.treeWidget.model()
@@ -434,47 +439,41 @@ class OWGeneInfo(widget.OWWidget):
 
         isselected = selectedIds.__contains__
 
-        if self.useAttr:
-            def is_selected(attr):
-                return attr.name in selectedIds
-            attrs = [attr for attr in self.data.domain.attributes
-                     if isselected(attr.name)]
-            domain = Orange.data.Domain(
-                attrs, self.data.domain.class_vars, self.data.domain.metas)
-            newdata = self.data.from_table(domain, self.data)
-            self.send("Data Subset", newdata)
+        if selectedIds:
 
-        elif self.attributes:
-            attr = self.attributes[self.gene_attr]
-            gene_col = [attr.str_val(v)
-                        for v in self.data.get_column_view(attr)[0]]
-            gene_col = [(i, name) for i, name in enumerate(gene_col)
-                        if isselected(name)]
-            indices = [i for i, _ in gene_col]
+            if self.useAttr:
+                attrs = [attr for attr in self.data.domain.attributes if isselected(attr.name)]
+                domain = Orange.data.Domain(attrs, self.data.domain.class_vars, self.data.domain.metas)
+                newdata = self.data.from_table(domain, self.data)
 
-            # Add a gene info columns to the output
-            headers = [str(model.headerData(i, Qt.Horizontal, Qt.DisplayRole))
-                       for i in range(model.columnCount())]
-            metas = [Orange.data.StringVariable(name) for name in headers]
-            domain = Orange.data.Domain(
-                self.data.domain.attributes, self.data.domain.class_vars,
-                self.data.domain.metas + tuple(metas))
+                self.Outputs.selected_genes.send(newdata)
 
-            newdata = self.data.from_table(domain, self.data)[indices]
+            elif self.attributes:
+                attr = self.attributes[self.gene_attr]
+                gene_col = [attr.str_val(v) for v in self.data.get_column_view(attr)[0]]
+                gene_col = [(i, name) for i, name in enumerate(gene_col) if isselected(name)]
+                indices = [i for i, _ in gene_col]
 
-            model_rows = [gene2row[gene] for _, gene in gene_col]
-            for col, meta in zip(range(model.columnCount()), metas):
-                col_data = [str(model.index(row, col).data(Qt.DisplayRole))
-                            for row in model_rows]
-                col_data = np.array(col_data, dtype=object, ndmin=2).T
-                newdata[:, meta] = col_data
+                # SELECTED GENES OUTPUT
+                selected_genes_metas = [Orange.data.StringVariable(name) for name in gene.GENE_INFO_HEADER_LABELS]
+                selected_genes_domain = Orange.data.Domain(
+                    self.data.domain.attributes, self.data.domain.class_vars,
+                    self.data.domain.metas + tuple(selected_genes_metas))
 
-            if not len(newdata):
-                newdata = None
+                selected_genes_data = self.data.from_table(selected_genes_domain, self.data)[indices]
 
-            self.send("Data Subset", newdata)
+                model_rows = [gene2row[gene_name] for _, gene_name in gene_col]
+                for col, meta in zip(range(model.columnCount()), selected_genes_metas):
+                    col_data = [str(model.index(row, col).data(Qt.DisplayRole)) for row in model_rows]
+                    col_data = np.array(col_data, dtype=object, ndmin=2).T
+                    selected_genes_data[:, meta] = col_data
+
+                if not len(selected_genes_data):
+                    selected_genes_data = None
+
+                self.Outputs.selected_genes.send(selected_genes_data)
         else:
-            self.send("Data Subset", None)
+            self.Outputs.selected_genes.send(None)
 
     def rowFiltered(self, row):
         searchStrings = self.search_string.lower().split()

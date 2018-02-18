@@ -70,6 +70,11 @@ class GeneInfo(dict):
             gene_obj = Gene()
 
             for attr, value in zip(gene_obj.__slots__, gene):
+                if attr == 'db_refs':
+                    value = parse_sources(value)
+                elif attr == 'synonyms':
+                    value = parse_synonyms(value)
+
                 setattr(gene_obj, attr, value)
 
             self[gene_obj.gene_id] = gene_obj
