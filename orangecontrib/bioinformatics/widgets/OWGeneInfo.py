@@ -401,10 +401,17 @@ class OWGeneInfo(widget.OWWidget):
                  gene_var.attributes['Ensembl ID'] = str(self.map_input_to_ensembl[gene_var.name])
 
             self.Outputs.data.send(new_data)
+
         elif self.attributes:
+            ensembl_ids = []
+            for gene_name in self.data.get_column_view(self.attributes[self.gene_attr])[0]:
+                if gene_name and gene_name in self.map_input_to_ensembl:
+                    ensembl_ids.append(self.map_input_to_ensembl[gene_name])
+                else:
+                    ensembl_ids.append('')
+
             data_with_ensembl = append_columns(self.data,
-                                               metas=[(Orange.data.StringVariable('Ensembl ID'),
-                                                       list(self.map_input_to_ensembl.values()))])
+                                               metas=[(Orange.data.StringVariable('Ensembl ID'), ensembl_ids)])
             self.Outputs.data.send(data_with_ensembl)
 
     def clear(self):
