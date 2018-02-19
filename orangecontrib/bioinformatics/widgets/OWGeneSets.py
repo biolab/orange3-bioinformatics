@@ -382,6 +382,12 @@ class OWGeneSets(OWWidget):
         self.progress_bar = ProgressBar(self, iterations=iterations)
         self.setStatusMessage('displaying gene sets')
 
+        if not only_selected_hier:
+            self.progress_bar.finish()
+            self.setStatusMessage('')
+            self.hierarchy_widget.setDisabled(False)
+            return
+
         for selected_hierarchy in only_selected_hier:
             self.threadpool.start(self.workers[selected_hierarchy])
 
