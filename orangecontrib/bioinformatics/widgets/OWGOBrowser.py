@@ -298,6 +298,7 @@ class OWGOBrowser(widget.OWWidget):
 
         self.listView.header().setSectionsClickable(True)
         self.listView.header().setSortIndicatorShown(True)
+        self.listView.header().setSortIndicator(self.DAGcolumns.index('p-value'), Qt.DescendingOrder)
         self.listView.setSortingEnabled(True)
         self.listView.setItemDelegateForColumn(
             6, EnrichmentColumnItemDelegate(self))
@@ -311,6 +312,7 @@ class OWGOBrowser(widget.OWWidget):
         self.sigTerms.setHeaderLabels(self.DAGcolumns)
         self.sigTerms.setSortingEnabled(True)
         self.sigTerms.setSelectionMode(QTreeView.ExtendedSelection)
+        self.sigTerms.header().setSortIndicator(self.DAGcolumns.index('p-value'), Qt.DescendingOrder)
         self.sigTerms.setItemDelegateForColumn(
             6, EnrichmentColumnItemDelegate(self))
 
