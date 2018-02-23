@@ -318,6 +318,8 @@ class OWGeneSets(OWWidget):
 
                 self.data_view.resizeColumnToContents(i)
 
+            self.filter_proxy_model.setSourceModel(self.data_model)
+
     def populate_data_model(self, partial_result):
         assert threading.current_thread() == threading.main_thread()
 
@@ -518,12 +520,13 @@ class OWGeneSets(OWWidget):
     def init_item_model(self):
         if self.data_model:
             self.data_model.clear()
+            self.filter_proxy_model.setSourceModel(None)
         else:
             self.data_model = QStandardItemModel()
 
         self.data_model.setSortRole(Qt.UserRole)
         self.data_model.setHorizontalHeaderLabels(DATA_HEADER_LABELS)
-        self.filter_proxy_model.setSourceModel(self.data_model)
+
 
     def sizeHint(self):
         return QSize(1280, 960)
