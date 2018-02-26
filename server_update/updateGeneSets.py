@@ -9,16 +9,19 @@ import io
 from zipfile import ZipFile
 
 from urllib.request import urlopen
-from server_update import register_sets
+from server_update import create_folder, sf_local, create_info_file
 from orangecontrib.bioinformatics import go, kegg, omim, dicty
 from orangecontrib.bioinformatics.kegg import caching
 from orangecontrib.bioinformatics.ncbi import taxonomy
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
 from orangecontrib.bioinformatics.geneset import (
-    DOMAIN, GeneSet, GeneSets, GeneSetRegException,
-    filename, pickle_temp, GO_TERM_LINK, CYTOBAND_DOWNLOAD_LINK,
+    DOMAIN, GeneSet, GeneSets, GeneSetException,
+    filename, GO_TERM_LINK, CYTOBAND_DOWNLOAD_LINK,
     REACTOME_DOWNLOAD_LINK, REACTOME_FILE_NAME, OMIM_LINK
 )
+
+DOMAIN_PATH = sf_local.localpath(DOMAIN)
+create_folder(DOMAIN_PATH)
 
 
 def go_gene_sets(org):
@@ -33,7 +36,8 @@ def go_gene_sets(org):
         genes = annotations.get_genes_by_go_term(termn)
         hier = ('GO', term.namespace)
         if len(genes) > 0:
-            gs = GeneSet(id=termn, name=term.name, genes=genes, hierarchy=hier,
+
+            gs = GeneSet(gs_id=termn, name=term.name, genes=genes, hierarchy=hier,
                          organism=org, link=GO_TERM_LINK.format(termn))
 
             gene_sets.append(gs)
@@ -63,9 +67,10 @@ def kegg_gene_sets(org):
                     # some kegg names can not be matched to ncbi ids
                     # they are included in geneset anyway
                     # remove prefix, that specifies kegg organism
-                    mapped_genes.append(gene.split(':')[-1])
+                    # mapped_genes.append(gene.split(':')[-1])
+                    pass
 
-            gs = GeneSet(id=id,
+            gs = GeneSet(gs_id=id,
                          name=pway.title,
                          genes=mapped_genes,
                          hierarchy=hier,
@@ -91,15 +96,13 @@ def dicty_mutant_gene_sets(org):
             genes = []
 
             for gene in gene_matcher.genes:
-                if gene.ncbi_id is None:
-                    genes.append(gene.input_name)
-                else:
+                if gene.ncbi_id is not None:
                     genes.append(int(gene.ncbi_id))
 
             if len(gene_symbols) != len(genes):
                 print(len(gene_symbols), len(genes))
 
-            gs = GeneSet(id=phenotype,
+            gs = GeneSet(gs_id=phenotype,
                          name=phenotype,
                          genes=genes,
                          hierarchy=('Dictybase', 'Phenotypes'),
@@ -129,12 +132,10 @@ def cytoband_gene_sets(org):
 
                 genes = []
                 for gene in gene_matcher.genes:
-                    if gene.ncbi_id is None:
-                        genes.append(gene.input_name)
-                    else:
+                    if gene.ncbi_id is not None:
                         genes.append(int(gene.ncbi_id))
 
-                genesets.append(GeneSet(id=b[0], name=b[1], genes=genes if b[2:] else [],
+                genesets.append(GeneSet(gs_id=b[0], name=b[1], genes=genes if b[2:] else [],
                                         hierarchy=('Cytobands',), organism='9606', link=''))
 
             return GeneSets(genesets)
@@ -161,12 +162,10 @@ def reactome_gene_sets(org):
                     genes = []
 
                     for gene in gene_matcher.genes:
-                        if gene.ncbi_id is None:
-                            genes.append(gene.input_name)
-                        else:
+                        if gene.ncbi_id is not None:
                             genes.append(int(gene.ncbi_id))
 
-                    gs = GeneSet(id=path.split('\t')[0],
+                    gs = GeneSet(gs_id=path.split('\t')[0],
                                  name=path.split('\t')[0],
                                  genes=genes,
                                  hierarchy=('Reactome', 'Pathways'),
@@ -191,12 +190,10 @@ def omim_gene_sets(org):
             genes = []
 
             for gene in gene_matcher.genes:
-                if gene.ncbi_id is None:
-                    genes.append(gene.input_name)
-                else:
+                if gene.ncbi_id is not None:
                     genes.append(int(gene.ncbi_id))
 
-            gs = GeneSet(id=disease.id,
+            gs = GeneSet(gs_id=disease.id,
                          name=disease.name,
                          genes=genes,
                          hierarchy=('OMIM',),
@@ -207,27 +204,21 @@ def omim_gene_sets(org):
         return GeneSets(genesets)
 
 
-
 def register_serverfiles(genesets):
     """ Registers using the common hierarchy and organism. """
     org = genesets.common_org()
     hierarchy = genesets.common_hierarchy()
     fn = filename(hierarchy, org)
 
-    # save to temporary file
-    tfname = pickle_temp(genesets)
+    file_path = os.path.join(DOMAIN_PATH, fn)
 
-    try:
-        if org != None:
-            taxname = taxonomy.name(org)
-            title = "Gene sets: " + ", ".join(hierarchy) + ((" (" + taxname + ")") if org is not None else "")
+    if org is not None:
+        taxname = taxonomy.name(org)
+        title = "Gene sets: " + ", ".join(hierarchy) + ((" (" + taxname + ")") if org is not None else "")
 
-            tags = list(hierarchy) + ["gene sets"] + ([taxname] if org is not None else []) + taxonomy.shortname(org)
-            with open(tfname, 'rb') as f:
-                register_sets(DOMAIN, fn, f.read(), title, tags)
-    finally:
-        # clean up temp files
-        os.remove(tfname)
+        tags = list(hierarchy) + ["gene sets"] + ([taxname] if org is not None else []) + taxonomy.shortname(org)
+        genesets.to_gmt_file_format(file_path)
+        create_info_file(file_path, title=title, tags=tags)
 
 
 def upload_genesets():
@@ -255,11 +246,11 @@ def upload_genesets():
                     continue
 
                 for gs in genesets:
-                    print("registering {}".format(str(gs.common_hierarchy())))
+                    # print("registering {}".format(str(gs.common_hierarchy())))
                     register_serverfiles(gs)  # server files register(gs)
             except taxonomy.UnknownSpeciesIdentifier:
                 print("Organism ontology not available %s" % org)
-            except GeneSetRegException:
+            except GeneSetException:
                 print("Empty gene sets. %s" % org)
 
 

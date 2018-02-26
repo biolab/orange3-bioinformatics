@@ -2,7 +2,7 @@ import pickle
 
 
 from urllib.request import urlopen
-from orangecontrib.bioinformatics.geneset.utils import serverfiles
+from orangecontrib.bioinformatics.utils import serverfiles
 from . import phenotypes
 
 
