@@ -1,7 +1,7 @@
 import unittest
 
-
-from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter, QStringListModel
+from PyQt5.QtCore import QStringListModel
+from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
 
 
 class TestCompleter(unittest.TestCase):
