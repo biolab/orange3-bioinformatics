@@ -5,9 +5,6 @@ TAGS = ['NCBI', 'Gene names', 'Gene Ids', 'Description', 'Essential']
 FTP_FILENAME = 'gene_info.gz'
 FTP_URL = 'ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/gene_info.gz'
 
-# dictyBase gene names
-DICTY_GENE_NAMES = \
-    'http://www.dictybase.org/db/cgi-bin/dictyBase/download/download.pl?area=general&ID=gene_information.txt'
 
 # NCBI_INFO - order is important
 GENE_INFO_TAGS = ['tax_id',
