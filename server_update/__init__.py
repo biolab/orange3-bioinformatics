@@ -25,18 +25,6 @@ sf_temp = 'temp'
 _sync_path = 'serverfiles-bio@orange.biolab.si:/serverfiles-bio2'
 
 
-# genesets register helper
-def register_sets(sfdomain, fn, tfname, title, tags):
-    domain_path = sf_local.localpath(sfdomain)
-    create_folder(domain_path)
-    file_path = os.path.join(domain_path, fn)
-
-    with open(file_path, 'wb') as f:
-        f.write(tfname)
-
-    create_info_file(file_path, title=title, tags=tags)
-
-
 def sf_last_modified(domain, filename):
     return datetime.strptime(sf_server.info(domain, filename)['datetime'], info_date_fmt)
 

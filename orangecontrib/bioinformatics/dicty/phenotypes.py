@@ -1,3 +1,4 @@
+""" Mutant Phenotypes """
 import os
 import shutil
 import pickle
@@ -6,33 +7,34 @@ from urllib.request import urlopen
 from collections import defaultdict
 from functools import reduce
 
+from orangecontrib.bioinformatics.dicty.config import DOMAIN, PHENOTYPES_FILENAME
 from orangecontrib.bioinformatics.utils import serverfiles
-
-domain = "dictybase"
-pickle_file = "mutants.pkl"
-tags = ["Dictyostelium discoideum", "mutant", "dictyBase", "phenotype"]
 
 
 class DictyMutant:
-    """
-    A single Dictyostelium discoideum mutant from the Dictybase.
 
-    :param str mutant_entry: A single mutant entry from
-        `curated mutants file <http://dictybase.org/db/cgi-bin/dictyBase/download/download.pl?area=mutant_phenotypes&ID=all-mutants.txt>`_.
+    def __init__(self, mutant_entry):  # type: (str) -> None
+        """ A single Dictyostelium discoideum mutant from the Dictybase.
 
-    :ivar DictyMutant.name: dictyBase ID.
-    :ivar DictyMutant.descriptor: dictyBase strain descriptor.
-    :ivar DictyMutant.genes: all associated genes.
-    :ivar DictyMutant.phenotypes: all associated phenotypes.
+        Args:
+            mutant_entry: A single mutant entry from `curated mutants file
+            <http://dictybase.org/db/cgi-bin/dictyBase/download/download.pl?area=mutant_phenotypes&ID=all-mutants.txt>`_.
+        """
 
-    """
-
-    def __init__(self, mutant_entry):
         mutant = mutant_entry.split("\t")
+
+        # dictyBase ID
         self.name = mutant[0]
+
+        # dictyBase strain descriptor
         self.descriptor = mutant[1]
+
+        # all associated genes
         self.genes = mutant[2].split(" | ")
+
+        # all associated phenotypes
         self.phenotypes = mutant[3].split(" | ")
+
         self.null = False
         self.overexp = False
         self.multiple = False
@@ -41,26 +43,23 @@ class DictyMutant:
 
 
 class DictyMutants:
-    """
-    A collection of Dictybase mutants as a dictionary of
-    :obj:`DictyMutant` objects.
-
-    :param local_database_path: A path for storing
-        D. dictyostelium mutants objects. If `None` then
-        a default database path is used.
-
-    """
-
-    VERSION = 1
-    DEFAULT_DATABASE_PATH = serverfiles.localpath("DictyMutants")  # use a default local folder for storing the genesets
+    DEFAULT_DATABASE_PATH = serverfiles.localpath(DOMAIN)  # use a default local folder for storing the genesets
 
     def __init__(self, local_database_path=None):
-        self.local_database_path = local_database_path if local_database_path is not None else self.DEFAULT_DATABASE_PATH
+        """ A collection of Dictybase mutants as a dictionary of :obj:`DictyMutant` objects.
+
+        Args:
+            local_database_path: A path for storing D. dictyostelium mutants objects. If `None` then
+                                a default database path is used.
+        """
+
+        self.local_database_path = local_database_path \
+            if local_database_path is not None else self.DEFAULT_DATABASE_PATH
 
         if not os.path.exists(self.local_database_path):
             os.mkdir(self.local_database_path)
-        print(serverfiles.localpath_download(domain, pickle_file))
-        self._mutants = pickle.load(open(serverfiles.localpath_download(domain, pickle_file), "rb"))
+
+        self._mutants = pickle.load(open(serverfiles.localpath_download(DOMAIN, PHENOTYPES_FILENAME), "rb"))
 
     def update_file(self, name):
         url = "http://dictybase.org/db/cgi-bin/dictyBase/download/download.pl?area=mutant_phenotypes&ID="
@@ -76,7 +75,7 @@ class DictyMutants:
 
     def load_mutants(self, file):
         data = open(file)
-        # data_header = data.readline()
+        data.readline()  # remove data_header
         data = data.read()
         return data.splitlines()
 
@@ -203,4 +202,6 @@ def download_mutants():
 
 if __name__ == "__main__":
     dicty_mutants = mutants()
-    print(mutant_phenotypes(dicty_mutants[0]))
+    mutant = list(dicty_mutants)[0]
+    print(mutant.name, mutant.descriptor, mutant.genes)
+    print(gene_mutants())
