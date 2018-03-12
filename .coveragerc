@@ -1,0 +1,17 @@
+[run]
+source =
+    orangecontrib/bioinformatics
+omit =
+    orangecontrib/bioinformatics/tests/*
+    orangecontrib/bioinformatics/widgets/*
+    orangecontrib/bioinformatics/__init__.py
+    orangecontrib/bioinformatics/__main__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+
+[html]
+directory = coverage_html_report

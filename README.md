@@ -1,6 +1,10 @@
 Orange3-bioinformatics
 =======================
 
+[![codecov](https://codecov.io/gh/biolab/orange3-bioinformatics/branch/master/graph/badge.svg)](https://codecov.io/gh/biolab/orange3-bioinformatics)
+
+
+
 Orange Bioinformatics extends Orange, a data mining software
 package, with common functionality for bioinformatics. The provided
 functionality can be accessed as a Python library or through a visual
