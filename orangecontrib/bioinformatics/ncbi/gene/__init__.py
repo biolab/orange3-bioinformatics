@@ -10,7 +10,7 @@ from orangecontrib.bioinformatics.utils import serverfiles, ensure_type
 
 
 _no_hits, _single_hit, _multiple_hits = 0, 1, 2
-_source, _symbol, _synonym, _locus = 'External reference', 'Symbol', 'Synonym', 'Locus tag'
+_source, _symbol, _synonym, _locus, _gene_id = 'External reference', 'Symbol', 'Synonym', 'Locus tag', 'NCBI ID'
 gene_matcher_tuple = namedtuple('gene_matcher_tuple', MATCHER_TUPLE_TAGS)
 
 
@@ -145,6 +145,17 @@ class GeneMatcher:
         for gene in self.genes:
             if callback:
                 callback()
+
+            try:
+                ncbi_match = match_input(self._matcher[MAP_GENE_IDS], int(gene.input_name))
+                if ncbi_match:
+                    gene.ncbi_id = ncbi_match[0].gene_id
+                    gene.type_of_match = _gene_id
+                    continue
+            except ValueError:
+                # NCBI ids are stored as Integers. If ValueError is raised, probably not NCBI ID.
+                # We expect unique match here.
+                pass
 
             source_match = match_input(self._matcher[MAP_SOURCES], gene.input_name)
             # ids from different sources are unique. We do not expect to get multiple hits here.
