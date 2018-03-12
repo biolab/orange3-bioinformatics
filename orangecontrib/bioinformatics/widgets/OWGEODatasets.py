@@ -1,9 +1,7 @@
 """ Gene Expression Omnibus datasets widget """
 import glob
-import io
 import os
 import sys
-import tempfile
 import numpy
 import urllib.request as urlrequest
 
@@ -27,7 +25,8 @@ from Orange.widgets.utils.concurrent import ThreadExecutor, Task, methodinvoke
 from Orange.widgets.utils.datacaching import data_hints
 
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics import geo
+from orangecontrib.bioinformatics.geo.utils import gds_ensure_downloaded
+from orangecontrib.bioinformatics.geo.dataset import GDS, GDSInfo, DOMAIN
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
 from orangecontrib.bioinformatics.widgets.utils.data import GENE_NAME, TAX_ID
 
@@ -499,8 +498,8 @@ class OWGEODatasets(OWWidget):
 
             def get_data(gds_id, report_genes, transpose, sample_type, title):
                 gds_ensure_downloaded(gds_id, progress)
-                gds = geo.GDS(gds_id)
-                data = gds.getdata(
+                gds = GDS(gds_id)
+                data = gds.get_data(
                     report_genes=report_genes, transpose=transpose,
                     sample_type=sample_type
                 )
@@ -636,7 +635,7 @@ def get_gds_model(progress=lambda val: None):
 
     :param progress: A progress callback.
     :rval tuple:
-        A tuple of (QStandardItemModel, geo.GDSInfo, [geo.GDS])
+        A tuple of (QStandardItemModel, GDSInfo, [GDS])
 
     .. note::
         The returned QStandardItemModel's thread affinity is set to
@@ -644,9 +643,9 @@ def get_gds_model(progress=lambda val: None):
 
     """
     progress(1)
-    info = geo.GDSInfo()
+    info = GDSInfo()
     search_keys = ["dataset_id", "title", "platform_organism", "description"]
-    cache_dir = serverfiles.localpath(geo.DOMAIN)
+    cache_dir = serverfiles.localpath(DOMAIN)
     gds_link = "http://www.ncbi.nlm.nih.gov/sites/GDSbrowser?acc={0}"
     pm_link = "http://www.ncbi.nlm.nih.gov/pubmed/{0}"
     gds_list = []
@@ -700,134 +699,6 @@ def get_gds_model(progress=lambda val: None):
     if QThread.currentThread() is not QCoreApplication.instance().thread():
         model.moveToThread(QCoreApplication.instance().thread())
     return model, info, gds_list
-
-
-GDS_CACHE_DIR = serverfiles.localpath(geo.DOMAIN)
-
-
-if sys.version_info >= (3, 4):
-    _os_replace = os.replace
-else:
-    if os.name != "posix":
-        def _os_replace(src, dst):
-            try:
-                os.rename(src, dst)
-            except FileExistsError:
-                os.remove(dst)
-                os.rename(src)
-    else:
-        _os_replace = os.rename
-
-
-def gds_is_cached(gdsname):
-    return os.path.isfile(
-        os.path.join(GDS_CACHE_DIR, gdsname + ".soft.gz"))
-
-
-def gds_ensure_downloaded(gdsname, progress=None):
-    """
-    Ensure the GDS dataset is available locally in GDS_CACHE_DIR.
-    """
-    if gds_is_cached(gdsname):
-        return
-    else:
-        gds_download(gdsname, progress=progress)
-
-
-def gds_download(gdsname, progress=None):
-    """
-    Download the GDS dataset into the GDS_CACHE_DIR.
-    """
-    gdsurl = gds_download_url(gdsname)
-    basename = gdsname + ".soft.gz"
-    targetpath = os.path.join(GDS_CACHE_DIR, basename)
-    temp = tempfile.NamedTemporaryFile(
-       prefix=basename + "-", dir=GDS_CACHE_DIR, delete=False)
-    try:
-        retrieve_url(gdsurl, temp, progress=progress)
-    except BaseException as err:
-        try:
-            temp.close()
-            os.remove(temp.name)
-        except (OSError, IOError):
-            pass
-        raise err
-    else:
-        temp.close()
-        _os_replace(temp.name, targetpath)
-
-
-def gds_download_url(gdsname):
-    """Return the download url for a GDS id `gdsname`."""
-    return "ftp://{}/{}/{}.soft.gz".format(geo.FTP_NCBI, geo.FTP_DIR, gdsname)
-
-
-def retrieve_url(url, dstobj, progress=None):
-    """
-    Retrieve an `url` writing it to an open file-like `destobj`.
-
-    Parameters
-    ----------
-    url : str
-        The source url.
-    destobj : file-like object
-        An file-like object opened for writing.
-    progress : (int, int) -> None optional
-        An optional progress callback function. Will be called
-        periodically with `(transfered, total)` bytes count. `total`
-        can be `-1` if the total contents size cannot be
-        determined beforehand.
-    """
-    with urlrequest.urlopen(url, timeout=10) as stream:
-        length = stream.headers.get("content-length", None)
-        if length is not None:
-            length = int(length)
-        copyfileobj(stream, dstobj, size=length, progress=progress)
-
-
-def copyfileobj(src, dst, buffer=2 ** 15, size=None, progress=None):
-    """
-    Like shutil.copyfileobj but with progress reporting.
-
-    Parameters
-    ----------
-    src : file-like object
-        Source file object
-    dst : file-like object
-        Destination file object
-    buffer : buffer size
-        Buffer size
-    size : int optional
-        Total `src` contents size if available.
-    progress : (int, int) -> None
-        An optional progress callback function. Will be called
-        periodically with `(transfered, total)` bytes count. `total`
-        can be `-1` if the total contents size cannot be
-        determined beforehand.
-    """
-    count = 0
-    if size is None:
-        size = sniff_size(src)
-
-    while True:
-        data = src.read(buffer)
-        dst.write(data)
-        count += len(data)
-        if progress is not None:
-            progress(count, size if size is not None else -1)
-        if not data:
-            break
-
-    if size is None and progress is not None:
-        progress(count, count)
-
-    return count
-
-
-def sniff_size(fileobj):
-    if isinstance(fileobj, io.FileIO):
-        return os.fstat(fileobj.fileno()).st_size
-    return None
 
 
 if __name__ == "__main__":

@@ -50,7 +50,7 @@ def hierarchy_tree(tax_id, gene_sets):
         if set_hierarchy:
             collect(col[set_hierarchy[0]], set_hierarchy[1:])
 
-    for hierarchy, t_id, _ in gene_sets:
+    for hierarchy, t_id in gene_sets:
         collect(collection[t_id], hierarchy)
 
     return tax_id, collection[tax_id]
@@ -85,7 +85,7 @@ def get_collections(gene_sets, mapped_genes, partial_result, progress_callback):
 def download_gene_sets(gene_sets, progress_callback):
 
     # get only those sets that are not already downloaded
-    for hierarchy, tax_id in [(hierarchy, tax_id) for hierarchy, tax_id, local in gene_sets if not local]:
+    for hierarchy, tax_id in [(hierarchy, tax_id) for hierarchy, tax_id in gene_sets]:
 
         serverfiles.localpath_download(geneset.DOMAIN, geneset.filename(hierarchy, tax_id),
                                        callback=progress_callback.emit)

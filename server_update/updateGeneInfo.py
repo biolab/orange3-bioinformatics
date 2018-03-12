@@ -7,9 +7,9 @@ import bz2
 from server_update import *
 from server_update.tests.test_GeneInfo import GeneInfo
 from orangecontrib.bioinformatics.ncbi.gene import (
-    DOMAIN, FILENAME, FTP_FILENAME, FTP_URL, TITLE,
-    TAGS, DICTY_GENE_NAMES)
-
+    DOMAIN, FILENAME, FTP_FILENAME, FTP_URL, TITLE, TAGS
+)
+from orangecontrib.bioinformatics.dicty.config import DICTY_INFO_URL, DICTY_MAPPING_URL
 from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids
 from orangecontrib.bioinformatics.ncbi.taxonomy.utils import Taxonomy
 
@@ -70,7 +70,7 @@ init_table = """
 """
 
 gene_info_lines = []
-gene_match_lines = []
+gene_source_lines = []
 gene_names_dictyBase = []
 
 # DOWNLOAD FILES
@@ -80,19 +80,40 @@ with open(os.path.join(domain_path, FTP_FILENAME), 'wb') as f:
     shutil.copyfileobj(stream, f)
 
 print("Downloading dictyBase file ...")
-stream = urlopen(DICTY_GENE_NAMES, timeout=30)
+stream = urlopen(DICTY_INFO_URL, timeout=30)
 with open(os.path.join(domain_path, 'DictyBase'), 'wb') as f:
     shutil.copyfileobj(stream, f)
+
+print("Downloading dictyMappings file ...")
+stream = urlopen(DICTY_MAPPING_URL, timeout=30)
+with open(os.path.join(domain_path, 'DictyMapping'), 'wb') as f:
+    shutil.copyfileobj(stream, f)
+
 
 # PARSE DICTY BASE FILE
 dicty_id, dicty_name = 0, 1
 dictyBase_map = dict()
 
 with open(os.path.join(domain_path, 'DictyBase'), 'r') as f:
-    header = f.readline()
+    f.readline()  # skip header
     for line in f:
-        split_line = line.split('\t')
+        split_line = line.strip().split('\t')
         dictyBase_map[split_line[dicty_id]] = split_line[dicty_name]
+
+
+# PARSE DICTY MAPPINGS FILE
+ddb_id,	ddb_g_id, name, uniProt_id = 0, 1, 2, 3
+dictyMapping_map = dict()
+
+with open(os.path.join(domain_path, 'DictyMapping'), 'r') as f:
+    f.readline()  # skip header
+    for line in f:
+        split_line = line.strip().split('\t')
+        try:
+            dictyMapping_map[split_line[ddb_g_id]] = split_line[uniProt_id]
+        except IndexError:
+            # no uniprot id for this gene
+            pass
 
 
 # PARSE GENE_INFO FILE
@@ -101,15 +122,20 @@ def parse_refs(gene):
 
     for ref in external_ids:
         source, source_id = ref.split(':', 1)
-        gene_match_lines.append([int(gene[tax_id]), int(gene[gene_id]), source, source_id])
+        # gene_source_lines.append([int(gene[tax_id]), int(gene[gene_id]), source, source_id])
 
-        # we want to have gene symbols from source database for dictyBase
         if source == 'dictyBase':
             try:
+                # Update gene symbol column, we want to have gene symbols from source database for dictyBase
                 gene_names_dictyBase.append([int(gene[gene_id]), dictyBase_map[source_id]])
+
+                # add uniProt ID as a source to dicty genes
+                if dictyMapping_map[source_id] is not None:
+                    gene[db_refs] = gene[db_refs] + '|UniProt:' + dictyMapping_map[source_id]
+
             except KeyError:
                 # dictyBase map is constructed from official database source for dicty.
-                # if source_id in ncbi database is not found in that map, it is probably deleted.
+                # if source_id in ncbi database is not found in that map, it is probably deprecated.
                 pass
 
 
@@ -156,8 +182,8 @@ cursor.executemany("INSERT INTO gene_info VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
                      gene[modification_date])
                     for gene in gene_info_lines))
 
-cursor.executemany("INSERT INTO gene_source VALUES (?, ?, ?, ?)",
-                   ([column for column in match] for match in gene_match_lines))
+# cursor.executemany("INSERT INTO gene_source VALUES (?, ?, ?, ?)",
+# ([column for column in match] for match in gene_source_lines))
 
 con.commit()
 

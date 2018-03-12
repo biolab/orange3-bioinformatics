@@ -37,8 +37,8 @@ def name(tax_id):
     """
     # Most of the lookups will be for the common names, so in most
     # situations we can avoid loading the taxonomy.
-    if tax_id in COMMON_NAMES:
-        return COMMON_NAMES[tax_id]
+    if tax_id in COMMON_NAMES_MAPPING:
+        return COMMON_NAMES_MAPPING[tax_id]
     else:
         return Taxonomy()[tax_id]
 
