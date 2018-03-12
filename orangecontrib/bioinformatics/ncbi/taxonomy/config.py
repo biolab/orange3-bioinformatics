@@ -5,6 +5,7 @@ TAXDUMP_URL = "http://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
 DEFAULT_ORGANISM = '9606'
 
 COMMON_NAMES = (
+    ("6500",   "Aplysia californica"),
     ("3702",   "Arabidopsis thaliana"),
     ("9913",   "Bos taurus"),
     ("6239",   "Caenorhabditis elegans"),
@@ -31,6 +32,7 @@ COMMON_NAMES = (
 )
 
 SHORT_NAMES = {
+    "6500":   ["aplysia"],
     "3702":   ["arabidopsis", "thaliana", "plant"],
     "9913":   ["cattle", "cow"],
     "6239":   ["nematode", "roundworm"],
@@ -57,3 +59,4 @@ SHORT_NAMES = {
 
 
 COMMON_NAMES_MAPPING = dict(COMMON_NAMES)
+
