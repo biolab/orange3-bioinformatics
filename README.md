@@ -1,6 +1,6 @@
 Orange3-bioinformatics
 =======================
-
+[![Build Status](https://travis-ci.org/biolab/orange3-bioinformatics.svg?branch=master)](https://travis-ci.org/biolab/orange3-bioinformatics)
 [![codecov](https://codecov.io/gh/biolab/orange3-bioinformatics/branch/master/graph/badge.svg)](https://codecov.io/gh/biolab/orange3-bioinformatics)
 
 
