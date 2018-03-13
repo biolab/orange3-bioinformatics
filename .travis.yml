@@ -1,0 +1,36 @@
+language: python
+sudo: false
+dist: trusty
+
+python:
+  - "3.5"
+  - "3.6"
+
+cache:
+    apt: true
+    pip: true
+    ccache: true
+
+before_install:
+    # use miniconda python.
+    - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+    - bash miniconda.sh -b -p $HOME/miniconda
+    - export PATH="$HOME/miniconda/bin:$PATH"
+    - conda config --set always_yes yes
+    - conda update -q conda
+    - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
+    - source activate test-environment
+    # - python -c 'import sys; print(sys.executable)'
+    - pip install -U setuptools pip wheel
+    - pip install codecov
+
+install:
+    - pip install PyQt5==5.9.2
+    - pip install Orange3
+    - travis_wait pip install -e .
+
+script:
+    - catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" coverage run setup.py test
+
+after_success:
+- codecov
