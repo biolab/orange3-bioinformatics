@@ -15,7 +15,7 @@ from Orange.data import Table
 from Orange.widgets import gui, settings
 from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets.utils.signals import Output
-from Orange.widgets.utils.datacaching import data_hints
+# from Orange.widgets.utils.datacaching import data_hints
 
 from orangecontrib.bioinformatics import resolwe
 from orangecontrib.bioinformatics.utils import environ
@@ -244,8 +244,10 @@ class OWdictyExpress(OWWidget):
         self.setStatusMessage('')
 
         data = etc_to_table(etc_json, self.setTimeVariable)
-        data_hints.set_hint(data, TAX_ID, self.orgnism)
-        data_hints.set_hint(data, GENE_AS_ATTRIBUTE_NAME, self.setTimeVariable)
+
+        data.attributes[TAX_ID] = self.orgnism
+        data.attributes[GENE_AS_ATTRIBUTE_NAME] = self.setTimeVariable
+
         self.Outputs.etc_data.send(data)
 
     def commit(self):

@@ -22,7 +22,6 @@ from Orange.widgets import gui
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.concurrent import ThreadExecutor, Task, methodinvoke
-from Orange.widgets.utils.datacaching import data_hints
 
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.geo.utils import gds_ensure_downloaded
@@ -576,8 +575,8 @@ class OWGEODatasets(OWWidget):
         if message is not None:
             self.warning(0, message)
 
-        data_hints.set_hint(data, TAX_ID, self.currentGds.get("taxid", ""))
-        data_hints.set_hint(data, GENE_AS_ATTRIBUTE_NAME, bool(self.outputRows))
+        data.attributes[TAX_ID] = self.currentGds.get('taxid', '')
+        data.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.outputRows)
 
         data.name = data_name
         self.send("Expression Data", data)

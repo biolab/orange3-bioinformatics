@@ -23,7 +23,6 @@ from Orange.widgets.gui import (
 from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets.utils import itemmodels
 from Orange.widgets.settings import Setting, ContextSetting
-from Orange.widgets.utils.datacaching import data_hints
 from Orange.widgets.utils.signals import Output, Input
 
 from Orange.data import DiscreteVariable, StringVariable, Domain, Table
@@ -205,9 +204,11 @@ class OWGeneSets(OWWidget):
 
     def _update_gene_matcher(self):
         self._gene_names_from_table()
-        if self.gene_matcher:
-            self.gene_matcher.genes = self.input_genes
-            self.gene_matcher.organism = self._get_selected_organism()
+        if not self.gene_matcher:
+            self.gene_matcher = gene.GeneMatcher(self._get_selected_organism())
+
+        self.gene_matcher.genes = self.input_genes
+        self.gene_matcher.organism = self._get_selected_organism()
 
     def on_input_option_change(self):
         self._update_gene_matcher()
@@ -217,7 +218,6 @@ class OWGeneSets(OWWidget):
     def handle_input(self, data):
         if data:
             self.input_data = data
-            self.gene_matcher = gene.GeneMatcher(self._get_selected_organism())
 
             self.gene_column_combobox.clear()
             self.column_candidates = [attr for attr in data.domain.variables + data.domain.metas
@@ -226,8 +226,9 @@ class OWGeneSets(OWWidget):
             for var in self.column_candidates:
                 self.gene_column_combobox.addItem(*attributeItem(var))
 
-            self.tax_id = str(data_hints.get_hint(self.input_data, TAX_ID))
-            self.use_attr_names = data_hints.get_hint(self.input_data, GENE_AS_ATTRIBUTE_NAME, default=self.use_attr_names)
+            self.tax_id = str(self.input_data.attributes.get(TAX_ID, ''))
+            self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.use_attr_names)
+
             self.gene_col_index = min(self.gene_col_index, len(self.column_candidates) - 1)
 
             if self.tax_id in self.organisms:
@@ -526,7 +527,6 @@ class OWGeneSets(OWWidget):
 
         self.data_model.setSortRole(Qt.UserRole)
         self.data_model.setHorizontalHeaderLabels(DATA_HEADER_LABELS)
-
 
     def sizeHint(self):
         return QSize(1280, 960)

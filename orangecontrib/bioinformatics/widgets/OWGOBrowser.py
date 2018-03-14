@@ -10,7 +10,6 @@ import Orange.data
 import logging
 
 
-from requests.exceptions import ConnectTimeout
 from collections import defaultdict
 from functools import reduce
 from concurrent.futures import Future
@@ -32,7 +31,6 @@ from Orange.widgets.utils.concurrent import (
 )
 from Orange.widgets.utils.concurrent import Task
 from Orange.widgets import widget, gui, settings
-from Orange.widgets.utils.datacaching import data_hints
 from orangecontrib.bioinformatics import go
 from orangecontrib.bioinformatics.ncbi import taxonomy
 from orangecontrib.bioinformatics.utils import serverfiles, statistics
@@ -391,7 +389,8 @@ class OWGOBrowser(widget.OWWidget):
             for var in self.candidateGeneAttrs:
                 self.geneAttrIndexCombo.addItem(*gui.attributeItem(var))
 
-            tax_id = data_hints.get_hint(data, TAX_ID, '')
+            tax_id = str(data.attributes.get(TAX_ID, ''))
+
             if tax_id is not None:
                 _c2i = {a.taxid: i for i, a in enumerate(self.availableAnnotations)}
                 try:
@@ -399,7 +398,7 @@ class OWGOBrowser(widget.OWWidget):
                 except KeyError:
                     pass
 
-            self.useAttrNames = data_hints.get_hint(data, GENE_AS_ATTRIBUTE_NAME, default=self.useAttrNames)
+            self.useAttrNames = data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.useAttrNames)
 
             self.geneAttrIndex = min(self.geneAttrIndex, len(self.candidateGeneAttrs) - 1)
             if len(self.candidateGeneAttrs) == 0:
