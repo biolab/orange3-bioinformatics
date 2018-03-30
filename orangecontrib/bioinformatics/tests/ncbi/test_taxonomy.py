@@ -33,9 +33,7 @@ class TestTaxonomy(unittest.TestCase):
         self.assertGreater(len(tax_obj.search('Homo sapiens', exact=True)), 0)
         self.assertGreater(len((tax_obj.lineage(self.human))), 0)
 
-        neanderthal, denisova = tax_obj.get_all_strains(self.human)
-        self.assertEqual(taxonomy.name(neanderthal), 'Homo sapiens neanderthalensis')
-        self.assertEqual(taxonomy.name(denisova), 'Homo sapiens ssp. Denisova')
+        self.assertGreater(len(tax_obj.get_all_strains(self.human)), 2)
 
 
 if __name__ == '__main__':
