@@ -341,7 +341,7 @@ class OWGOBrowser(widget.OWWidget):
                 name=taxonomy.common_taxid_to_name(AnnotationSlot.parse_tax_id(annotation_file)),
                 filename=FILENAME_ANNOTATION.format(AnnotationSlot.parse_tax_id(annotation_file))
             )
-            for _, annotation_file in serverfiles.ServerFiles().listfiles(DOMAIN)
+            for _, annotation_file in set(serverfiles.ServerFiles().listfiles(DOMAIN) + serverfiles.listfiles(DOMAIN))
             if annotation_file != FILENAME_ONTOLOGY
 
         ]
@@ -540,7 +540,7 @@ class OWGOBrowser(widget.OWWidget):
         # otherwise
         assert self.__state == State.Ready
         annotation = self.availableAnnotations[self.annotationIndex]
-        go_files = serverfiles.listfiles(DOMAIN)
+        go_files = [fname for domain, fname in serverfiles.listfiles(DOMAIN)]
         files = []
 
         if annotation.filename not in go_files:
@@ -828,7 +828,14 @@ class OWGOBrowser(widget.OWWidget):
         fromParentDict = {}
         self.termListViewItemDict = {}
         self.listViewItems = []
-        enrichment = lambda t: len(t[0]) / t[2] * (len(self.referenceGenes) / len(self.clusterGenes))
+
+        def enrichment(t):
+            try:
+                return len(t[0]) / t[2] * (len(self.referenceGenes) / len(self.clusterGenes))
+            except ZeroDivisionError:
+                # TODO: find out why this happens
+                return 0
+
         maxFoldEnrichment = max([enrichment(term) for term in self.graph.values()] or [1])
 
         def addNode(term, parent, parentDisplayNode):
