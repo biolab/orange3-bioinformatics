@@ -1,8 +1,9 @@
 """ServerFiles"""
+import os
 import serverfiles
 
 
-from orangecontrib.bioinformatics.utils import buffer_folder
+from orangecontrib.bioinformatics.utils import local_cache
 
 server_url = "http://orange.biolab.si/serverfiles-bio2/"
 
@@ -13,7 +14,7 @@ class ServerFiles(serverfiles.ServerFiles):
         serverfiles.ServerFiles.__init__(self, server)
 
 
-PATH = buffer_folder
+PATH = os.path.join(local_cache, 'serverfiles-bio')
 LOCALFILES = serverfiles.LocalFiles(PATH, serverfiles=ServerFiles())
 
 

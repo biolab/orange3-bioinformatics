@@ -1,13 +1,13 @@
 import os
 
-from . import environ
+from Orange.misc.environ import data_dir
 
 
 def progress_bar_milestones(count, iterations=100):
     return set([int(i*count/float(iterations)) for i in range(iterations)])
 
 
-buffer_folder = os.path.join(environ.buffer_dir, 'serverfiles-bio/')
+local_cache = os.path.join(data_dir(), 'bioinformatics/')
 
 
 def ensure_type(value, types):

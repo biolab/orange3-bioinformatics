@@ -18,7 +18,7 @@ from Orange.widgets.utils.signals import Output
 # from Orange.widgets.utils.datacaching import data_hints
 
 from orangecontrib.bioinformatics import resolwe
-from orangecontrib.bioinformatics.utils import environ
+from orangecontrib.bioinformatics.utils import local_cache
 from orangecontrib.bioinformatics.resolwe.utils import etc_to_table
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
@@ -43,7 +43,7 @@ def h_line():
 
 
 #  Support cache with requests_cache module
-cache_path = os.path.join(environ.buffer_dir, "resolwe")
+cache_path = os.path.join(local_cache, "resolwe")
 
 try:
     os.makedirs(cache_path)

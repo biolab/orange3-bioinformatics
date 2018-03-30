@@ -6,7 +6,7 @@ import sys
 
 from urllib.request import urlopen
 from server_update.common import *
-from orangecontrib.bioinformatics.utils import buffer_folder
+from orangecontrib.bioinformatics.utils import local_cache
 from unittest import TextTestRunner, makeSuite
 
 # create_folder(update_folder)  # before calling utils.serverfiles
@@ -54,10 +54,10 @@ class SyncHelper:
 
     def _allinfo(self):
         # delete old __INFO__.txt from the server
-        subprocess.call(['rsync', '-av', '--delete', '--include=__INFO__', '--exclude=*', buffer_folder, _sync_path])
+        subprocess.call(['rsync', '-av', '--delete', '--include=__INFO__', '--exclude=*', local_cache, _sync_path])
 
         # create new allinfo file
-        info_path = os.path.join(buffer_folder, '__INFO__')
+        info_path = os.path.join(local_cache, '__INFO__')
         with open(info_path, 'wt') as f:
             # we must initialize ServerFiles object again because old one has __INFO__ cached
             json.dump(list(ServerFiles().allinfo().items()), f)
@@ -94,7 +94,7 @@ class SyncHelper:
 
     @staticmethod
     def remove_update_folder():
-        shutil.rmtree(buffer_folder)
+        shutil.rmtree(local_cache)
 
     def sync_files(self):
         """ use rsync to upload file on serverfiles-bio repo (info file included).
