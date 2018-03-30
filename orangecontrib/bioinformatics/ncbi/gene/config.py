@@ -1,6 +1,6 @@
 DOMAIN = 'gene_info'
 FILENAME = 'gene_info.sqlite'
-TITLE = 'NCBI Gene Information'
+TITLE = 'NCBI Gene database'
 TAGS = ['NCBI', 'Gene names', 'Gene Ids', 'Description', 'Essential']
 FTP_FILENAME = 'gene_info.gz'
 FTP_URL = 'ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/gene_info.gz'
