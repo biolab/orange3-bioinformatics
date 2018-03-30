@@ -1,5 +1,5 @@
 from unittest import TestCase
-from orangecontrib.bioinformatics.geo import GDSInfo
+from orangecontrib.bioinformatics.geo.dataset import GDSInfo
 
 
 class GEOTest(TestCase):

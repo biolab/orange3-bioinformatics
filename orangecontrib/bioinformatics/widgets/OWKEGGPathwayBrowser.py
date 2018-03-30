@@ -30,7 +30,7 @@ from Orange.widgets.utils import itemmodels, concurrent
 from orangecontrib.bioinformatics import kegg
 from orangecontrib.bioinformatics import geneset
 from orangecontrib.bioinformatics.utils import statistics
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_NAME
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
 
 
 def relation_list_to_multimap(rellist, ncbi_gene_ids):
@@ -465,7 +465,7 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
                 except Exception as ex:
                     print(ex, taxid)
 
-            self.useAttrNames = data_hints.get_hint(data, GENE_NAME, self.useAttrNames)
+            self.useAttrNames = data_hints.get_hint(data, GENE_AS_ATTRIBUTE_NAME, self.useAttrNames)
 
             if len(self.geneAttrCandidates) == 0:
                 self.useAttrNames = True

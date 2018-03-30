@@ -2,7 +2,7 @@
 import serverfiles
 
 
-from orangecontrib.bioinformatics.utils import serverfile_path
+from orangecontrib.bioinformatics.utils import buffer_folder
 
 server_url = "http://orange.biolab.si/serverfiles-bio2/"
 
@@ -13,7 +13,7 @@ class ServerFiles(serverfiles.ServerFiles):
         serverfiles.ServerFiles.__init__(self, server)
 
 
-PATH = serverfile_path()
+PATH = buffer_folder
 LOCALFILES = serverfiles.LocalFiles(PATH, serverfiles=ServerFiles())
 
 
@@ -21,8 +21,9 @@ def localpath(*args, **kwargs):
     return LOCALFILES.localpath(*args, **kwargs)
 
     
-def listfiles(*args, **kwargs):
-    return [fname for domain, fname in LOCALFILES.listfiles(*args, **kwargs)]
+def listfiles(*args):
+    files = serverfiles.LocalFiles(PATH, serverfiles=ServerFiles())
+    return files.listfiles(*args)
 
 
 def localpath_download(*path, **kwargs):
@@ -30,9 +31,9 @@ def localpath_download(*path, **kwargs):
     return files.localpath_download(*path, **kwargs)
 
 
-def download(*args, **kwargs):
+def download(*path, **kwargs):
     files = serverfiles.LocalFiles(PATH, serverfiles=ServerFiles())
-    return files.download(*args, **kwargs)
+    return files.download(*path, **kwargs)
 
 
 def allinfo(*args, **kwargs):

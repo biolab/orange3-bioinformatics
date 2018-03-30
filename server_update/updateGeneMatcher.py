@@ -62,7 +62,7 @@ for taxonomy_id in common_taxids():
                    MAP_SYMBOLS: defaultdict(list),
                    MAP_SYNONYMS: defaultdict(list),
                    MAP_LOCUS: defaultdict(list)}
-
+    print(taxonomy_id)
     for record in g_db.select_gene_matcher_data(taxonomy_id):
         parse_gene_record(taxonomy_id, gene_mapper, record)
 
@@ -74,9 +74,13 @@ for taxonomy_id in common_taxids():
         shutil.copyfileobj(open(os.path.join(domain_path, MATCHER_FILENAME.format(taxonomy_id)), "rb"), f)
 
     create_info_file(os.path.join(temp_path, MATCHER_FILENAME.format(taxonomy_id)),
+                     domain=DOMAIN,
+                     filename=MATCHER_FILENAME.format(taxonomy_id),
+                     source=SOURCE_SERVER,
                      title=MATCHER_TITLE + ' for ' + common_taxid_to_name(taxonomy_id),
                      tags=MATCHER_TAGS + [taxonomy_id],
-                     uncompressed=uncompressed_size, compression='bz2')
+                     uncompressed=uncompressed_size,
+                     compression='bz2')
 
 con.close()
 

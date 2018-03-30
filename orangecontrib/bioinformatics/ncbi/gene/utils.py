@@ -3,7 +3,6 @@ import os
 import sqlite3
 
 from contextlib import closing
-from itertools import islice
 
 from orangecontrib.bioinformatics.ncbi.gene import DOMAIN, FILENAME
 from orangecontrib.bioinformatics.utils import serverfiles
@@ -49,21 +48,6 @@ def parse_sources(values):
     return out_dict
 
 
-def iter_slice(it, length=100):
-    return [_ for _ in islice(it, length)]
-
-
-def _fetch_organism_strains(organism):
-    """  Return a list of taxonomy ids for given organism and all its strains.
-    """
-    from orangecontrib.bioinformatics.ncbi.taxonomy.utils import Taxonomy
-    tax_obj = Taxonomy()
-    strains = tax_obj.get_all_strains(organism)
-    # append parent tax_id
-    strains.append(organism)
-    return strains
-
-
 class GeneInfoDB:
 
     def __init__(self):
@@ -83,48 +67,29 @@ class GeneInfoDB:
             return cursor.execute('SELECT * FROM gene_info WHERE gene_id = ?', (gene_id,)).fetchone()
 
     def select_genes_by_organism(self, organism):
-        strains = _fetch_organism_strains(organism)
         with closing(self._db_con.cursor()) as cursor:
-            return cursor.execute('SELECT * FROM gene_info '
-                                  'WHERE tax_id in ({})'.format(', '.join('?' for _ in strains)), strains).fetchall()
+            return cursor.execute('SELECT tax_id, gene_id, symbol, synonyms, db_refs, description, locus_tag,'
+                                  'chromosome, map_location, type_of_gene, symbol_from_nomenclature_authority,'
+                                  'full_name_from_nomenclature_authority, nomenclature_status, other_designations,'
+                                  'modification_date FROM gene_info '
+                                  'WHERE species = ?', (organism,)).fetchall()
 
     def select_gene_matcher_data(self, organism):
-        strains = _fetch_organism_strains(organism)
         with closing(self._db_con.cursor()) as cursor:
             return cursor.execute('SELECT tax_id, gene_id, symbol, synonyms, db_refs, locus_tag FROM gene_info '
-                                  'WHERE tax_id in ({})'.format(', '.join('?' for _ in strains)),
-                                  strains).fetchall()
-    '''def has_external_reference(self, gene_id):
-        with closing(self._db_con.cursor()) as cursor:
-            if not cursor.execute('SELECT gene_id FROM gene_match WHERE gene_id = ?', (gene_id,)).fetchall():
-                return False
-            return True
-
-    def match_symbol(self, gene, tax_id):
-        with closing(self._db_con.cursor()) as cursor:
-            return cursor.execute('SELECT gene_id, symbol FROM gene_info WHERE symbol = ? AND tax_id = ?',
-                                  (gene, tax_id)).fetchall()
-
-    def match_synonym(self, gene, tax_id):
-        with closing(self._db_con.cursor()) as cursor:
-            synonym_tag = '%|' + gene + '|%'
-            return cursor.execute('SELECT gene_id FROM gene_info WHERE synonyms LIKE ? AND tax_id = ?',
-                                  (synonym_tag, tax_id)).fetchall()
-
-    def match_source_id(self, gene, tax_id):
-        with closing(self._db_con.cursor()) as cursor:
-            return cursor.execute('SELECT gene_id, source_id FROM gene_match WHERE source_id = ? AND tax_id = ?',
-                                  (gene, tax_id)).fetchall()'''
+                                  'WHERE species = ?', (organism,)).fetchall()
 
     def __del__(self):
         self._db_con.close()
 
 
 if __name__ == "__main__":
+
     def main():
         test = GeneInfoDB()
-        genes = test.select_gene_matcher_data("9606")
+        genes = test.select_gene_matcher_data("562")
         print(type(genes), len(genes), genes[0])
-
+        sel_genes = test.select_genes_by_organism('562')
+        print(type(sel_genes), len(sel_genes), sel_genes[0])
 
     main()

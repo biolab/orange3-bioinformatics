@@ -99,6 +99,15 @@ class Taxonomy:
     def lineage(self, taxid):
         return self._tax.lineage(taxid)
 
+    def get_species(self, taxid):
+        linage = self.lineage(taxid)
+        for tax in linage:
+            if self.rank(tax) == 'species':
+                return tax
+
+        if self.rank(taxid) == 'species':
+            return taxid
+
     def get_all_strains(self, tax_id):
         return self._tax.strains(tax_id)
 
@@ -344,5 +353,7 @@ if __name__ == "__main__":
         test = Taxonomy()
         strains = test.get_all_strains("562")
         print(strains)
+        #print(test.lineage('1005443'))
+        #print(test.get_species('1005443'))
 
     main()

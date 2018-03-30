@@ -20,7 +20,7 @@ from Orange.widgets.utils.datacaching import data_hints
 from orangecontrib.bioinformatics import resolwe
 from orangecontrib.bioinformatics.utils import environ
 from orangecontrib.bioinformatics.resolwe.utils import etc_to_table
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_NAME
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 
 
@@ -245,7 +245,7 @@ class OWdictyExpress(OWWidget):
 
         data = etc_to_table(etc_json, self.setTimeVariable)
         data_hints.set_hint(data, TAX_ID, self.orgnism)
-        data_hints.set_hint(data, GENE_NAME, self.setTimeVariable)
+        data_hints.set_hint(data, GENE_AS_ATTRIBUTE_NAME, self.setTimeVariable)
         self.Outputs.etc_data.send(data)
 
     def commit(self):

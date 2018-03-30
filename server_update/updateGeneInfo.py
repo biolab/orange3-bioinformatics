@@ -29,19 +29,21 @@ create_folder(domain_path)
 create_folder(temp_path)
 parent_tax_ids = common_taxids()
 
-# we must include all strains of organism. Genes refer to specific strain and not to parent organism
+# we must include all strains of organism. Genes refer to specific strain of an organism
 tax_ids = []
+map_strain_to_species = {}
 tax_obj = Taxonomy()
 for parent_id in parent_tax_ids:
     strains = tax_obj.get_all_strains(parent_id)
     tax_ids.append(parent_id)
-    # print(parent_id, len(strains))
+
     if strains:
         [tax_ids.append(strain_id) for strain_id in strains]
 
 
 init_table = """ 
  CREATE TABLE "gene_info" ( 
+    species INTEGER NOT NULL,
     tax_id INTEGER NOT NULL, 
     gene_id INTEGER NOT NULL UNIQUE, 
     symbol INTEGER NOT NULL,
@@ -164,8 +166,9 @@ for table in ["gene_info", "gene_source"]:
 
 cursor.executescript(init_table)
 
-cursor.executemany("INSERT INTO gene_info VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                   ((int(gene[tax_id]),
+cursor.executemany("INSERT INTO gene_info VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   ((int(tax_obj.get_species(gene[tax_id])),
+                     int(gene[tax_id]),
                      int(gene[gene_id]),
                      gene[symbol],
                      gene[synonyms],
@@ -200,7 +203,15 @@ db_size = os.stat(file_path).st_size  # store uncompressed database size
 
 with bz2.BZ2File(os.path.join(temp_path, FILENAME), mode='w', compresslevel=9) as f:
     shutil.copyfileobj(open(os.path.join(domain_path, FILENAME), 'rb'), f)
-create_info_file(os.path.join(temp_path, FILENAME), title=TITLE, tags=TAGS, uncompressed=db_size, compression='bz2')
+
+create_info_file(os.path.join(temp_path, FILENAME),
+                 domain=DOMAIN,
+                 filename=FILENAME,
+                 source=SOURCE_SERVER,
+                 title=TITLE,
+                 tags=TAGS,
+                 uncompressed=db_size,
+                 compression='bz2')
 
 helper = SyncHelper(DOMAIN, GeneInfo)
 
