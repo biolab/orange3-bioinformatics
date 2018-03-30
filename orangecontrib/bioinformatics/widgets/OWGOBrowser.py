@@ -36,7 +36,7 @@ from Orange.widgets.utils.datacaching import data_hints
 from orangecontrib.bioinformatics import go
 from orangecontrib.bioinformatics.ncbi import taxonomy
 from orangecontrib.bioinformatics.utils import serverfiles, statistics
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_NAME, TAX_ID
+from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME, TAX_ID
 from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY, FILENAME_ANNOTATION
 
 
@@ -399,7 +399,7 @@ class OWGOBrowser(widget.OWWidget):
                 except KeyError:
                     pass
 
-            self.useAttrNames = data_hints.get_hint(data, GENE_NAME, default=self.useAttrNames)
+            self.useAttrNames = data_hints.get_hint(data, GENE_AS_ATTRIBUTE_NAME, default=self.useAttrNames)
 
             self.geneAttrIndex = min(self.geneAttrIndex, len(self.candidateGeneAttrs) - 1)
             if len(self.candidateGeneAttrs) == 0:

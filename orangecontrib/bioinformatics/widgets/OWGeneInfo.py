@@ -22,7 +22,7 @@ from Orange.widgets.utils.signals import Output, Input
 
 from orangecontrib.bioinformatics.ncbi import gene, taxonomy
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_NAME
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
 from orangecontrib.bioinformatics.widgets.utils.data import append_columns
 
 
@@ -305,7 +305,7 @@ class OWGeneInfo(widget.OWWidget):
                 self.geneAttrComboBox.addItem(*gui.attributeItem(var))
 
             self.taxid = str(data_hints.get_hint(self.data, TAX_ID))
-            self.useAttr = data_hints.get_hint(self.data, GENE_NAME, default=self.useAttr)
+            self.useAttr = data_hints.get_hint(self.data, GENE_AS_ATTRIBUTE_NAME, default=self.useAttr)
             self.gene_attr = min(self.gene_attr, len(self.attributes) - 1)
 
             if self.taxid in self.organisms:

@@ -28,7 +28,7 @@ from Orange.widgets.utils.signals import Output, Input
 
 from Orange.data import DiscreteVariable, StringVariable, Domain, Table
 
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_NAME
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.ncbi import gene, taxonomy
@@ -227,7 +227,7 @@ class OWGeneSets(OWWidget):
                 self.gene_column_combobox.addItem(*attributeItem(var))
 
             self.tax_id = str(data_hints.get_hint(self.input_data, TAX_ID))
-            self.use_attr_names = data_hints.get_hint(self.input_data, GENE_NAME, default=self.use_attr_names)
+            self.use_attr_names = data_hints.get_hint(self.input_data, GENE_AS_ATTRIBUTE_NAME, default=self.use_attr_names)
             self.gene_col_index = min(self.gene_col_index, len(self.column_candidates) - 1)
 
             if self.tax_id in self.organisms:

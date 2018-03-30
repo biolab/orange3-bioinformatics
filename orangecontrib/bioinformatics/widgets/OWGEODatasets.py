@@ -28,7 +28,7 @@ from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.geo.utils import gds_ensure_downloaded
 from orangecontrib.bioinformatics.geo.dataset import GDS, GDSInfo, DOMAIN
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_NAME, TAX_ID
+from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME, TAX_ID
 
 
 TextFilterRole = next(gui.OrangeUserRole)
@@ -577,7 +577,7 @@ class OWGEODatasets(OWWidget):
             self.warning(0, message)
 
         data_hints.set_hint(data, TAX_ID, self.currentGds.get("taxid", ""))
-        data_hints.set_hint(data, GENE_NAME, bool(self.outputRows))
+        data_hints.set_hint(data, GENE_AS_ATTRIBUTE_NAME, bool(self.outputRows))
 
         data.name = data_name
         self.send("Expression Data", data)

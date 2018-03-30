@@ -23,7 +23,7 @@ from Orange.widgets.utils.datacaching import data_hints
 
 from orangecontrib.bioinformatics.widgets.utils.settings import SetContextHandler
 from orangecontrib.bioinformatics.widgets.utils import gui as guiutils
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_NAME
+from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME
 
 
 def score_fold_change(a, b, axis=0):
@@ -769,7 +769,7 @@ class OWDifferentialExpression(widget.OWWidget):
             # Initialize the selected groups/labels.
             # Default selected group key
             index = 0
-            rowshint = data_hints.get_hint(data, GENE_NAME, False)
+            rowshint = data_hints.get_hint(data, GENE_AS_ATTRIBUTE_NAME, False)
 
             if not rowshint:
                 # Select the first row group split candidate (if available)

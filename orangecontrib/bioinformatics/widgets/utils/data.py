@@ -7,11 +7,11 @@ from operator import itemgetter
 from typing import Sequence, Tuple
 
 # Data hints variables
-TAX_ID = 'Taxonomy_id'
+TAX_ID = 'taxonomy_id'
 
 # Will be set to True if gene names are represented as attribute names.
 # If gene names are in rows, we set this value to False. (user must select proper column index)
-GENE_NAME = 'gene_as_attribute_name'
+GENE_AS_ATTRIBUTE_NAME = 'gene_as_attribute_name'
 
 
 col_spec = Sequence[Tuple[Orange.data.Variable, Sequence[numbers.Real]]]
