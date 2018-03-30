@@ -33,7 +33,7 @@ class TestTaxonomy(unittest.TestCase):
         self.assertGreater(len(tax_obj.search('Homo sapiens', exact=True)), 0)
         self.assertGreater(len((tax_obj.lineage(self.human))), 0)
 
-        self.assertGreater(len(tax_obj.get_all_strains(self.human)), 2)
+        self.assertGreater(len(tax_obj.get_all_strains(self.human)), 0)
 
 
 if __name__ == '__main__':

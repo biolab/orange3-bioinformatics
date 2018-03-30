@@ -7,8 +7,7 @@ FTP_URL = 'ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/gene_info.gz'
 
 
 # NCBI_INFO - order is important
-GENE_INFO_TAGS = ['species',
-                  'tax_id',
+GENE_INFO_TAGS = ['tax_id',
                   'gene_id',
                   'symbol',
                   'synonyms',

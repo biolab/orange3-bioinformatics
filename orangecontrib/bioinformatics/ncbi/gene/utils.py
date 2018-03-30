@@ -42,6 +42,7 @@ def parse_sources(values):
 
     for ref in external_ids:
         if ref != '-':
+
             source_dest, source_id = ref.split(':', 1)
             out_dict[source_dest] = source_id
 
@@ -64,7 +65,11 @@ class GeneInfoDB:
 
     def select_gene_info(self, gene_id):
         with closing(self._db_con.cursor()) as cursor:
-            return cursor.execute('SELECT * FROM gene_info WHERE gene_id = ?', (gene_id,)).fetchone()
+            return cursor.execute('SELECT tax_id, gene_id, symbol, synonyms, db_refs, description, locus_tag,'
+                                  'chromosome, map_location, type_of_gene, symbol_from_nomenclature_authority,'
+                                  'full_name_from_nomenclature_authority, nomenclature_status, other_designations,'
+                                  'modification_date FROM gene_info '
+                                  'WHERE gene_id = ?', (gene_id,)).fetchone()
 
     def select_genes_by_organism(self, organism):
         with closing(self._db_con.cursor()) as cursor:
