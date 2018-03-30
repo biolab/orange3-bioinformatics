@@ -15,7 +15,6 @@ from AnyQt.QtCore import (
     QModelIndex, QItemSelection, QItemSelectionModel, Slot
 )
 
-from Orange.widgets.utils.datacaching import data_hints
 from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils.concurrent import ThreadExecutor, Task, methodinvoke
 from Orange.widgets.utils.signals import Output, Input
@@ -304,8 +303,9 @@ class OWGeneInfo(widget.OWWidget):
             for var in self.attributes:
                 self.geneAttrComboBox.addItem(*gui.attributeItem(var))
 
-            self.taxid = str(data_hints.get_hint(self.data, TAX_ID))
-            self.useAttr = data_hints.get_hint(self.data, GENE_AS_ATTRIBUTE_NAME, default=self.useAttr)
+            self.taxid = str(self.data.attributes.get(TAX_ID, ''))
+            self.useAttr = self.data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.useAttr)
+
             self.gene_attr = min(self.gene_attr, len(self.attributes) - 1)
 
             if self.taxid in self.organisms:

@@ -68,7 +68,8 @@ for taxonomy_id in common_taxids():
 
     with open(os.path.join(domain_path, MATCHER_FILENAME.format(taxonomy_id)), 'wb') as file:
         pickle.dump(gene_mapper, file, protocol=pickle.HIGHEST_PROTOCOL)
-        uncompressed_size = os.stat(os.path.join(domain_path, MATCHER_FILENAME.format(taxonomy_id))).st_size
+
+    uncompressed_size = os.stat(os.path.join(domain_path, MATCHER_FILENAME.format(taxonomy_id))).st_size
 
     with bz2.BZ2File(os.path.join(temp_path, MATCHER_FILENAME.format(taxonomy_id)), mode='w', compresslevel=9) as f:
         shutil.copyfileobj(open(os.path.join(domain_path, MATCHER_FILENAME.format(taxonomy_id)), "rb"), f)
@@ -81,6 +82,7 @@ for taxonomy_id in common_taxids():
                      tags=MATCHER_TAGS + [taxonomy_id],
                      uncompressed=uncompressed_size,
                      compression='bz2')
+
 
 con.close()
 

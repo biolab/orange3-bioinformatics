@@ -21,9 +21,6 @@ from AnyQt.QtGui import (
 )
 from AnyQt.QtCore import Qt, QRectF, QSize, Slot, QItemSelectionModel
 
-
-from Orange.widgets.utils.datacaching import data_hints
-
 from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils import itemmodels, concurrent
 
@@ -31,6 +28,7 @@ from orangecontrib.bioinformatics import kegg
 from orangecontrib.bioinformatics import geneset
 from orangecontrib.bioinformatics.utils import statistics
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
+from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
 
 
 def relation_list_to_multimap(rellist, ncbi_gene_ids):
@@ -457,7 +455,8 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
             self.geneAttrIndex = imax
 
-            taxid = data_hints.get_hint(data, TAX_ID, None)
+            taxid = str(data.attributes.get(TAX_ID, ''))
+
             if taxid:
                 try:
                     code = kegg.from_taxid(taxid)
@@ -465,7 +464,7 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
                 except Exception as ex:
                     print(ex, taxid)
 
-            self.useAttrNames = data_hints.get_hint(data, GENE_AS_ATTRIBUTE_NAME, self.useAttrNames)
+            self.useAttrNames = data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.useAttrNames)
 
             if len(self.geneAttrCandidates) == 0:
                 self.useAttrNames = True
@@ -675,7 +674,6 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
         org_code = self.SelectedOrganismCode()
 
-        from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
         gm = GeneMatcher(kegg.to_taxid(org_code))
         gm.genes = genes
         gm.run_matcher()
@@ -708,7 +706,8 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
             kegg_sets = relation_list_to_multimap(linkmap, dict((gene.upper(), ncbi.split(':')[-1])
                                                                 for ncbi, gene in converted_ids))
 
-            kegg_sets = geneset.GeneSets(input=kegg_sets)
+            kegg_sets = geneset.GeneSets(sets=[geneset.GeneSet(gs_id=ddi, genes=set(genes))
+                                               for ddi, genes in kegg_sets.items()])
 
             pathways = pathway_enrichment(
                 kegg_sets, unique_genes.values(),
@@ -896,7 +895,7 @@ def pathway_enrichment(genesets, genes, reference, prob=None, callback=None):
         n = len(genes)
         if k:
             p_val = prob.p_value(k, N, m, n)
-            result_sets.append((gs.id, cluster, ref))
+            result_sets.append((gs.gs_id, cluster, ref))
             p_values.append(p_val)
         if callback is not None:
             callback(100.0 * i / len(genesets))
