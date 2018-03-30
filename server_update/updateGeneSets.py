@@ -1,6 +1,7 @@
 """ update gene_sets """
 import server_update
 
+from server_update import SOURCE_SERVER
 from server_update.tests.test_GeneSets import GeneSetsTest
 
 
@@ -10,7 +11,8 @@ from zipfile import ZipFile
 
 from urllib.request import urlopen
 from server_update import create_folder, sf_local, create_info_file
-from orangecontrib.bioinformatics import go, kegg, omim, dicty
+from orangecontrib.bioinformatics import go, kegg, omim
+from orangecontrib.bioinformatics.dicty import phenotypes
 from orangecontrib.bioinformatics.kegg import caching
 from orangecontrib.bioinformatics.ncbi import taxonomy
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
@@ -55,7 +57,7 @@ def kegg_gene_sets(org):
 
     for id in kegg_org.pathways():
         pway = kegg.KEGGPathway(id)
-        hier = ('KEGG', 'pathways')
+        hier = ('KEGG', 'Pathways')
 
         if pway.pathway_attributes():
             kegg_names = kegg_org.get_genes_by_pathway(id)
@@ -88,9 +90,9 @@ def dicty_mutant_gene_sets(org):
         gene_sets = []
         gene_matcher = GeneMatcher('352472')
 
-        for phenotype, mutants in dicty.phenotypes.phenotype_mutants().items():
-
-            gene_symbols = [dicty.phenotypes.mutant_genes(mutant)[0] for mutant in mutants]
+        for phenotype, mutants in phenotypes.phenotype_mutants().items():
+            print(phenotype, mutants)
+            gene_symbols = [phenotypes.mutant_genes(mutant)[0] for mutant in mutants]
             gene_matcher.genes = gene_symbols
             gene_matcher.run_matcher()
             genes = []
@@ -168,7 +170,7 @@ def reactome_gene_sets(org):
                     gs = GeneSet(gs_id=path.split('\t')[0],
                                  name=path.split('\t')[0],
                                  genes=genes,
-                                 hierarchy=('Reactome', 'Pathways'),
+                                 hierarchy=('Reactome', 'pathways'),
                                  organism='9606', link='')
 
                     genesets.append(gs)
@@ -218,7 +220,12 @@ def register_serverfiles(genesets):
 
         tags = list(hierarchy) + ["gene sets"] + ([taxname] if org is not None else []) + taxonomy.shortname(org)
         genesets.to_gmt_file_format(file_path)
-        create_info_file(file_path, title=title, tags=tags)
+        create_info_file(file_path,
+                         domain=DOMAIN,
+                         filename=fn,
+                         source=SOURCE_SERVER,
+                         title=title,
+                         tags=tags)
 
 
 def upload_genesets():

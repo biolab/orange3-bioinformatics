@@ -81,7 +81,12 @@ if len(gds_names):
             skipped.append(gds_name)
 
     # update .info file
-    create_info_file(localfile, title=TITLE, tags=TAGS)
+    create_info_file(localfile,
+                     domain=DOMAIN,
+                     filename=GDS_INFO,
+                     source=SOURCE_SERVER,
+                     title=TITLE,
+                     tags=TAGS)
 
     print("GDS data sets: %d" % len(gds_info))
     print("Organisms:")
@@ -98,3 +103,4 @@ if len(gds_names):
 else:
     helper.remove_update_folder()
     sys.exit(up_to_date)
+

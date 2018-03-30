@@ -1,5 +1,4 @@
 """ GO update """
-import os
 import gzip
 import bz2
 
@@ -14,7 +13,7 @@ from orangecontrib.bioinformatics.go.config import (
     ONTOLOGY_TITLE, ONTOLOGY_TAGS
 )
 
-from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids, Taxonomy
+from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids, Taxonomy, common_taxid_to_name
 
 
 domain_path = sf_local.localpath(DOMAIN)
@@ -33,7 +32,11 @@ with open(os.path.join(domain_path, FILENAME_ONTOLOGY), 'wb') as f:
 with bz2.BZ2File(os.path.join(temp_path, FILENAME_ONTOLOGY), mode='w', compresslevel=9) as f_compressed:
     shutil.copyfileobj(open(os.path.join(domain_path, FILENAME_ONTOLOGY), 'rb'), f_compressed)
 
-create_info_file(os.path.join(temp_path, FILENAME_ONTOLOGY), title=ONTOLOGY_TITLE,
+create_info_file(os.path.join(temp_path, FILENAME_ONTOLOGY),
+                 domain=DOMAIN,
+                 filename=FILENAME_ONTOLOGY,
+                 source=SOURCE_SERVER,
+                 title=ONTOLOGY_TITLE,
                  tags=ONTOLOGY_TAGS,
                  uncompressed=db_size,
                  compression='bz2')
@@ -67,7 +70,7 @@ with gzip.open(os.path.join(domain_path, FTP_FILE_ANNOTATIONS), 'rb') as gene2go
 for org, lines in store_lines_by_taxid.items():
     filename = FILENAME_ANNOTATION.format(org)
     FILE_PATH = os.path.join(domain_path, filename)
-    TITLE = "GO Annotations for " + org
+    TITLE = "GO Annotations for " + common_taxid_to_name(org)
     TAGS = ["gene", "annotation", "ontology", "GO", org]
 
     with open(FILE_PATH, 'wb') as f:
@@ -79,7 +82,14 @@ for org, lines in store_lines_by_taxid.items():
     with bz2.BZ2File(os.path.join(temp_path, filename), mode='w', compresslevel=9) as f_compressed:
         shutil.copyfileobj(open(os.path.join(domain_path, filename), 'rb'), f_compressed)
 
-    create_info_file(os.path.join(temp_path, filename), title=TITLE, tags=TAGS, uncompressed=db_size, compression='bz2')
+    create_info_file(os.path.join(temp_path, filename),
+                     domain=DOMAIN,
+                     filename=filename,
+                     source=SOURCE_SERVER,
+                     title=TITLE,
+                     tags=TAGS,
+                     uncompressed=db_size,
+                     compression='bz2')
 
 
 helper = SyncHelper(DOMAIN, GOTest)

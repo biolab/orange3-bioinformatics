@@ -6,10 +6,10 @@ import sys
 
 from urllib.request import urlopen
 from server_update.common import *
-from orangecontrib.bioinformatics.utils import update_folder
+from orangecontrib.bioinformatics.utils import buffer_folder
 from unittest import TextTestRunner, makeSuite
 
-create_folder(update_folder)  # before calling utils.serverfiles
+# create_folder(update_folder)  # before calling utils.serverfiles
 from orangecontrib.bioinformatics.utils.serverfiles import ServerFiles, LOCALFILES, PATH
 
 print(PATH)
@@ -23,6 +23,10 @@ sf_server = ServerFiles()
 sf_local = LOCALFILES
 sf_temp = 'temp'
 _sync_path = 'serverfiles-bio@orange.biolab.si:/serverfiles-bio2'
+
+# File sources
+SOURCE_SERVER = 'server_file'  # files on the serverfiles-bio repository
+SOURCE_USER = 'user_file'      # user defined files
 
 
 def sf_last_modified(domain, filename):
@@ -50,10 +54,10 @@ class SyncHelper:
 
     def _allinfo(self):
         # delete old __INFO__.txt from the server
-        subprocess.call(['rsync', '-av', '--delete', '--include=__INFO__', '--exclude=*', update_folder, _sync_path])
+        subprocess.call(['rsync', '-av', '--delete', '--include=__INFO__', '--exclude=*', buffer_folder, _sync_path])
 
         # create new allinfo file
-        info_path = os.path.join(update_folder, '__INFO__')
+        info_path = os.path.join(buffer_folder, '__INFO__')
         with open(info_path, 'wt') as f:
             # we must initialize ServerFiles object again because old one has __INFO__ cached
             json.dump(list(ServerFiles().allinfo().items()), f)
@@ -90,7 +94,7 @@ class SyncHelper:
 
     @staticmethod
     def remove_update_folder():
-        shutil.rmtree(update_folder)
+        shutil.rmtree(buffer_folder)
 
     def sync_files(self):
         """ use rsync to upload file on serverfiles-bio repo (info file included).

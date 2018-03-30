@@ -12,12 +12,12 @@ from server_update.tests.test_Taxonomy import TaxonomyTest
 
 DOMAIN = taxonomy.DOMAIN
 FILENAME = taxonomy.FILENAME
-TITLE = "NCBI Taxonomy"
-TAGS = ["NCBI", "taxonomy", "organism names", "essential"]
+TITLE = "NCBI Taxonomy database"
+TAGS = ["NCBI", "taxonomy", "organism", 'taxid']
 helper = SyncHelper(DOMAIN, TaxonomyTest)
 
 #if not http_last_modified(taxonomy.TAXDUMP_URL) > sf_last_modified(DOMAIN, FILENAME):
-    # remove update folder
+# remove update folder
 #    helper.remove_update_folder()
 #    sys.exit(up_to_date)
 
@@ -37,7 +37,14 @@ db_size = os.stat(db_filename).st_size  # store uncompressed database size
 
 with bz2.BZ2File(os.path.join(temp_path, FILENAME), mode="w", compresslevel=9) as f:
     shutil.copyfileobj(open(db_filename, "rb"), f)
-create_info_file(os.path.join(temp_path, FILENAME), title=TITLE, tags=TAGS, uncompressed=db_size, compression='bz2')
+create_info_file(os.path.join(temp_path, FILENAME),
+                 domain=DOMAIN,
+                 filename=FILENAME,
+                 source=SOURCE_SERVER,
+                 title=TITLE,
+                 tags=TAGS,
+                 uncompressed=db_size,
+                 compression='bz2')
 
 # sync files with remote server
 helper.run_tests()
