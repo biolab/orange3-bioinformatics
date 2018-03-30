@@ -289,10 +289,13 @@ class CustomTreeItem(QTreeWidgetItem):
     def set_rows(self, row):
         for index, label in enumerate(Labels):
             if index > 0:
-                if type(row[label[0]]["value"]) == list:
-                    self.setText(index, row[label[0]]["value"][0]["name"])
-                else:
-                    self.setText(index, row[label[0]]["value"])
+                try:
+                    if type(row[label[0]]["value"]) == list:
+                        self.setText(index, row[label[0]]["value"][0]["name"])
+                    else:
+                        self.setText(index, row[label[0]]["value"])
+                except IndexError:
+                    self.setText(index, 'No data')
 
 
 if __name__ == "__main__":
