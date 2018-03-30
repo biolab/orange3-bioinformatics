@@ -11,7 +11,8 @@ def list_all(**kwargs):
     """
     organism = kwargs.get("organism", None)
 
-    all_available = [filename_parse(f_name) for domain, f_name in serverfiles.ServerFiles().listfiles(DOMAIN)]
+    all_available = [filename_parse(f_name) for domain, f_name
+                     in serverfiles.ServerFiles().listfiles(DOMAIN) + serverfiles.listfiles(DOMAIN)]
     if organism:
         return [(hier, org) for hier, org in all_available if org == organism]
     else:
