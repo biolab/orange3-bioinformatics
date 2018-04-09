@@ -1,7 +1,7 @@
 """ NCBI GeneInformation module """
 import pickle
 
-from collections import namedtuple
+from collections import defaultdict
 from typing import List
 
 from orangecontrib.bioinformatics.ncbi.gene.config import *
@@ -10,8 +10,8 @@ from orangecontrib.bioinformatics.utils import serverfiles, ensure_type
 
 
 _no_hits, _single_hit, _multiple_hits = 0, 1, 2
-_source, _symbol, _synonym, _locus, _gene_id = 'External reference', 'Symbol', 'Synonym', 'Locus tag', 'NCBI ID'
-gene_matcher_tuple = namedtuple('gene_matcher_tuple', MATCHER_TUPLE_TAGS)
+_source, _symbol, _synonym, _locus, _gene_id, _nom_symbol = \
+    'External reference', 'Symbol', 'Synonym', 'Locus tag', 'NCBI ID', 'Nomenclature symbol'
 
 
 class NoGeneNamesException(Exception):
@@ -92,10 +92,11 @@ class GeneInfo(dict):
 
 class GeneMatcher:
 
-    def __init__(self,  tax_id):
+    def __init__(self,  tax_id, **kwargs):
         self._organism = ensure_type(tax_id, str)  # type: str
         self._genes = []                           # type: (List[str])
 
+        self._case_insensitive = kwargs.get("case_insensitive", False)
         self._matcher = self.load_matcher_file(DOMAIN, MATCHER_FILENAME.format(tax_id))
 
     @property
@@ -121,14 +122,25 @@ class GeneMatcher:
     def map_input_to_ncbi(self):
         return {gene.input_name: gene.ncbi_id for gene in self.genes if gene.ncbi_id}
 
+    def match_table_attributes(self, data_table):
+        input_gene_names = [var.name for var in data_table.domain.attributes]
+
+        if input_gene_names:
+            self.genes = input_gene_names
+            self.run_matcher()
+
+            for gene in self.genes:
+                if gene.ncbi_id:
+                    data_table.domain[gene.input_name].attributes[MAP_GENE_ID] = gene.ncbi_id
+                else:
+                    data_table.domain[gene.input_name].attributes[MAP_GENE_ID] = '?'
+
     def run_matcher(self, progress_callback=None):
         """ This will try to match genes, with ncbi ids, based on provided input of genes.
 
 
         Args:
             progress_callback: Used for progress bar in widgets. It emits the signal back to main thread
-
-        Returns:
 
         """
         if progress_callback:
@@ -147,9 +159,9 @@ class GeneMatcher:
                 callback()
 
             try:
-                ncbi_match = match_input(self._matcher[MAP_GENE_IDS], int(gene.input_name))
+                ncbi_match = match_input(self._matcher[MAP_GENE_ID], int(gene.input_name))
                 if ncbi_match:
-                    gene.ncbi_id = ncbi_match[0].gene_id
+                    gene.ncbi_id = ncbi_match[0][MAP_GENE_ID]
                     gene.type_of_match = _gene_id
                     continue
             except ValueError:
@@ -161,13 +173,13 @@ class GeneMatcher:
             # ids from different sources are unique. We do not expect to get multiple hits here.
             # There is exceptions with organism 3702. It has same source id from Araport or TAIR databases.
             if source_match:
-                gene.ncbi_id = source_match[0].gene_id
+                gene.ncbi_id = source_match[0][MAP_GENE_ID]
                 gene.type_of_match = _source
                 continue
 
-            symbol_match = match_input(self._matcher[MAP_SYMBOLS], gene.input_name)
+            symbol_match = match_input(self._matcher[MAP_SYMBOL], gene.input_name)
             if len(symbol_match) == _single_hit:
-                gene.ncbi_id = symbol_match[0].gene_id
+                gene.ncbi_id = symbol_match[0][MAP_GENE_ID]
                 gene.type_of_match = _symbol
                 continue
             elif len(symbol_match) >= _multiple_hits:
@@ -175,7 +187,7 @@ class GeneMatcher:
 
             locus_match = match_input(self._matcher[MAP_LOCUS], gene.input_name)
             if len(locus_match) == _single_hit:
-                gene.ncbi_id = locus_match[0].gene_id
+                gene.ncbi_id = locus_match[0][MAP_GENE_ID]
                 gene.type_of_match = _locus
                 continue
             elif len(symbol_match) >= _multiple_hits:
@@ -183,19 +195,60 @@ class GeneMatcher:
 
             synonym_match = match_input(self._matcher[MAP_SYNONYMS], gene.input_name)
             if len(synonym_match) == _single_hit:
-                gene.ncbi_id = synonym_match[0].gene_id
+                gene.ncbi_id = synonym_match[0][MAP_GENE_ID]
                 gene.type_of_match = _synonym
                 continue
             elif len(synonym_match) >= _multiple_hits:
                 gene.possible_hits = synonym_match
 
-    @classmethod
-    def load_matcher_file(cls, domain, filename):
+            nomenclature_match = match_input(self._matcher[MAP_NOMENCLATURE], gene.input_name)
+            if len(nomenclature_match) == _single_hit:
+                gene.ncbi_id = nomenclature_match[0][MAP_GENE_ID]
+                gene.type_of_match = _nom_symbol
+                continue
+            elif len(nomenclature_match) >= _multiple_hits:
+                gene.possible_hits = nomenclature_match
+
+    def load_matcher_file(self, domain, filename):
         # this starts download if files are not on local machine
         file_path = serverfiles.localpath_download(domain, filename)
+        # download new version before using this file for gene name matching
+        serverfiles.update(domain, filename)
+
+        def case_insensitive_keys(matcher_dict):
+            updated_dict = {MAP_SOURCES:  matcher_dict[MAP_SOURCES],
+                            MAP_GENE_ID: matcher_dict[MAP_GENE_ID],
+                            MAP_LOCUS:    matcher_dict[MAP_LOCUS],
+                            MAP_SYNONYMS: defaultdict(list),
+                            MAP_SYMBOL:  defaultdict(list),
+                            MAP_NOMENCLATURE: defaultdict(list)}
+
+            for key, value in matcher_dict[MAP_SYMBOL].items():
+                # ensure string, we are using string methods (upper, lower)
+                key = ensure_type(str(key), str)
+                updated_dict[MAP_SYMBOL][key] = value
+                updated_dict[MAP_SYMBOL][key.upper()] = value
+                updated_dict[MAP_SYMBOL][key.lower()] = value
+
+            for key, value in matcher_dict[MAP_SYNONYMS].items():
+                key = ensure_type(str(key), str)
+                updated_dict[MAP_SYNONYMS][key] = value
+                updated_dict[MAP_SYNONYMS][key.upper()] = value
+                updated_dict[MAP_SYNONYMS][key.lower()] = value
+
+            for key, value in matcher_dict[MAP_NOMENCLATURE].items():
+                key = ensure_type(str(key), str)
+                updated_dict[MAP_NOMENCLATURE][key] = value
+                updated_dict[MAP_NOMENCLATURE][key.upper()] = value
+                updated_dict[MAP_NOMENCLATURE][key.lower()] = value
+
+            return updated_dict
 
         with open(file_path, 'rb') as pickle_file:
-            return pickle.load(pickle_file)
+            if not self._case_insensitive:
+                return pickle.load(pickle_file)
+            else:
+                return case_insensitive_keys(pickle.load(pickle_file))
 
 
 if __name__ == "__main__":

@@ -26,16 +26,17 @@ GENE_INFO_TAGS = ['tax_id',
 GENE_MATCHER_TAGS = ['input_name', 'type_of_match', 'ncbi_id', '_possible_hits']
 
 # PICKLED GENE MAPPER
-MATCHER_FILENAME = 'gene_mapper_{}'
+MATCHER_FILENAME = 'gene_mapper.{}'
 MATCHER_TITLE = 'Gene mapper'
 MATCHER_TAGS = ['source id', 'ncbi id', 'symbols', 'synonyms', 'genes', 'mapping']
 
-MATCHER_TUPLE_TAGS = ['tax_id', 'gene_id', 'symbol', 'synonyms', 'sources', 'locus_tag']
-MAP_GENE_IDS = 'gene_ids'
+MAP_TAX_ID = 'tax_id'
+MAP_GENE_ID = 'gene_id'
 MAP_SOURCES = 'sources'
-MAP_SYMBOLS = 'symbols'
+MAP_SYMBOL = 'symbol'
 MAP_SYNONYMS = 'synonyms'
 MAP_LOCUS = 'locus_tag'
+MAP_NOMENCLATURE = 'symbol_from_nomenclature_authority'
 
 # OWGeneInfo settings
 GENE_INFO_HEADER_LABELS = ['NCBI ID', 'Ensembl ID', 'Symbol', 'Locus Tag', 'Chromosome', 'Description', 'Synonyms', 'Nomenclature']

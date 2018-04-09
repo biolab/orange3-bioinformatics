@@ -47,6 +47,11 @@ def info(*args, **kwargs):
     return files.info(*args, **kwargs)
 
 
+def need_update(*path):
+    files = serverfiles.LocalFiles(PATH, serverfiles=ServerFiles())
+    return files.needs_update(*path)
+
+
 def update(*path, **kwargs):
     files = serverfiles.LocalFiles(PATH, serverfiles=ServerFiles())
     return files.update(*path, **kwargs)

@@ -7,8 +7,8 @@ from collections import defaultdict
 from server_update import *
 from server_update.tests.test_GeneInfo import GeneInfo
 from orangecontrib.bioinformatics.ncbi.gene import (
-    DOMAIN, FILENAME, gene_matcher_tuple, MATCHER_FILENAME, MATCHER_TITLE, MATCHER_TAGS,
-    MAP_GENE_IDS, MAP_SOURCES, MAP_SYMBOLS, MAP_SYNONYMS, MAP_LOCUS)
+    DOMAIN, FILENAME, MATCHER_FILENAME, MATCHER_TITLE, MATCHER_TAGS,
+    MAP_GENE_ID, MAP_SOURCES, MAP_SYMBOL, MAP_SYNONYMS, MAP_LOCUS, MAP_NOMENCLATURE, MAP_TAX_ID)
 
 from orangecontrib.bioinformatics.ncbi.gene.utils import parse_sources, parse_synonyms, GeneInfoDB
 from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids, common_taxid_to_name
@@ -17,7 +17,8 @@ from orangecontrib.bioinformatics.utils import serverfiles
 
 serverfiles.localpath_download(DOMAIN, FILENAME)
 
-tax_id, gene_id, symbol, synonyms, source, locus_tag = 0, 1, 2, 3, 4, 5
+# for indexing results from gene info database
+tax_id, gene_id, symbol, synonyms, sources, locus_tag, nomenclature = range(7)
 
 domain_path = sf_local.localpath(DOMAIN)
 temp_path = os.path.join(domain_path, sf_temp)
@@ -30,23 +31,25 @@ create_folder(domain_path)
 
 
 def parse_gene_record(parent_tax, mapper, gene_record):
-
-    gene = gene_matcher_tuple(parent_tax,
-                              gene_record[gene_id],
-                              gene_record[symbol],
-                              parse_synonyms(gene_record[synonyms]),
-                              parse_sources(gene_record[source]),
-                              gene_record[locus_tag])
+    gene = {MAP_TAX_ID:        parent_tax,
+            MAP_GENE_ID:       gene_record[gene_id],
+            MAP_SYMBOL:        gene_record[symbol],
+            MAP_SYNONYMS:      parse_synonyms(gene_record[synonyms]),
+            MAP_SOURCES:       parse_sources(gene_record[sources]),
+            MAP_LOCUS:         gene_record[locus_tag],
+            MAP_NOMENCLATURE:  gene_record[nomenclature]
+            }
 
     # construct gene mapper
-    mapper[MAP_SYMBOLS][gene.symbol].append(gene)
-    mapper[MAP_LOCUS][gene.locus_tag].append(gene)
-    mapper[MAP_GENE_IDS][gene.gene_id].append(gene)
+    mapper[MAP_SYMBOL][gene[MAP_SYMBOL]].append(gene)
+    mapper[MAP_LOCUS][gene[MAP_LOCUS]].append(gene)
+    mapper[MAP_GENE_ID][gene[MAP_GENE_ID]].append(gene)
+    mapper[MAP_NOMENCLATURE][gene[MAP_NOMENCLATURE]].append(gene)
 
-    for gene_synonym in gene.synonyms:
+    for gene_synonym in gene[MAP_SYNONYMS]:
         mapper[MAP_SYNONYMS][gene_synonym].append(gene)
 
-    for source_id in gene.sources.values():
+    for source_id in gene[MAP_SOURCES].values():
         mapper[MAP_SOURCES][source_id].append(gene)
 
 
@@ -57,12 +60,13 @@ cursor = con.cursor()
 
 for taxonomy_id in common_taxids():
     g_db = GeneInfoDB()
-    gene_mapper = {MAP_GENE_IDS: defaultdict(list),
+    gene_mapper = {MAP_GENE_ID: defaultdict(list),
                    MAP_SOURCES: defaultdict(list),
-                   MAP_SYMBOLS: defaultdict(list),
+                   MAP_SYMBOL: defaultdict(list),
                    MAP_SYNONYMS: defaultdict(list),
-                   MAP_LOCUS: defaultdict(list)}
-    print(taxonomy_id)
+                   MAP_LOCUS: defaultdict(list),
+                   MAP_NOMENCLATURE: defaultdict(list)}
+
     for record in g_db.select_gene_matcher_data(taxonomy_id):
         parse_gene_record(taxonomy_id, gene_mapper, record)
 
