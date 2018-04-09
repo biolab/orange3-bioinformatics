@@ -81,7 +81,8 @@ class GeneInfoDB:
 
     def select_gene_matcher_data(self, organism):
         with closing(self._db_con.cursor()) as cursor:
-            return cursor.execute('SELECT tax_id, gene_id, symbol, synonyms, db_refs, locus_tag FROM gene_info '
+            return cursor.execute('SELECT tax_id, gene_id, symbol, synonyms, db_refs, locus_tag, '
+                                  'symbol_from_nomenclature_authority FROM gene_info '
                                   'WHERE species = ?', (organism,)).fetchall()
 
     def __del__(self):
