@@ -77,13 +77,13 @@ class GeneInfoDB:
                                   'chromosome, map_location, type_of_gene, symbol_from_nomenclature_authority,'
                                   'full_name_from_nomenclature_authority, nomenclature_status, other_designations,'
                                   'modification_date FROM gene_info '
-                                  'WHERE species = ?', (organism,)).fetchall()
+                                  'WHERE species = ? or tax_id = ?', (organism, organism)).fetchall()
 
     def select_gene_matcher_data(self, organism):
         with closing(self._db_con.cursor()) as cursor:
             return cursor.execute('SELECT tax_id, gene_id, symbol, synonyms, db_refs, locus_tag, '
                                   'symbol_from_nomenclature_authority FROM gene_info '
-                                  'WHERE species = ?', (organism,)).fetchall()
+                                  'WHERE species = ? or tax_id = ?', (organism, organism)).fetchall()
 
     def __del__(self):
         self._db_con.close()
