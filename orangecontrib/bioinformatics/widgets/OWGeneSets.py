@@ -328,9 +328,16 @@ class OWGeneSets(OWWidget):
             self.data_model.appendRow(partial_result)
 
     def set_hierarchy_model(self, model, tax_id, sets):
+
+        def beautify_displayed_text(text):
+            if '_' in text:
+                return text.replace('_', ' ').title()
+            else:
+                return text
+
         # TODO: maybe optimize this code?
         for key, value in sets.items():
-            item = QTreeWidgetItem(model, [key])
+            item = QTreeWidgetItem(model, [beautify_displayed_text(key)])
             item.setFlags(item.flags() & (Qt.ItemIsUserCheckable | ~Qt.ItemIsSelectable | Qt.ItemIsEnabled))
             # item.setDisabled(True)
             item.setData(0, Qt.CheckStateRole, Qt.Unchecked)
