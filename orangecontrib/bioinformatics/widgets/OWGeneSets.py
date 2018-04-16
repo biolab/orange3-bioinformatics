@@ -29,6 +29,7 @@ from Orange.data import DiscreteVariable, StringVariable, Domain, Table
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
+from orangecontrib.bioinformatics.widgets.utils.settings import OrganismContextHandler
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.ncbi import gene, taxonomy
 from orangecontrib.bioinformatics import geneset
@@ -103,9 +104,12 @@ class OWGeneSets(OWWidget):
     selected_organism = Setting(0)
     auto_commit = Setting(True)
     auto_apply = Setting(True)
+    gene_col_index = Setting(0)
+    use_attr_names = Setting(False)
 
-    gene_col_index = ContextSetting(0)
-    use_attr_names = ContextSetting(False)
+    settingsHandler = OrganismContextHandler()
+    stored_selections = ContextSetting([])
+    organism = ContextSetting(None)
 
     class Inputs:
         genes = Input("Genes", Table)
@@ -180,9 +184,6 @@ class OWGeneSets(OWWidget):
         if self.progress_bar:
             self.progress_bar.advance()
 
-    def _get_selected_organism(self):
-        return self.organisms[self.selected_organism]
-
     def _get_available_organisms(self):
         available_organism = sorted([(tax_id, taxonomy.name(tax_id)) for tax_id in taxonomy.common_taxids()],
                                     key=lambda x: x[1])
@@ -205,10 +206,13 @@ class OWGeneSets(OWWidget):
     def _update_gene_matcher(self):
         self._gene_names_from_table()
         if not self.gene_matcher:
-            self.gene_matcher = gene.GeneMatcher(self._get_selected_organism())
+            self.gene_matcher = gene.GeneMatcher(self.get_selected_organism())
 
         self.gene_matcher.genes = self.input_genes
-        self.gene_matcher.organism = self._get_selected_organism()
+        self.gene_matcher.organism = self.get_selected_organism()
+
+    def get_selected_organism(self):
+        return self.organisms[self.selected_organism]
 
     def on_input_option_change(self):
         self._update_gene_matcher()
@@ -216,6 +220,8 @@ class OWGeneSets(OWWidget):
 
     @Inputs.genes
     def handle_input(self, data):
+        self.closeContext()
+
         if data:
             self.input_data = data
 
@@ -233,6 +239,8 @@ class OWGeneSets(OWWidget):
 
             if self.tax_id in self.organisms:
                 self.selected_organism = self.organisms.index(self.tax_id)
+
+            self.openContext(self.tax_id)
 
         self.on_input_option_change()
 
@@ -265,6 +273,8 @@ class OWGeneSets(OWWidget):
 
     def handle_matcher_results(self):
         assert threading.current_thread() == threading.main_thread()
+        self.openContext(self.get_selected_organism())
+
         if self.progress_bar:
             self.progress_bar.finish()
             self.setStatusMessage('')
@@ -275,6 +285,7 @@ class OWGeneSets(OWWidget):
         else:
             # reset gene sets
             self.init_item_model()
+            self.hierarchy_widget.clear()
             self.update_info_box()
 
     def on_gene_sets_download(self, result):
@@ -286,6 +297,7 @@ class OWGeneSets(OWWidget):
 
         tax_id, sets = result
         self.set_hierarchy_model(self.hierarchy_widget, *hierarchy_tree(tax_id, sets))
+        self.set_selected_hierarchies()
 
         self.organism_select_combobox.setEnabled(True)  # re-enable combobox
 
@@ -305,6 +317,8 @@ class OWGeneSets(OWWidget):
 
             self.workers[selected_hierarchy] = worker
             self.progress_bar_iterations[selected_hierarchy] = len(gene_sets)
+
+        self.display_gene_sets()
 
     def handle_worker_finished(self):
         # We check if all workers have completed. If not, continue
@@ -339,8 +353,6 @@ class OWGeneSets(OWWidget):
         for key, value in sets.items():
             item = QTreeWidgetItem(model, [beautify_displayed_text(key)])
             item.setFlags(item.flags() & (Qt.ItemIsUserCheckable | ~Qt.ItemIsSelectable | Qt.ItemIsEnabled))
-            # item.setDisabled(True)
-            item.setData(0, Qt.CheckStateRole, Qt.Unchecked)
             item.setExpanded(True)
             item.tax_id = tax_id
             item.hierarchy = key
@@ -356,7 +368,7 @@ class OWGeneSets(OWWidget):
                 item.hierarchy = ((key,), tax_id)
 
     def download_gene_sets(self):
-        tax_id = self._get_selected_organism()
+        tax_id = self.get_selected_organism()
 
         self.Error.clear()
         # do not allow user to change organism when download task is running
@@ -398,8 +410,15 @@ class OWGeneSets(OWWidget):
             self.hierarchy_widget.setDisabled(False)
             return
 
+        # save setting on selected hierarchies
+        self.stored_selections = only_selected_hier
+        # save context
+        self.closeContext()
+
         for selected_hierarchy in only_selected_hier:
             self.threadpool.start(self.workers[selected_hierarchy])
+
+        self.openContext(self.get_selected_organism())
 
     def handle_error(self, ex):
         self.progress_bar.finish()
@@ -410,6 +429,31 @@ class OWGeneSets(OWWidget):
             self.Error.cant_reach_host()
 
         print(ex)
+
+    def set_selected_hierarchies(self):
+        iterator = QTreeWidgetItemIterator(self.hierarchy_widget, QTreeWidgetItemIterator.All)
+
+        while iterator.value():
+            # note: if hierarchy value is not a tuple, then this is just top level qTreeWidgetItem that
+            #       holds subcategories. We don't want to display all sets from category
+            if type(iterator.value().hierarchy) is not str:
+                if iterator.value().hierarchy in self.stored_selections:
+                    iterator.value().setCheckState(0, Qt.Checked)
+                else:
+                    iterator.value().setCheckState(0, Qt.Unchecked)
+
+            iterator += 1
+
+        # if no items are checked, we check first one at random
+        if len(self.get_hierarchies(only_selected=True)) == 0:
+            iterator = QTreeWidgetItemIterator(self.hierarchy_widget, QTreeWidgetItemIterator.NotChecked)
+
+            while iterator.value():
+                if type(iterator.value().hierarchy) is not str:
+                    iterator.value().setCheckState(0, Qt.Checked)
+                    return
+
+                iterator += 1
 
     def get_hierarchies(self, **kwargs):
         """ return selected hierarchy
@@ -511,6 +555,7 @@ class OWGeneSets(OWWidget):
         self.data_view = QTreeView()
         self.data_view.setModel(self.filter_proxy_model)
         self.data_view.setAlternatingRowColors(True)
+        self.data_view.sortByColumn(2, Qt.DescendingOrder)
         self.data_view.setSortingEnabled(True)
         self.data_view.setSelectionMode(QTreeView.ExtendedSelection)
         self.data_view.setEditTriggers(QTreeView.NoEditTriggers)
