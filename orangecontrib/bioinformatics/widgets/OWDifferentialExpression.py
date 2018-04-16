@@ -245,15 +245,16 @@ def hypergeometric_test_score(*args, **kwargs):
         # Test parameters
         M = X.shape[0]  # Number of cells
         n = g.sum()  # Number of cells expressing g
-        N = g[cell_cluster].sum()  # Number of cells expressing g in target clusters
+        N = len(cell_cluster)  # Number of cells belonging to cluster(s)
         hg = hypergeom(M, n, N)
 
         # Test for over expression
-        x_over = np.arange(N, M)  # N or more
+        x = g[cell_cluster].sum()
+        x_over = np.arange(x, n + 1)  # x or more
         pvalue_over = hg.pmf(x_over).sum()
 
         # Test for under expression
-        x_under = np.arange(0, N)  # N or less
+        x_under = np.arange(0, x + 1)  # x or less
         pvalue_under = hg.pmf(x_under).sum()
 
         # Proposed scoring:
