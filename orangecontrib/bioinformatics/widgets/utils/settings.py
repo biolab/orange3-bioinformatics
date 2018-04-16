@@ -34,3 +34,30 @@ class SetContextHandler(settings.ContextHandler):
             if isinstance(setting, settings.ContextSetting) and setting.name in data:
                 value = self.decode_setting(settings, data[setting.name])
                 setattr(instance, setting.name, value)
+
+
+class OrganismContextHandler(settings.ContextHandler):
+
+    def __init__(self):
+        super().__init__()
+
+    def match(self, context, taxonomy_id, *args):
+        if not context.organism == taxonomy_id:
+            return self.NO_MATCH
+
+        return self.PERFECT_MATCH
+
+    def new_context(self, tax_id):
+        context = super().new_context()
+        context.organism = tax_id
+        return context
+
+    def settings_from_widget(self, widget, *args):
+        super().settings_from_widget(widget, *args)
+
+        context = widget.current_context
+        if context is None:
+            return
+
+        # get taxonomy id from the widget
+        context.organism = widget.get_selected_organism()
