@@ -1,6 +1,6 @@
 """ Multithreading widgets with QThreadPool """
 
-from PyQt5.QtCore import (
+from AnyQt.QtCore import (
     QObject, pyqtSignal, QRunnable, pyqtSlot
 )
 

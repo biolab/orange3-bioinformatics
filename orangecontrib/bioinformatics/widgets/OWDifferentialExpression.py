@@ -8,10 +8,10 @@ import Orange.data
 
 
 from types import SimpleNamespace as namespace
-from PyQt5.QtGui import (
+from AnyQt.QtGui import (
     QStandardItemModel, QPen
 )
-from PyQt5.QtCore import (
+from AnyQt.QtCore import (
     Qt, pyqtSignal as Signal, pyqtSlot as Slot, QSize, QRectF, QLineF
 )
 

@@ -2,8 +2,8 @@
 import re
 
 
-from PyQt5.QtWidgets import QCompleter
-from PyQt5.QtCore import QStringListModel, QObject, Qt
+from AnyQt.QtWidgets import QCompleter
+from AnyQt.QtCore import QStringListModel, QObject, Qt
 
 
 class TokenListCompleter(QCompleter):

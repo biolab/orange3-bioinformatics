@@ -1,6 +1,6 @@
 import unittest
 
-from PyQt5.QtCore import QStringListModel
+from AnyQt.QtCore import QStringListModel
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
 
 

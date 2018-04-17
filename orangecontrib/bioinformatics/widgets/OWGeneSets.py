@@ -5,13 +5,13 @@ import numpy as np
 from requests.exceptions import ConnectionError
 from collections import defaultdict
 
-from PyQt5.QtWidgets import (
+from AnyQt.QtWidgets import (
     QTreeView, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator
 )
-from PyQt5.QtCore import (
+from AnyQt.QtCore import (
     Qt, QSize, QThreadPool, QSortFilterProxyModel
 )
-from PyQt5.QtGui import (
+from AnyQt.QtGui import (
     QColor, QStandardItemModel, QStandardItem
 )
 
@@ -533,7 +533,7 @@ class OWGeneSets(OWWidget):
 
 
 if __name__ == "__main__":
-    from PyQt5.QtWidgets import QApplication
+    from AnyQt.QtWidgets import QApplication
     app = QApplication([])
     ow = OWGeneSets()
     ow.show()
