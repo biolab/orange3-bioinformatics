@@ -6,13 +6,13 @@ from itertools import chain, starmap
 from collections import defaultdict, namedtuple
 from functools import singledispatch
 
-from PyQt5.QtGui import (
+from AnyQt.QtGui import (
     QStandardItem, QStandardItemModel,
 )
-from PyQt5.QtCore import (
+from AnyQt.QtCore import (
     Qt, pyqtSignal as Signal, QItemSelection, QItemSelectionModel, QPersistentModelIndex, QSize
 )
-from PyQt5.QtWidgets import (
+from AnyQt.QtWidgets import (
     QWidget, QListView, QVBoxLayout, QGroupBox, QComboBox, QSizePolicy
 )
 
