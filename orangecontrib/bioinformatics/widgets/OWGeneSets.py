@@ -294,7 +294,7 @@ class OWGeneSets(OWWidget):
         self.workers = defaultdict(list)
         self.progress_bar_iterations = dict()
 
-        for selected_hierarchy in [*self.get_hierarchies()]:
+        for selected_hierarchy in self.get_hierarchies():
             gene_sets = geneset.load_gene_sets(selected_hierarchy)
             worker = Worker(get_collections, gene_sets, self.mapped_genes, progress_callback=True, partial_result=True)
             worker.signals.error.connect(self.handle_error)
@@ -378,7 +378,7 @@ class OWGeneSets(OWWidget):
         self.init_item_model()
         self.hierarchy_widget.setDisabled(True)
 
-        only_selected_hier = [*self.get_hierarchies(only_selected=True)]
+        only_selected_hier = self.get_hierarchies(only_selected=True)
 
         # init progress bar
         iterations = sum([self.progress_bar_iterations[hier] for hier in only_selected_hier])

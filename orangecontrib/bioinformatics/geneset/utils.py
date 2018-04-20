@@ -160,7 +160,7 @@ class GeneSets(set):
         with open(file_path, 'a') as gmt_file:
             for gene_set in self:
                 genes = map(str, gene_set.genes)
-                line = '\t'.join((gene_set.gs_id, gene_set.gmt_description(), *genes))
+                line = '\t'.join([gene_set.gs_id, gene_set.gmt_description()] + list(genes))
                 gmt_file.write(line + '\n')
 
     @staticmethod
