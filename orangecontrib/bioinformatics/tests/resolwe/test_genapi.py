@@ -36,13 +36,13 @@ class TestGenapi(unittest.TestCase):
         self.assertTrue(test_experiment)
         self.assertEqual(test_experiment.id, '564a509e6b13390ffb40d4c8')
 
-        json = gen.download_etc_data(test_experiment.id)
+        json, table_name = gen.download_etc_data(test_experiment.id)
 
         self.assertEqual(type(json), dict)
         self.assertEqual(len(json["etc"].keys()), 2)
         self.assertEqual(len(json["etc"]["genes"].keys()), 12410)
         self.assertEqual(json["etc"]["genes"]["DPU_G0071544"], [0.0, 0.1787337345055, 4.20485453935, 20.002575156149998,
-                          19.52080354305, 18.7919080288, 12.38709403699])
+                                                                19.52080354305, 18.7919080288, 12.38709403699])
         self.assertEqual(json["etc"]["timePoints"], [0, 4, 8, 12, 16, 20, 24])
 
         self.assertEqual(type(etc_to_table(json)), Orange.data.table.Table)
