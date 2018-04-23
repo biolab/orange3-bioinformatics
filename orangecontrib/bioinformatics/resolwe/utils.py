@@ -1,4 +1,9 @@
 """ Utils """
+import json
+import io
+import gzip
+
+
 from Orange.data import ContinuousVariable, StringVariable, TimeVariable, Domain, Table
 
 
@@ -59,3 +64,23 @@ def etc_to_table(etc_json, time_var=False):
         orange_table = transpose_table(orange_table)
 
     return orange_table
+
+
+def response_to_json(response):
+    if not response.ok:
+        response.raise_for_status()
+
+    try:
+        response_content = response.content.decode()
+        json_object = json.loads(response_content)
+
+    except UnicodeDecodeError:
+        response_gzipped = io.BytesIO(response.content)
+        response_content = io.TextIOWrapper(gzip.GzipFile(fileobj=response_gzipped), encoding='utf-8')
+
+        try:
+            json_object = json.load(response_content)
+        except ValueError as e:
+            raise ValueError('Downloaded data is not a valid JSON') from e
+
+    return json_object

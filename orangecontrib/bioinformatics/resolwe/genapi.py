@@ -1,11 +1,9 @@
 """ GenAPI """
-import json
-import io
-import gzip
 import requests
 
 
 from genesis import Genesis, GenData
+from .utils import response_to_json
 
 
 view_model = ['experiment', 'growth', 'genotype', 'treatment', 'strain', 'time', 'replicate']
@@ -80,19 +78,4 @@ class GenAPI:
         except requests.exceptions.ConnectionError as e:
             raise requests.exceptions.ConnectionError('Server not accessible, check your connection.') from e
 
-        if not response.ok:
-            response.raise_for_status()
-
-        response_gzipped = io.BytesIO(response.content)
-
-        response_content = io.TextIOWrapper(gzip.GzipFile(fileobj=response_gzipped), encoding='utf-8')
-
-        if callback:
-            callback.emit()
-
-        try:
-            json_object = json.load(response_content)
-        except ValueError as e:
-            raise ValueError('Downloaded data is not a valid JSON') from e
-
-        return json_object
+        return response_to_json(response)
