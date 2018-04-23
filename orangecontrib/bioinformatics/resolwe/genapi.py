@@ -68,6 +68,7 @@ class GenAPI:
 
         """
         callback = kwargs.get("progress_callback", None)
+        table_name = kwargs.get("table_name", '')
 
         try:
             response = next(self._gen.download([gen_data_id], 'output.etcfile'))
@@ -78,4 +79,4 @@ class GenAPI:
         except requests.exceptions.ConnectionError as e:
             raise requests.exceptions.ConnectionError('Server not accessible, check your connection.') from e
 
-        return response_to_json(response)
+        return response_to_json(response), table_name

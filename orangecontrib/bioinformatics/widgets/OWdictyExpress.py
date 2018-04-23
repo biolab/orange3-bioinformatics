@@ -255,16 +255,22 @@ class OWdictyExpress(OWWidget):
     def handle_cache_button(self, handle):
         self.refresh_button.setEnabled(handle)
 
-    def send_to_output(self, etc_json):
+    def send_to_output(self, result):
         self.progress_bar.finish()
         self.setStatusMessage('')
 
-        data = etc_to_table(etc_json, bool(self.gene_as_attr_name))
+        etc_json, table_name = result
 
+        # convert to table
+        data = etc_to_table(etc_json, bool(self.gene_as_attr_name))
+        # set table name
+        data.name = table_name
+        # add table attributes
         data.attributes[TAX_ID] = self.orgnism
         data.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.gene_as_attr_name)
-
+        # reset cache indicators
         self.set_cached_indicator()
+        # send data to the output signal
         self.Outputs.etc_data.send(data)
 
     def commit(self):
@@ -278,7 +284,11 @@ class OWdictyExpress(OWWidget):
             # status message
             self.setStatusMessage('downloading experiment data')
 
-            worker = Worker(self.res.download_etc_data, selected_item.gen_data_id, progress_callback=True)
+            worker = Worker(self.res.download_etc_data,
+                            selected_item.gen_data_id,
+                            table_name=selected_item.data_name,
+                            progress_callback=True)
+
             worker.signals.progress.connect(self.progress_advance)
             worker.signals.result.connect(self.send_to_output)
             worker.signals.error.connect(self.handle_error)
@@ -310,6 +320,17 @@ class CustomTreeItem(QTreeWidgetItem):
     @property
     def gen_data_id(self):
         return self._gen_data.id
+
+    @property
+    def data_name(self):
+        try:
+            project = self._gen_data.var['project']
+            experiment = self._gen_data.static['name']
+        except AttributeError:
+            project = ''
+            experiment = ''
+
+        return '{} ({})'.format(project, experiment)
 
     def set_rows(self, row):
         for index, label in enumerate(Labels):
