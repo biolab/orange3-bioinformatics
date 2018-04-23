@@ -83,6 +83,7 @@ class OWdictyExpress(OWWidget):
     username = settings.Setting('')
     password = settings.Setting('')
     setTimeVariable = settings.Setting(False)
+    gene_as_attr_name = settings.Setting(0)
 
     def __init__(self):
         super().__init__()
@@ -113,9 +114,9 @@ class OWdictyExpress(OWWidget):
 
         self.controlArea.layout().addWidget(h_line())
 
-        self.time_var_checkBox = gui.checkBox(self.controlArea, self, "setTimeVariable",
-                                              "Set Time variable")
-        self.time_var_checkBox.setToolTip('Create new column where each row represents one time point')
+        box = gui.widgetBox(self.controlArea, "Output", addSpace=True)
+        gui.radioButtonsInBox(box, self, "gene_as_attr_name", ["Genes in rows", "Genes in columns"],
+                              callback=self.commit)
 
         self.controlArea.layout().addWidget(h_line())
 
@@ -254,10 +255,10 @@ class OWdictyExpress(OWWidget):
         self.progress_bar.finish()
         self.setStatusMessage('')
 
-        data = etc_to_table(etc_json, self.setTimeVariable)
+        data = etc_to_table(etc_json, bool(self.gene_as_attr_name))
 
         data.attributes[TAX_ID] = self.orgnism
-        data.attributes[GENE_AS_ATTRIBUTE_NAME] = self.setTimeVariable
+        data.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.gene_as_attr_name)
 
         self.set_cached_indicator()
         self.Outputs.etc_data.send(data)
@@ -265,20 +266,21 @@ class OWdictyExpress(OWWidget):
     def commit(self):
         self.Error.clear()
 
-        # init progress bar
-        self.progress_bar = gui.ProgressBar(self, iterations=1)
-        # status message
-        self.setStatusMessage('downloading experiment data')
-
         selected_item = self.experimentsWidget.currentItem()  # get selected TreeItem
 
-        worker = Worker(self.res.download_etc_data, selected_item.gen_data_id, progress_callback=True)
-        worker.signals.progress.connect(self.progress_advance)
-        worker.signals.result.connect(self.send_to_output)
-        worker.signals.error.connect(self.handle_error)
+        if selected_item:
+            # init progress bar
+            self.progress_bar = gui.ProgressBar(self, iterations=1)
+            # status message
+            self.setStatusMessage('downloading experiment data')
 
-        # move download process to worker thread
-        self.threadpool.start(worker)
+            worker = Worker(self.res.download_etc_data, selected_item.gen_data_id, progress_callback=True)
+            worker.signals.progress.connect(self.progress_advance)
+            worker.signals.result.connect(self.send_to_output)
+            worker.signals.error.connect(self.handle_error)
+
+            # move download process to worker thread
+            self.threadpool.start(worker)
 
     def set_cached_indicator(self):
         cached = get_cached_ids()
