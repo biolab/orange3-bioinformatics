@@ -7,7 +7,7 @@ import requests_cache
 
 from requests.exceptions import ConnectionError
 
-from AnyQt.QtCore import Qt, QThreadPool
+from AnyQt.QtCore import Qt, QThreadPool, QSize
 from AnyQt.QtGui import QFont
 from AnyQt.QtWidgets import QTreeWidget, QTreeWidgetItem, QLabel, QLineEdit, QApplication, QFrame
 
@@ -22,6 +22,7 @@ from orangecontrib.bioinformatics.utils import local_cache
 from orangecontrib.bioinformatics.resolwe.utils import etc_to_table
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
+from orangecontrib.bioinformatics.resolwe.utils import response_to_json
 
 
 Labels = [
@@ -54,6 +55,13 @@ cache_file = os.path.join(cache_path, 'dictyExpress_cache')
 requests_cache.install_cache(cache_name=cache_file, backend='sqlite')
 
 
+def get_cached_ids():
+    cached_object = requests_cache.core.get_cache()
+    responses = [cached_object.get_response_and_time(response) for response in cached_object.responses]
+    responses_json = [response_to_json(response) for response, _ in responses]
+    return [response['id'] for response in responses_json if 'id' in response]
+
+
 class OWdictyExpress(OWWidget):
 
     name = "dictyExpress"
@@ -75,6 +83,7 @@ class OWdictyExpress(OWWidget):
     username = settings.Setting('')
     password = settings.Setting('')
     setTimeVariable = settings.Setting(False)
+    gene_as_attr_name = settings.Setting(0)
 
     def __init__(self):
         super().__init__()
@@ -85,7 +94,7 @@ class OWdictyExpress(OWWidget):
         self.headerLabels = [x[1] for x in Labels]
         self.searchString = ""
         self.items = []
-        self.lastSelected = None  # store last selected customTreeItem
+        # self.lastSelected = None  # store last selected customTreeItem
 
         self.progress_bar = None
         # threads
@@ -105,9 +114,9 @@ class OWdictyExpress(OWWidget):
 
         self.controlArea.layout().addWidget(h_line())
 
-        self.time_var_checkBox = gui.checkBox(self.controlArea, self, "setTimeVariable",
-                                              "Set Time variable")
-        self.time_var_checkBox.setToolTip('Create new column where each row represents one time point')
+        box = gui.widgetBox(self.controlArea, "Output", addSpace=True)
+        gui.radioButtonsInBox(box, self, "gene_as_attr_name", ["Genes in rows", "Genes in columns"],
+                              callback=self.commit)
 
         self.controlArea.layout().addWidget(h_line())
 
@@ -148,6 +157,10 @@ class OWdictyExpress(OWWidget):
 
         self.auth_set()
         self.connect()
+        self.sizeHint()
+
+    def sizeHint(self):
+        return QSize(1400, 680)
 
     def auth_set(self):
         self.passfield.setDisabled(not self.username)
@@ -163,7 +176,7 @@ class OWdictyExpress(OWWidget):
     def reset(self):
         self.experimentsWidget.clear()  # clear QTreeWidget
         self.items = []
-        self.lastSelected = None
+        # self.lastSelected = None
         self.searchString = ""
         self.handle_commit_button(False)
 
@@ -213,7 +226,7 @@ class OWdictyExpress(OWWidget):
     def load_experiments(self):
         if self.res:
             # init progress bar
-            self.progress_bar = gui.ProgressBar(self, iterations=3)
+            self.progress_bar = gui.ProgressBar(self, iterations=2)
             # status message
             self.setStatusMessage('downloading experiments')
 
@@ -227,8 +240,11 @@ class OWdictyExpress(OWWidget):
 
     def load_tree_items(self, list_of_exp):
         self.items = [CustomTreeItem(self.experimentsWidget, item) for item in list_of_exp]
+
         for i in range(len(self.headerLabels)):
             self.experimentsWidget.resizeColumnToContents(i)
+
+        self.set_cached_indicator()
 
     def onSelectionChanged(self):
         self.handle_commit_button(True)
@@ -239,38 +255,55 @@ class OWdictyExpress(OWWidget):
     def handle_cache_button(self, handle):
         self.refresh_button.setEnabled(handle)
 
-    def send_to_output(self, etc_json):
+    def send_to_output(self, result):
         self.progress_bar.finish()
         self.setStatusMessage('')
 
-        data = etc_to_table(etc_json, self.setTimeVariable)
+        etc_json, table_name = result
 
+        # convert to table
+        data = etc_to_table(etc_json, bool(self.gene_as_attr_name))
+        # set table name
+        data.name = table_name
+        # add table attributes
         data.attributes[TAX_ID] = self.orgnism
-        data.attributes[GENE_AS_ATTRIBUTE_NAME] = self.setTimeVariable
-
+        data.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.gene_as_attr_name)
+        # reset cache indicators
+        self.set_cached_indicator()
+        # send data to the output signal
         self.Outputs.etc_data.send(data)
 
     def commit(self):
         self.Error.clear()
 
-        # init progress bar
-        self.progress_bar = gui.ProgressBar(self, iterations=3)
-        # status message
-        self.setStatusMessage('downloading experiment data')
-
         selected_item = self.experimentsWidget.currentItem()  # get selected TreeItem
-        if self.lastSelected:
-            self.lastSelected.setData(0, Qt.DisplayRole, "")
-        self.lastSelected = selected_item
-        selected_item.setData(0, Qt.DisplayRole, " ")
 
-        worker = Worker(self.res.download_etc_data, selected_item.gen_data_id, progress_callback=True)
-        worker.signals.progress.connect(self.progress_advance)
-        worker.signals.result.connect(self.send_to_output)
-        worker.signals.error.connect(self.handle_error)
+        if selected_item:
+            # init progress bar
+            self.progress_bar = gui.ProgressBar(self, iterations=1)
+            # status message
+            self.setStatusMessage('downloading experiment data')
 
-        # move download process to worker thread
-        self.threadpool.start(worker)
+            worker = Worker(self.res.download_etc_data,
+                            selected_item.gen_data_id,
+                            table_name=selected_item.data_name,
+                            progress_callback=True)
+
+            worker.signals.progress.connect(self.progress_advance)
+            worker.signals.result.connect(self.send_to_output)
+            worker.signals.error.connect(self.handle_error)
+
+            # move download process to worker thread
+            self.threadpool.start(worker)
+
+    def set_cached_indicator(self):
+        cached = get_cached_ids()
+        for item in self.items:
+
+            if item.gen_data_id in cached:
+                item.setData(0, Qt.DisplayRole, " ")
+            else:
+                item.setData(0, Qt.DisplayRole, "")
 
 
 class CustomTreeItem(QTreeWidgetItem):
@@ -287,6 +320,17 @@ class CustomTreeItem(QTreeWidgetItem):
     @property
     def gen_data_id(self):
         return self._gen_data.id
+
+    @property
+    def data_name(self):
+        try:
+            project = self._gen_data.var['project']
+            experiment = self._gen_data.static['name']
+        except AttributeError:
+            project = ''
+            experiment = ''
+
+        return '{} ({})'.format(project, experiment)
 
     def set_rows(self, row):
         for index, label in enumerate(Labels):
