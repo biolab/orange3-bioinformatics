@@ -7,7 +7,7 @@ import requests_cache
 
 from requests.exceptions import ConnectionError
 
-from AnyQt.QtCore import Qt, QThreadPool
+from AnyQt.QtCore import Qt, QThreadPool, QSize
 from AnyQt.QtGui import QFont
 from AnyQt.QtWidgets import QTreeWidget, QTreeWidgetItem, QLabel, QLineEdit, QApplication, QFrame
 
@@ -157,6 +157,10 @@ class OWdictyExpress(OWWidget):
 
         self.auth_set()
         self.connect()
+        self.sizeHint()
+
+    def sizeHint(self):
+        return QSize(1400, 680)
 
     def auth_set(self):
         self.passfield.setDisabled(not self.username)
