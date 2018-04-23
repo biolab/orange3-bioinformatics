@@ -6,7 +6,7 @@ import scipy.special
 import scipy.stats
 import Orange.data
 
-
+from scipy.stats import hypergeom
 from types import SimpleNamespace as namespace
 from AnyQt.QtGui import (
     QStandardItemModel, QPen
@@ -26,7 +26,7 @@ from orangecontrib.bioinformatics.widgets.utils import gui as guiutils
 from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME
 
 
-def score_fold_change(a, b, axis=0):
+def score_fold_change(a, b, **kwargs):
     """
     Calculate the fold change between `a` and `b` samples.
 
@@ -42,6 +42,8 @@ def score_fold_change(a, b, axis=0):
     FC : array
         The FC scores
     """
+    axis = kwargs.get('axis', 0)
+
     mean_a = np.nanmean(a, axis=axis)
     mean_b = np.nanmean(b, axis=axis)
     res = mean_a / mean_b
@@ -52,7 +54,7 @@ def score_fold_change(a, b, axis=0):
     return res, warning
 
 
-def score_log_fold_change(a, b, axis=0):
+def score_log_fold_change(a, b, **kwargs):
     """
     Return the log2(FC).
 
@@ -61,31 +63,37 @@ def score_log_fold_change(a, b, axis=0):
     score_fold_change
 
     """
-    s, w = score_fold_change(a, b, axis=axis) 
+    axis = kwargs.get('axis', 0)
+    s, w = score_fold_change(a, b, axis=axis)
     return np.log2(s), w
 
 
-def score_ttest(a, b, axis=0):
+def score_ttest(a, b, **kwargs):
+    axis = kwargs.get('axis', 0)
     T, P = scipy.stats.ttest_ind(a, b, axis=axis)
     return T, P
 
 
-def score_ttest_t(a, b, axis=0):
+def score_ttest_t(a, b, **kwargs):
+    axis = kwargs.get('axis', 0)
     T, _ = score_ttest(a, b, axis=axis)
     return T
 
 
-def score_ttest_p(a, b, axis=0):
+def score_ttest_p(a, b, **kwargs):
+    axis = kwargs.get('axis', 0)
     _, P = score_ttest(a, b, axis=axis)
     return P
 
 
-def score_anova(*arrays, axis=0):
+def score_anova(*arrays, **kwargs):
+    axis = kwargs.get('axis', 0)
     F, P = f_oneway(*arrays, axis=axis)
     return F, P
 
 
-def score_anova_(*arrays, axis=0):
+def score_anova_(*arrays, **kwargs):
+    axis = kwargs.get('axis', 0)
     arrays = [np.asarray(arr, dtype=float) for arr in arrays]
 
     if not len(arrays) > 1:
@@ -109,7 +117,7 @@ def score_anova_(*arrays, axis=0):
     return np.array(F, dtype=float), np.array(P, dtype=float)
 
 
-def f_oneway(*arrays, axis=0):
+def f_oneway(*arrays, **kwargs):
     """
     Perform a 1-way ANOVA
 
@@ -135,6 +143,7 @@ def f_oneway(*arrays, axis=0):
     --------
     scipy.stats.f_oneway
     """
+    axis = kwargs.get('axis', 0)
     arrays = [np.asarray(a, dtype=float) for a in arrays]
     alldata = np.concatenate(arrays, axis)
     bign = alldata.shape[axis]
@@ -156,17 +165,20 @@ def f_oneway(*arrays, axis=0):
     return f, prob
 
 
-def score_anova_f(*arrays, axis=0):
+def score_anova_f(*arrays, **kwargs):
+    axis = kwargs.get('axis', 0)
     F, _ = score_anova(*arrays, axis=axis)
     return F
 
 
-def score_anova_p(*arrays, axis=0):
+def score_anova_p(*arrays, **kwargs):
+    axis = kwargs.get('axis', 0)
     _, P = score_anova(*arrays, axis=axis)
     return P
 
 
-def score_signal_to_noise(a, b, axis=0):
+def score_signal_to_noise(a, b, **kwargs):
+    axis = kwargs.get('axis', 0)
     mean_a = np.nanmean(a, axis=axis)
     mean_b = np.nanmean(b, axis=axis)
 
@@ -176,7 +188,8 @@ def score_signal_to_noise(a, b, axis=0):
     return (mean_a - mean_b) / (std_a + std_b)
 
 
-def score_mann_whitney(a, b, axis=0):
+def score_mann_whitney(a, b, **kwargs):
+    axis = kwargs.get('axis', 0)
     a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
 
     if not 0 <= axis < 2:
@@ -196,7 +209,8 @@ def score_mann_whitney(a, b, axis=0):
     return np.array(U), np.array(P)
 
 
-def score_mann_whitney_u(a, b, axis=0):
+def score_mann_whitney_u(a, b, **kwargs):
+    axis = kwargs.get('axis', 0)
     U, _ = score_mann_whitney(a, b, axis=axis)
     return U
 
@@ -213,6 +227,43 @@ class InfiniteLine(pg.InfiniteLine):
         painter.setPen(self.currentPen)
         painter.drawLine(line)
         painter.restore()
+
+
+def hypergeometric_test_score(*args, **kwargs):
+
+    X = kwargs.get('X', None)
+    cell_cluster = kwargs.get('cell_cluster', None)
+    expression_treshold = kwargs.get('treshold', None)
+
+    scores = np.zeros((X.shape[1],))
+
+    # Binary expression matrix
+    Y = (X >= expression_treshold).astype(int)
+
+    # Process each gene
+    for gi, g in enumerate(Y.T):
+        # Test parameters
+        M = X.shape[0]  # Number of cells
+        n = g.sum()  # Number of cells expressing g
+        N = len(cell_cluster)  # Number of cells belonging to cluster(s)
+        hg = hypergeom(M, n, N)
+
+        # Test for over expression
+        x = g[cell_cluster].sum()
+        x_over = np.arange(x, n + 1)  # x or more
+        pvalue_over = hg.pmf(x_over).sum()
+
+        # Test for under expression
+        x_under = np.arange(0, x + 1)  # x or less
+        pvalue_under = hg.pmf(x_under).sum()
+
+        # Proposed scoring:
+        p = min(pvalue_under, pvalue_over)
+        s = -1 if pvalue_under < pvalue_over else 1
+        score = -np.log(p) * s
+        scores[gi] = score
+
+    return scores
 
 
 class Histogram(pg.PlotWidget):
@@ -535,9 +586,9 @@ class OWDifferentialExpression(widget.OWWidget):
         ("T-test P-value", LowTail, TwoSampleTest, score_ttest_p),
         ("ANOVA", HighTail, VarSampleTest, score_anova_f),
         ("ANOVA P-value", LowTail, VarSampleTest, score_anova_p),
-        ("Signal to Noise Ratio", TwoTail, TwoSampleTest,
-         score_signal_to_noise),
+        ("Signal to Noise Ratio", TwoTail, TwoSampleTest, score_signal_to_noise),
         ("Mann-Whitney", LowTail, TwoSampleTest, score_mann_whitney_u),
+        ('Hypergeometric Test', TwoTail, TwoSampleTest, hypergeometric_test_score)
     ]
 
     settingsHandler = SetContextHandler()
@@ -564,7 +615,6 @@ class OWDifferentialExpression(widget.OWWidget):
         "ANOVA P-value": (0, 0.01),
     })
 
-    add_scores_to_output = settings.Setting(False)
     auto_commit = settings.Setting(False)
 
     #: Current target group index
@@ -579,6 +629,9 @@ class OWDifferentialExpression(widget.OWWidget):
 
         self.min_value, self.max_value = \
             self.thresholds.get(self.Scores[self.score_index][0], (1, 0))
+
+        # threshold defining expressed genes (for Hypergeometric Test)
+        self.expression_threshold_value = 1.0
 
         #: Input data set
         self.data = None
@@ -623,8 +676,15 @@ class OWDifferentialExpression(widget.OWWidget):
         box1 = gui.widgetBox(self.controlArea, "Scoring Method")
         gui.comboBox(box1, self, "score_index",
                      items=[sm[0] for sm in self.Scores],
-                     callback=[self.on_scoring_method_changed,
-                               self.update_scores])
+                     callback=[self.on_scoring_method_changed, self.update_scores])
+
+        self.expression_threshold_box = gui.widgetBox(self.controlArea, 'Expression threshold')
+        self.expression_threshold = gui.doubleSpin(
+            self.expression_threshold_box,
+            self, "expression_threshold_value",
+            minv=0, maxv=1e2, step=1e-2,
+            callback=self.update_scores,
+            callbackOnReturn=True)
 
         box = gui.widgetBox(self.controlArea, "Target Labels")
         self.label_selection_widget = guiutils.LabelSelectionWidget(self)
@@ -686,10 +746,6 @@ class OWDifferentialExpression(widget.OWWidget):
         acbox = gui.auto_commit(
             box, self, "auto_commit", "Commit", box=None)
         acbox.button.setDefault(True)
-
-        gui.checkBox(box, self, "add_scores_to_output",
-                     "Add gene scores to output",
-                     callback=self._invalidate_selection)
 
         gui.rubber(self.controlArea)
 
@@ -816,7 +872,12 @@ class OWDifferentialExpression(widget.OWWidget):
 
         def compute_scores(X, group_indices, warn=False):
             arrays = [X[ind] for ind in group_indices]
-            ss = score_func(*arrays, axis=0)
+            ss = score_func(*arrays,
+                            axis=0,
+                            X=X,
+                            cell_cluster=group_indices[0],
+                            treshold=self.expression_threshold_value)
+
             return ss[0] if isinstance(ss, tuple) and not warn else ss
 
         def permute_indices(group_indices, random_state=None):
@@ -839,7 +900,8 @@ class OWDifferentialExpression(widget.OWWidget):
                 self.data, grp, split_selection)
             G2 = ~G1
             indices = [np.flatnonzero(G1), np.flatnonzero(G2)]
-        elif test_type == self.VarSampleTest:
+
+        elif test_type == OWDifferentialExpression.VarSampleTest:
             indices = [guiutils.group_selection_mask(self.data, grp, [i])
                        for i in range(len(grp.values))]
             indices = [np.flatnonzero(ind) for ind in indices]
@@ -1200,10 +1262,14 @@ class OWDifferentialExpression(widget.OWWidget):
         self.update_scores()
 
     def on_scoring_method_changed(self):
-        _, _, test_type, _ = self.Scores[self.score_index]
+        _, _, test_type, score_method = self.Scores[self.score_index]
         self.label_selection_widget.values_view.setEnabled(
             test_type == OWDifferentialExpression.TwoSampleTest
         )
+
+        # TODO: refactor this, not pretty :)
+        self.expression_threshold_box.setHidden(score_method.__name__ != hypergeometric_test_score.__name__)
+
         self.__update_threshold_spinbox()
 
     def __update_threshold_spinbox(self):
@@ -1231,6 +1297,7 @@ class OWDifferentialExpression(widget.OWWidget):
         mask = np.isfinite(scores)
         test = self.test_f[side]
         selected_masked = test(scores[mask], low, high)
+
         selected = np.zeros_like(scores, dtype=bool)
         selected[mask] = selected_masked
 
@@ -1242,17 +1309,32 @@ class OWDifferentialExpression(widget.OWWidget):
         if axis == 0:
             # Select rows
             score_var = Orange.data.ContinuousVariable(score_name)
-            domain = Orange.data.Domain(domain.attributes, domain.class_vars,
-                                        domain.metas + (score_var,))
+            domain_selected_genes = Orange.data.Domain([], metas=domain.metas + (score_var,))
+
+            domain = Orange.data.Domain(domain.attributes, domain.class_vars, domain.metas + (score_var,))
+
             data = self.data.from_table(domain, self.data)
+            table_selected_genes = self.data.from_table(domain_selected_genes, self.data)
+
             data[:, score_var] = np.c_[scores]
+            table_selected_genes[:, score_var] = np.c_[scores]
+
             subsetdata = data[indices]
             remainingdata = data[remaining]
+
+            self.send("Selected genes", table_selected_genes[indices])
         else:
+            domain_selected_genes = Orange.data.Domain([], metas=[Orange.data.StringVariable('genes'),
+                                                                  Orange.data.ContinuousVariable(score_name)])
+            data_selected_genes = []
+
             # select columns
             attrs = [copy_variable(var) for var in domain.attributes]
             for var, score in zip(attrs, scores):
                 var.attributes[score_name] = str(score)
+                data_selected_genes.append([var.name, score])
+
+            table_selected_genes = Orange.data.Table(domain_selected_genes, data_selected_genes)
 
             selected_attrs = [attrs[i] for i in indices]
             remaining_attrs = [attrs[i] for i in remaining]
@@ -1265,9 +1347,10 @@ class OWDifferentialExpression(widget.OWWidget):
                 remaining_attrs, domain.class_vars, domain.metas)
             remainingdata = self.data.from_table(domain, self.data)
 
+            self.send("Selected genes", table_selected_genes[indices])
+
         self.send("Data subset", subsetdata)
         self.send("Remaining data subset", remainingdata)
-        self.send("Selected genes", None)
 
     def send_report(self):
         self.report_plot()
@@ -1294,46 +1377,6 @@ def copy_variable(var):
     clone = var.copy(compute_value=transformation.Identity(var))
     clone.attributes = dict(var.attributes)
     return clone
-
-import unittest
-
-
-class Test_f_oneway(unittest.TestCase):
-    def test_f_oneway(self):
-        g1 = np.array([0.1, -0.1, 0.2, -0.2])
-        g2 = g1 + 1
-        g3 = g1
-
-        f1, p1 = scipy.stats.f_oneway(g1, g2)
-        f, p = f_oneway(g1, g2)
-        np.testing.assert_almost_equal([f, p], [f1, p1])
-
-        f, p = f_oneway(np.c_[g1], np.c_[g2], axis=0)
-        np.testing.assert_almost_equal([f[0], p[0]], [f1, p1])
-
-        f1, p1 = scipy.stats.f_oneway(g1, g2, g3)
-        f, p = f_oneway(g1, g2, g3)
-        np.testing.assert_almost_equal([f, p], [f1, p1])
-
-        G1 = np.random.normal(size=(10, 30))
-        G2 = np.random.normal(loc=1, size=(10, 20))
-        G3 = np.random.normal(loc=2, size=(10, 10))
-
-        F, P = f_oneway(G1, G2, G3, axis=1)
-        self.assertEqual(F.shape, (10,))
-        self.assertEqual(P.shape, (10,))
-
-        FP1 = [scipy.stats.f_oneway(g1, g2, g3)
-               for g1, g2, g3 in zip(G1, G2, G3)]
-
-        F1 = [f for f, _ in FP1]
-        P1 = [p for _, p in FP1]
-        np.testing.assert_almost_equal(F1, F)
-        np.testing.assert_almost_equal(P1, P)
-
-        F, P = f_oneway(G1.T, G2.T, G3.T, axis=0)
-        np.testing.assert_almost_equal(F1, F)
-        np.testing.assert_almost_equal(P1, P)
 
 
 if __name__ == "__main__":
