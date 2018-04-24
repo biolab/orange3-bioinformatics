@@ -1,5 +1,5 @@
 """ Resolwe module """
-from .genapi import GenAPI, DEFAULT_EMAIL, DEFAULT_PASSWD
+from .genapi import GenAPI, DEFAULT_EMAIL, DEFAULT_PASSWD, cache_backend, cache_name
 
 
 def connect(username, password, url, server_type):

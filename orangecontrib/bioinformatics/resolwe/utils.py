@@ -1,10 +1,25 @@
 """ Utils """
 import json
 import io
+import os
 import gzip
 
 
 from Orange.data import ContinuousVariable, StringVariable, TimeVariable, Domain, Table
+
+from orangecontrib.bioinformatics.utils import local_cache
+
+
+#  Support cache with requests_cache module
+cache_path = os.path.join(local_cache, "resolwe")
+
+try:
+    os.makedirs(cache_path)
+except OSError:
+    pass
+
+cache_name = os.path.join(cache_path, 'GenAPI_requests_cache')
+cache_backend = 'sqlite'
 
 
 def transpose_table(table):
@@ -70,17 +85,12 @@ def response_to_json(response):
     if not response.ok:
         response.raise_for_status()
 
+    response_gzipped = io.BytesIO(response.content)
+    response_content = io.TextIOWrapper(gzip.GzipFile(fileobj=response_gzipped), encoding='utf-8')
+
     try:
-        response_content = response.content.decode()
-        json_object = json.loads(response_content)
-
-    except UnicodeDecodeError:
-        response_gzipped = io.BytesIO(response.content)
-        response_content = io.TextIOWrapper(gzip.GzipFile(fileobj=response_gzipped), encoding='utf-8')
-
-        try:
-            json_object = json.load(response_content)
-        except ValueError as e:
-            raise ValueError('Downloaded data is not a valid JSON') from e
+        json_object = json.load(response_content)
+    except ValueError as e:
+        raise ValueError('Downloaded data is not a valid JSON') from e
 
     return json_object
