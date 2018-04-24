@@ -1,8 +1,6 @@
 """ dictyExpress widget """
 import sys
-import os
 import threading
-import requests_cache
 
 
 from requests.exceptions import ConnectionError
@@ -15,14 +13,12 @@ from Orange.data import Table
 from Orange.widgets import gui, settings
 from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets.utils.signals import Output
-# from Orange.widgets.utils.datacaching import data_hints
+
 
 from orangecontrib.bioinformatics import resolwe
-from orangecontrib.bioinformatics.utils import local_cache
 from orangecontrib.bioinformatics.resolwe.utils import etc_to_table
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
-from orangecontrib.bioinformatics.resolwe.utils import response_to_json
 
 
 Labels = [
@@ -41,25 +37,6 @@ def h_line():
     line.setFrameShape(QFrame.HLine)
     line.setFrameShadow(QFrame.Sunken)
     return line
-
-
-#  Support cache with requests_cache module
-cache_path = os.path.join(local_cache, "resolwe")
-
-try:
-    os.makedirs(cache_path)
-except OSError:
-    pass
-
-cache_file = os.path.join(cache_path, 'dictyExpress_cache')
-requests_cache.install_cache(cache_name=cache_file, backend='sqlite')
-
-
-def get_cached_ids():
-    cached_object = requests_cache.core.get_cache()
-    responses = [cached_object.get_response_and_time(response) for response in cached_object.responses]
-    responses_json = [response_to_json(response) for response, _ in responses]
-    return [response['id'] for response in responses_json if 'id' in response]
 
 
 class OWdictyExpress(OWWidget):
@@ -94,7 +71,6 @@ class OWdictyExpress(OWWidget):
         self.headerLabels = [x[1] for x in Labels]
         self.searchString = ""
         self.items = []
-        # self.lastSelected = None  # store last selected customTreeItem
 
         self.progress_bar = None
         # threads
@@ -297,7 +273,8 @@ class OWdictyExpress(OWWidget):
             self.threadpool.start(worker)
 
     def set_cached_indicator(self):
-        cached = get_cached_ids()
+        cached = self.res.get_cached_ids()
+
         for item in self.items:
 
             if item.gen_data_id in cached:
