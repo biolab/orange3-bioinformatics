@@ -131,9 +131,7 @@ class GeneMatcher:
 
             for gene in self.genes:
                 if gene.ncbi_id:
-                    data_table.domain[gene.input_name].attributes[MAP_GENE_ID] = gene.ncbi_id
-                else:
-                    data_table.domain[gene.input_name].attributes[MAP_GENE_ID] = '?'
+                    data_table.domain[gene.input_name].attributes[NCBI_ID] = gene.ncbi_id
 
     def run_matcher(self, progress_callback=None):
         """ This will try to match genes, with ncbi ids, based on provided input of genes.

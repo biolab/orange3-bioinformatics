@@ -38,6 +38,12 @@ MAP_SYNONYMS = 'synonyms'
 MAP_LOCUS = 'locus_tag'
 MAP_NOMENCLATURE = 'symbol_from_nomenclature_authority'
 
+# Pretty strings
+NCBI_ID = 'Gene ID'
+ENSEMBl_ID = 'Ensembl ID'
+GENE_SYMBOL = 'Symbol'
+GENE_SYNONYMS = 'Synonyms'
+
 # OWGeneInfo settings
 GENE_INFO_HEADER_LABELS = ['NCBI ID', 'Ensembl ID', 'Symbol', 'Locus Tag', 'Chromosome', 'Description', 'Synonyms', 'Nomenclature']
 NCBI_DETAIL_LINK = 'http://www.ncbi.nlm.nih.gov/sites/entrez?Db=gene&Cmd=ShowDetailView&TermToSearch={}'
