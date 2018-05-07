@@ -107,7 +107,7 @@ def group_candidates(data):
 
     targets = defaultdict(set)
     for label, value in items:
-        targets[label].add(value)
+        targets[label].add(str(value))
 
     # Need at least 2 distinct values or key
     targets = [(key, sorted(vals)) for key, vals in targets.items() if len(vals) >= 2]
