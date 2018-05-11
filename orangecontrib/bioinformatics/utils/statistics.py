@@ -1,5 +1,43 @@
 import math
 import threading
+import numpy as np
+
+
+from scipy.stats import hypergeom
+
+
+def hypergeometric_test(X, cluster, treshold):
+    # type: (np.ndarray, np.ndarray, float) -> np.ndarray
+
+    scores = np.zeros((X.shape[1],))
+
+    # Binary expression matrix
+    Y = (X >= treshold).astype(int)
+
+    # Process each gene
+    for gi, g in enumerate(Y.T):
+        # Test parameters
+        M = X.shape[0]  # Number of cells
+        n = g.sum()  # Number of cells expressing g
+        N = len(cluster)  # Number of cells belonging to cluster(s)
+        hg = hypergeom(M, n, N)
+
+        # Test for over expression
+        x = g[cluster].sum()
+        x_over = np.arange(x, n + 1)  # x or more
+        pvalue_over = hg.pmf(x_over).sum()
+
+        # Test for under expression
+        x_under = np.arange(0, x + 1)  # x or less
+        pvalue_under = hg.pmf(x_under).sum()
+
+        # Proposed scoring:
+        p = min(pvalue_under, pvalue_over)
+        s = -1 if pvalue_under < pvalue_over else 1
+        score = -np.log(p) * s
+        scores[gi] = score
+
+    return scores
 
 
 def _lngamma(z):
