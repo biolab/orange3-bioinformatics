@@ -17,7 +17,7 @@ from AnyQt.QtCore import (
 )
 from AnyQt.QtGui import QStandardItemModel, QStandardItem
 
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, StringVariable
 from Orange.widgets import gui
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.settings import Setting
@@ -27,7 +27,8 @@ from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.geo.utils import gds_ensure_downloaded
 from orangecontrib.bioinformatics.geo.dataset import GDS, GDSInfo, DOMAIN
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME, TAX_ID
+from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME, TAX_ID, GENE_ID_COLUMN
+from orangecontrib.bioinformatics.ncbi.gene import NCBI_ID
 
 
 TextFilterRole = next(gui.OrangeUserRole)
@@ -536,6 +537,10 @@ class OWGEODatasets(OWWidget):
 
         self.warning(0)
         message = None
+        from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
+
+        gene_matcher = GeneMatcher(self.currentGds.get('taxid', ''))
+
         if self.outputRows:
             def samplesinst(ex):
                 out = []
@@ -550,6 +555,7 @@ class OWGEODatasets(OWWidget):
             samples = set(samples)
             mask = [samples.issuperset(samplesinst(ex)) for ex in data]
             data = data[numpy.array(mask, dtype=bool)]
+            gene_matcher.match_table_attributes(data)
             if len(data) == 0:
                 message = "No samples with selected sample annotations."
         else:
@@ -570,13 +576,28 @@ class OWGEODatasets(OWWidget):
                     (key, value) for key, value in attr.attributes.items()
                     if key in stypes
                 )
+
             data = Table(domain, data)
+
+            if 'gene' in data.domain:
+                gene_column = data.domain['gene']
+                gene_names = data.get_column_view(gene_column)[0]
+                gene_matcher.genes = gene_names
+                gene_matcher.run_matcher()
+
+                domain_ids = Domain([], metas=[StringVariable(NCBI_ID)])
+                data_ids = [[str(gene.ncbi_id) if gene.ncbi_id else '?'] for gene in gene_matcher.genes]
+                table_ids = Table(domain_ids, data_ids)
+
+                data = Table.concatenate([data, table_ids])
 
         if message is not None:
             self.warning(0, message)
 
         data.attributes[TAX_ID] = self.currentGds.get('taxid', '')
         data.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.outputRows)
+        if not bool(self.outputRows):
+            data.attributes[GENE_ID_COLUMN] = NCBI_ID
 
         data.name = data_name
         self.send("Expression Data", data)
@@ -588,6 +609,7 @@ class OWGEODatasets(OWWidget):
 
         self.updateInfo()
         self.selectionChanged = False
+
 
     def splitterMoved(self, *args):
         self.splitterSettings = [bytes(sp.saveState()) for sp in self.splitters]
