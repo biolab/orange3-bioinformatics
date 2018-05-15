@@ -295,9 +295,8 @@ class ExtendedTableView(QWidget):
 class OWGeneNameMatching(OWWidget):
     name = "Gene Name Matching"
     description = "Tool for working with genes"
-    # TODO: widget icon
-    # icon = "icons/OWGeneSets.svg"
-    priority = 10
+    icon = "../widgets/icons/OWGeneInfo.svg"
+    priority = 5
     want_main_area = True
 
     selected_organism = Setting(0)
