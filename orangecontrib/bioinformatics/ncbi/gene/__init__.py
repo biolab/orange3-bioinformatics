@@ -57,6 +57,43 @@ class Gene:
 
             setattr(self, attr, value)
 
+    def to_html(self):
+        self.load_ncbi_info()
+        db_refs = getattr(self, 'db_refs')
+        external_links = []
+        if db_refs:
+            external_links = ['<dd>- <b>{}</b>: {}<dd>'.format(ref, ref_id) for ref, ref_id in db_refs.items()]
+
+        html_string = """<span>
+                      <h3><b>Gene info summary</b></h3>
+                      <dl>
+                      <dt><b>Gene ID:</b></dt>
+                      <dd>- {}</dd>
+                      
+                      <dt><b>Symbol:</b></dt>
+                      <dd>- {}</dd>
+   
+                      <dt><b>Synonyms:</b></dt>
+                      <dd>- {}</dd> 
+                      
+                      <dt><b>External references:</b></dt>
+                      {}
+                      
+                      <dt><b>Description:</b></dt>
+                      <dd>{}</dd>
+                      
+                      <dt><b>Type of gene:</b></dt>
+                      <dd>{}</dd>
+                      </dl>
+                      </span>""".format(self.ncbi_id,
+                                        getattr(self, 'symbol'),
+                                        ', '.join([synonym for synonym in getattr(self, 'synonyms')]),
+                                        '\n'.join([link for link in external_links]),
+                                        getattr(self, 'description'),
+                                        getattr(self, 'type_of_gene'))
+
+        return html_string
+
 
 class GeneInfo(dict):
 
