@@ -265,6 +265,11 @@ class ExtendedTableView(QWidget):
         # return a list of QModelIndex
         return self.genes_selection_model().selectedRows()
 
+    def reset_genes_model(self):
+        if self.genes_model:
+            self.genes_model.deleteLater()
+            self.genes_model = None
+
     def genes_selection_model(self):
         return self.genes_view.selectionModel()
 
@@ -406,6 +411,12 @@ class OWGeneNameMatching(OWWidget):
 
         self.get_available_organisms()
 
+    def __reset_widget_state(self):
+        self.Outputs.custom_data_table.send(None)
+        self.proxy_model.setSourceModel(None)
+        self.extended_view.reset_genes_model()
+        self.extended_view.reset_info_model()
+
     def __selection_changed(self):
         genes = [model_index.data() for model_index in self.extended_view.get_selected_gens()]
         self.extended_view.set_info_model(genes)
@@ -433,10 +444,14 @@ class OWGeneNameMatching(OWWidget):
 
         self._update_info_box()
 
+        # if no known genes, clean up and return
+        if not len(self.gene_matcher.get_known_genes()):
+            self.__reset_widget_state()
+            return
+
         self.extended_view.set_genes_model(self.gene_matcher.genes)
         self.proxy_model.setSourceModel(self.extended_view.genes_model)
         self.extended_view.genes_view.resizeRowsToContents()
-
         self.commit()
 
     def get_available_organisms(self):
@@ -509,12 +524,8 @@ class OWGeneNameMatching(OWWidget):
             self.on_input_option_change()
         else:
             self.info_box.setText('No data on input\n')
-            self.Outputs.custom_data_table.send(None)
+            self.__reset_widget_state()
             self.gene_matcher = None
-            if self.proxy_model.sourceModel():
-                self.proxy_model.sourceModel().deleteLater()
-                self.proxy_model.setSourceModel(None)
-            self.extended_view.reset_info_model()
 
     def __handle_ids(self, data_table):
         """
