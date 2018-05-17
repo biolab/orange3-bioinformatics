@@ -474,7 +474,7 @@ class OWGeneNameMatching(OWWidget):
     def _update_gene_matcher(self):
         self.gene_names_from_table()
         if not self.gene_matcher:
-            self.gene_matcher = GeneMatcher(self.get_selected_organism())
+            self.gene_matcher = GeneMatcher(self.get_selected_organism(), case_insensitive=True)
 
         self.gene_matcher.genes = self.input_genes
         self.gene_matcher.organism = self.get_selected_organism()
