@@ -24,6 +24,7 @@ from Orange.widgets.utils.datacaching import data_hints
 from orangecontrib.bioinformatics.widgets.utils.settings import SetContextHandler
 from orangecontrib.bioinformatics.widgets.utils import gui as guiutils
 from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME
+from orangecontrib.bioinformatics.utils.statistics import hypergeometric_test
 
 
 def score_fold_change(a, b, **kwargs):
@@ -235,35 +236,7 @@ def hypergeometric_test_score(*args, **kwargs):
     cell_cluster = kwargs.get('cell_cluster', None)
     expression_treshold = kwargs.get('treshold', None)
 
-    scores = np.zeros((X.shape[1],))
-
-    # Binary expression matrix
-    Y = (X >= expression_treshold).astype(int)
-
-    # Process each gene
-    for gi, g in enumerate(Y.T):
-        # Test parameters
-        M = X.shape[0]  # Number of cells
-        n = g.sum()  # Number of cells expressing g
-        N = len(cell_cluster)  # Number of cells belonging to cluster(s)
-        hg = hypergeom(M, n, N)
-
-        # Test for over expression
-        x = g[cell_cluster].sum()
-        x_over = np.arange(x, n + 1)  # x or more
-        pvalue_over = hg.pmf(x_over).sum()
-
-        # Test for under expression
-        x_under = np.arange(0, x + 1)  # x or less
-        pvalue_under = hg.pmf(x_under).sum()
-
-        # Proposed scoring:
-        p = min(pvalue_under, pvalue_over)
-        s = -1 if pvalue_under < pvalue_over else 1
-        score = -np.log(p) * s
-        scores[gi] = score
-
-    return scores
+    return hypergeometric_test(X, cell_cluster, expression_treshold)
 
 
 class Histogram(pg.PlotWidget):
