@@ -138,7 +138,7 @@ class GeneMatcher:
 
     @property
     def organism(self):
-        return self.organism
+        return self._organism
 
     @organism.setter
     def organism(self, tax_id):
@@ -205,6 +205,10 @@ class GeneMatcher:
                 # We expect unique match here.
                 pass
 
+            input_name = gene.input_name
+            if self._case_insensitive:
+                input_name = gene.input_name.lower()
+
             source_match = match_input(self._matcher[MAP_SOURCES], gene.input_name)
             # ids from different sources are unique. We do not expect to get multiple hits here.
             # There is exceptions with organism 3702. It has same source id from Araport or TAIR databases.
@@ -213,7 +217,7 @@ class GeneMatcher:
                 gene.type_of_match = _source
                 continue
 
-            symbol_match = match_input(self._matcher[MAP_SYMBOL], gene.input_name)
+            symbol_match = match_input(self._matcher[MAP_SYMBOL], input_name)
             if len(symbol_match) == _single_hit:
                 gene.ncbi_id = symbol_match[0][MAP_GENE_ID]
                 gene.type_of_match = _symbol
@@ -231,7 +235,7 @@ class GeneMatcher:
                 gene.possible_hits = locus_match
                 continue
 
-            synonym_match = match_input(self._matcher[MAP_SYNONYMS], gene.input_name)
+            synonym_match = match_input(self._matcher[MAP_SYNONYMS], input_name)
             if len(synonym_match) == _single_hit:
                 gene.ncbi_id = synonym_match[0][MAP_GENE_ID]
                 gene.type_of_match = _synonym
@@ -240,7 +244,7 @@ class GeneMatcher:
                 gene.possible_hits = synonym_match
                 continue
 
-            nomenclature_match = match_input(self._matcher[MAP_NOMENCLATURE], gene.input_name)
+            nomenclature_match = match_input(self._matcher[MAP_NOMENCLATURE], input_name)
             if len(nomenclature_match) == _single_hit:
                 gene.ncbi_id = nomenclature_match[0][MAP_GENE_ID]
                 gene.type_of_match = _nom_symbol
@@ -267,19 +271,16 @@ class GeneMatcher:
                 # ensure string, we are using string methods (upper, lower)
                 key = ensure_type(str(key), str)
                 updated_dict[MAP_SYMBOL][key] = value
-                updated_dict[MAP_SYMBOL][key.upper()] = value
                 updated_dict[MAP_SYMBOL][key.lower()] = value
 
             for key, value in matcher_dict[MAP_SYNONYMS].items():
                 key = ensure_type(str(key), str)
                 updated_dict[MAP_SYNONYMS][key] = value
-                updated_dict[MAP_SYNONYMS][key.upper()] = value
                 updated_dict[MAP_SYNONYMS][key.lower()] = value
 
             for key, value in matcher_dict[MAP_NOMENCLATURE].items():
                 key = ensure_type(str(key), str)
                 updated_dict[MAP_NOMENCLATURE][key] = value
-                updated_dict[MAP_NOMENCLATURE][key.upper()] = value
                 updated_dict[MAP_NOMENCLATURE][key.lower()] = value
 
             return updated_dict
