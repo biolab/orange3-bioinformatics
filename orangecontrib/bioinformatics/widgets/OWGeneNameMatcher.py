@@ -297,8 +297,8 @@ class ExtendedTableView(QWidget):
             self.reset_info_model()
 
 
-class OWGeneNameMatching(OWWidget):
-    name = "Gene Name Matching"
+class OWGeneNameMatcher(OWWidget):
+    name = "Gene Name Matcher"
     description = "Tool for working with genes"
     icon = "../widgets/icons/OWGeneInfo.svg"
     priority = 5
@@ -596,7 +596,7 @@ if __name__ == "__main__":
     app = QApplication([])
 
     data = Table('/Users/jakakokosar/Desktop/gnm.pickle')
-    ow = OWGeneNameMatching()
+    ow = OWGeneNameMatcher()
     ow.handle_input(data)
     ow.show()
     app.exec_()
