@@ -57,6 +57,43 @@ class Gene:
 
             setattr(self, attr, value)
 
+    def to_html(self):
+        self.load_ncbi_info()
+        db_refs = getattr(self, 'db_refs')
+        external_links = []
+        if db_refs:
+            external_links = ['<dd>- <b>{}</b>: {}<dd>'.format(ref, ref_id) for ref, ref_id in db_refs.items()]
+
+        html_string = """<span>
+                      <h3><b>Gene info summary</b></h3>
+                      <dl>
+                      <dt><b>Gene ID:</b></dt>
+                      <dd>- {}</dd>
+                      
+                      <dt><b>Symbol:</b></dt>
+                      <dd>- {}</dd>
+   
+                      <dt><b>Synonyms:</b></dt>
+                      <dd>- {}</dd> 
+                      
+                      <dt><b>External references:</b></dt>
+                      {}
+                      
+                      <dt><b>Description:</b></dt>
+                      <dd>{}</dd>
+                      
+                      <dt><b>Type of gene:</b></dt>
+                      <dd>{}</dd>
+                      </dl>
+                      </span>""".format(self.ncbi_id,
+                                        getattr(self, 'symbol'),
+                                        ', '.join([synonym for synonym in getattr(self, 'synonyms')]),
+                                        '\n'.join([link for link in external_links]),
+                                        getattr(self, 'description'),
+                                        getattr(self, 'type_of_gene'))
+
+        return html_string
+
 
 class GeneInfo(dict):
 
@@ -147,6 +184,7 @@ class GeneMatcher:
             self._match()
 
     def _match(self, **kwargs):
+        # TODO: refactor this madness ...
         callback = kwargs.get("callback", None)
 
         def match_input(mapper, input_name):
@@ -182,6 +220,7 @@ class GeneMatcher:
                 continue
             elif len(symbol_match) >= _multiple_hits:
                 gene.possible_hits = symbol_match
+                continue
 
             locus_match = match_input(self._matcher[MAP_LOCUS], gene.input_name)
             if len(locus_match) == _single_hit:
@@ -190,6 +229,7 @@ class GeneMatcher:
                 continue
             elif len(symbol_match) >= _multiple_hits:
                 gene.possible_hits = locus_match
+                continue
 
             synonym_match = match_input(self._matcher[MAP_SYNONYMS], gene.input_name)
             if len(synonym_match) == _single_hit:
@@ -198,6 +238,7 @@ class GeneMatcher:
                 continue
             elif len(synonym_match) >= _multiple_hits:
                 gene.possible_hits = synonym_match
+                continue
 
             nomenclature_match = match_input(self._matcher[MAP_NOMENCLATURE], gene.input_name)
             if len(nomenclature_match) == _single_hit:
@@ -206,6 +247,7 @@ class GeneMatcher:
                 continue
             elif len(nomenclature_match) >= _multiple_hits:
                 gene.possible_hits = nomenclature_match
+                continue
 
     def load_matcher_file(self, domain, filename):
         # this starts download if files are not on local machine
