@@ -302,8 +302,8 @@ class ExtendedTableView(QWidget):
             self.reset_info_model()
 
 
-class OWGeneNameMatching(OWWidget):
-    name = "Gene Name Matching"
+class OWGeneNameMatcher(OWWidget):
+    name = "Gene Name Matcher"
     description = "Tool for working with genes"
     icon = "../widgets/icons/OWGeneInfo.svg"
     priority = 5
@@ -311,7 +311,7 @@ class OWGeneNameMatching(OWWidget):
 
     selected_organism = Setting(0)
     selected_filter = Setting(0)
-    gene_col_index = Setting(0)
+    selected_gene_col = Setting(None)
     gene_as_attr_name = Setting(0)
     use_attr_names = Setting(False)
     filter_unknown = Setting(True)
@@ -370,9 +370,11 @@ class OWGeneNameMatching(OWWidget):
                                                  callback=self.on_input_option_change)
 
         box = widgetBox(self.controlArea, 'Gene names')
-        self.gene_columns = itemmodels.VariableListModel(parent=self)
-        self.gene_column_combobox = comboBox(box, self, 'gene_col_index', callback=self.on_input_option_change)
-        self.gene_column_combobox.setModel(self.gene_columns)
+        self.gene_columns_model = itemmodels.DomainModel(valid_types=(StringVariable, ))
+        self.gene_column_combobox = comboBox(box, self, 'selected_gene_col',
+                                             model=self.gene_columns_model,
+                                             sendSelectedValue=True,
+                                             callback=self.on_input_option_change)
 
         self.attr_names_checkbox = checkBox(box, self, 'use_attr_names', 'Use attribute names',
                                             disables=[(-1, self.gene_column_combobox)],
@@ -472,17 +474,19 @@ class OWGeneNameMatching(OWWidget):
         if self.input_data:
             if self.use_attr_names:
                 self.input_genes = [str(attr.name).strip() for attr in self.input_data.domain.attributes]
-            elif self.gene_columns:
-                column = self.gene_columns[self.gene_col_index]
-                self.input_genes = [str(e[column]) for e in self.input_data if not np.isnan(e[column])]
+            elif self.selected_gene_col:
+                self.input_genes = [str(e[self.selected_gene_col]) for e in self.input_data
+                                    if not np.isnan(e[self.selected_gene_col])]
 
     def _update_gene_matcher(self):
         self.gene_names_from_table()
-        if not self.gene_matcher:
-            self.gene_matcher = GeneMatcher(self.get_selected_organism())
 
-        self.gene_matcher.genes = self.input_genes
-        self.gene_matcher.organism = self.get_selected_organism()
+        if self.input_genes:
+            if not self.gene_matcher:
+                self.gene_matcher = GeneMatcher(self.get_selected_organism(), case_insensitive=True)
+
+            self.gene_matcher.genes = self.input_genes
+            self.gene_matcher.organism = self.get_selected_organism()
 
     def get_selected_organism(self):
         return self.organisms[self.selected_organism]
@@ -508,20 +512,17 @@ class OWGeneNameMatching(OWWidget):
 
     @Inputs.data_table
     def handle_input(self, data):
+        self.gene_columns_model.set_domain(None)
+
         if data:
             self.input_data = data
+            self.gene_columns_model.set_domain(self.input_data.domain)
 
-            self.gene_column_combobox.clear()
-            self.column_candidates = [attr for attr in data.domain.variables + data.domain.metas
-                                      if isinstance(attr, (StringVariable, DiscreteVariable))]
-
-            for var in self.column_candidates:
-                self.gene_column_combobox.addItem(*attributeItem(var))
+            if self.gene_columns_model:
+                self.selected_gene_col = self.gene_columns_model[0]
 
             self.tax_id = str(self.input_data.attributes.get(TAX_ID, ''))
             self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.use_attr_names)
-
-            self.gene_col_index = min(self.gene_col_index, len(self.column_candidates) - 1)
 
             if self.tax_id in self.organisms:
                 self.selected_organism = self.organisms.index(self.tax_id)
@@ -600,10 +601,9 @@ class OWGeneNameMatching(OWWidget):
                 )
                 data_table = data_table.transform(temp_domain)
             else:
-                # selected column for genes
-                column = self.gene_columns[self.gene_col_index]
-                # create filter
-                only_known = table_filter.FilterStringList(column, known_input_genes)
+
+                # create filter from selected column for genes
+                only_known = table_filter.FilterStringList(self.selected_gene_col, known_input_genes)
                 # apply filter to the data
                 data_table = table_filter.Values([only_known])(data_table)
 
