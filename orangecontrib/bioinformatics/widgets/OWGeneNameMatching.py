@@ -2,11 +2,14 @@
 import os
 import threading
 import numpy as np
+import re
 
+
+from typing import Set
 
 from AnyQt.QtWidgets import (
     QSplitter, QTableView, QWidget, QVBoxLayout, QItemDelegate, QStyledItemDelegate, QHeaderView, QStyleOptionViewItem,
-    QStyle, QAbstractItemView
+    QStyle, QAbstractItemView, QApplication
 )
 from AnyQt.QtCore import (
     Qt, QSize, QThreadPool, QSortFilterProxyModel, QAbstractListModel, QVariant,
@@ -16,7 +19,6 @@ from AnyQt.QtGui import (
     QIcon, QFont, QAbstractTextDocumentLayout, QFontMetrics, QTextDocument
 )
 
-
 from Orange.widgets.gui import (
     vBox, comboBox, ProgressBar, widgetBox, auto_commit, widgetLabel, checkBox,
     attributeItem, rubber, radioButtons, separator, hBox
@@ -25,10 +27,13 @@ from Orange.widgets.widget import OWWidget
 from Orange.widgets.utils import itemmodels
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output, Input
-from Orange.data import DiscreteVariable, StringVariable, Domain, Table, filter
+from Orange.data import DiscreteVariable, StringVariable, Domain, Table, filter as table_filter
 
 from orangecontrib.bioinformatics.widgets.utils.gui import horizontal_line
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN
+
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
+)
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 from orangecontrib.bioinformatics.ncbi import taxonomy
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, NCBI_ID
@@ -310,7 +315,7 @@ class OWGeneNameMatching(OWWidget):
     gene_as_attr_name = Setting(0)
     use_attr_names = Setting(False)
     filter_unknown = Setting(True)
-    include_gene_id = Setting(True)
+    include_entrez_id = Setting(True)
     # include_ensembl_id = Setting(True)
     auto_commit = Setting(True)
 
@@ -385,7 +390,7 @@ class OWGeneNameMatching(OWWidget):
         checkBox(output_box, self, 'filter_unknown', 'Filter unknown genes', callback=self.on_output_option_change)
         separator(output_box)
         output_box.layout().addWidget(horizontal_line())
-        checkBox(output_box, self, 'include_gene_id', 'Include Gene ID', callback=self.on_output_option_change)
+        checkBox(output_box, self, 'include_entrez_id', 'Include Entrez ID', callback=self.on_output_option_change)
 
         # TODO: provide support for ensembl ids as output option
         # checkBox(output_box, self, 'include_ensembl_id', 'Include Ensembl ID', callback=self.on_output_option_change)
@@ -527,26 +532,62 @@ class OWGeneNameMatching(OWWidget):
             self.__reset_widget_state()
             self.gene_matcher = None
 
+    @staticmethod
+    def get_gene_id_identifier(gene_id_strings):
+        # type: (Set[str]) -> str
+
+        if not len(gene_id_strings):
+            return NCBI_ID
+
+        regex = re.compile(r'Entrez ID \(.*?\)')
+        filtered = filter(regex.search, gene_id_strings)
+
+        return NCBI_ID + ' ({})'.format(len(set(filtered)) + 1)
+
     def __handle_ids(self, data_table):
         """
         If 'use_attr_names' is True, genes from the input data are in columns.
         """
         if self.use_attr_names:
+            # set_of_attributes = set([key for attr in data_table.domain[:] for key in attr.attributes.keys()
+            # if key.startswith(NCBI_ID)])
+            # gene_id = self.get_gene_id_identifier(set_of_attributes)
+            gene_id = NCBI_ID
+
             for gene in self.gene_matcher.genes:
                 if gene.ncbi_id:
-                    data_table.domain[gene.input_name].attributes[NCBI_ID] = str(gene.ncbi_id)
+                    data_table.domain[gene.input_name].attributes[gene_id] = str(gene.ncbi_id)
         else:
-            if NCBI_ID not in data_table.domain:
-                temp_domain = Domain([], metas=[StringVariable(NCBI_ID)])
-                temp_data = [[str(gene.ncbi_id) if gene.ncbi_id else '?'] for gene in self.gene_matcher.genes]
-                temp_table = Table(temp_domain, temp_data)
+            set_of_variables = set([var.name for var in data_table.domain.variables + data_table.domain.metas
+                                    if var.name.startswith(NCBI_ID)])
+
+            gene_id = self.get_gene_id_identifier(set_of_variables)
+
+            temp_domain = Domain([], metas=[StringVariable(gene_id)])
+            temp_data = [[str(gene.ncbi_id) if gene.ncbi_id else '?'] for gene in self.gene_matcher.genes]
+            temp_table = Table(temp_domain, temp_data)
+
+            # if columns differ, then concatenate.
+            if NCBI_ID in data_table.domain:
+                if gene_id != NCBI_ID and not np.array_equal(np.array(temp_data).ravel(),
+                                                             data_table.get_column_view(NCBI_ID)[0]):
+
+                    data_table = Table.concatenate([data_table, temp_table])
+                else:
+                    gene_id = NCBI_ID
+            else:
                 data_table = Table.concatenate([data_table, temp_table])
 
-        return data_table
+        return data_table, gene_id
 
     def __apply_filters(self, data_table):
-        if self.include_gene_id:
-            data_table = self.__handle_ids(data_table)
+        set_of_attributes = set([key for attr in data_table.domain[:] for key in attr.attributes.keys()
+                                 if key == NCBI_ID])
+
+        gene_id = NCBI_ID if NCBI_ID in data_table.domain or set_of_attributes else None
+
+        if self.include_entrez_id:
+            data_table, gene_id = self.__handle_ids(data_table)
 
         if self.filter_unknown:
             known_input_genes = [gene.input_name for gene in self.gene_matcher.get_known_genes()]
@@ -562,23 +603,26 @@ class OWGeneNameMatching(OWWidget):
                 # selected column for genes
                 column = self.gene_columns[self.gene_col_index]
                 # create filter
-                only_known = filter.FilterStringList(column, known_input_genes)
+                only_known = table_filter.FilterStringList(column, known_input_genes)
                 # apply filter to the data
-                data_table = filter.Values([only_known])(data_table)
+                data_table = table_filter.Values([only_known])(data_table)
 
-        return data_table
+        return data_table, gene_id
 
     def commit(self):
         self.Outputs.custom_data_table.send(None)
 
         output_data_table = self.input_data.transform(self.input_data.domain.copy())
-        output_data_table = self.__apply_filters(output_data_table.copy())
+        output_data_table, gene_id = self.__apply_filters(output_data_table.copy())
 
         # handle table attributes
         output_data_table.attributes[TAX_ID] = self.get_selected_organism()
         output_data_table.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.use_attr_names)
+
         if not bool(self.use_attr_names):
-            output_data_table.attributes[GENE_ID_COLUMN] = NCBI_ID
+            output_data_table.attributes[GENE_ID_COLUMN] = gene_id
+        else:
+            output_data_table.attributes[GENE_ID_ATTRIBUTE] = gene_id
 
         self.Outputs.custom_data_table.send(output_data_table)
         # gene_objs = [self.proxy_model.index(row, 0).data() for row in range(self.proxy_model.rowCount())]
@@ -589,14 +633,3 @@ class OWGeneNameMatching(OWWidget):
     def on_filter_changed(self):
         self.proxy_model.invalidateFilter()
         self.extended_view.genes_view.resizeRowsToContents()
-
-
-if __name__ == "__main__":
-    from AnyQt.QtWidgets import QApplication
-    app = QApplication([])
-
-    data = Table('/Users/jakakokosar/Desktop/gnm.pickle')
-    ow = OWGeneNameMatching()
-    ow.handle_input(data)
-    ow.show()
-    app.exec_()

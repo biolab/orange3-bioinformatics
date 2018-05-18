@@ -39,7 +39,7 @@ MAP_LOCUS = 'locus_tag'
 MAP_NOMENCLATURE = 'symbol_from_nomenclature_authority'
 
 # Pretty strings
-NCBI_ID = 'Gene ID'
+NCBI_ID = 'Entrez ID'
 ENSEMBl_ID = 'Ensembl ID'
 GENE_SYMBOL = 'Symbol'
 GENE_SYNONYMS = 'Synonyms'
