@@ -18,6 +18,9 @@ GENE_AS_ATTRIBUTE_NAME = 'gene_as_attribute_name'
 # Name of the column where rows are gene ids
 GENE_ID_COLUMN = 'gene_id_column'
 
+# Name of the variable attribute that holds gene id
+GENE_ID_ATTRIBUTE = 'gene_id_attribute'
+
 
 col_spec = Sequence[Tuple[Orange.data.Variable, Sequence[numbers.Real]]]
 metas_spec = Sequence[Tuple[Orange.data.Variable, Sequence[str]]]
