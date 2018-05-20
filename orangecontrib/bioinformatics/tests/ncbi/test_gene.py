@@ -41,6 +41,24 @@ class GeneMatcher(unittest.TestCase):
         for tag in gene.GENE_INFO_TAGS:
             self.assertIsNotNone(getattr(result, tag))
 
+    def test_case_insensitive(self):
+        organism = '10090'
+        original_name = 'Pou4f1'
+        ncbi_id = 18996
+
+        gene_matcher = gene.GeneMatcher(organism)
+        gene_matcher.genes = ['Pou4F1', 'pou4F1', 'POU4F1', 'pou4f1', original_name]
+        gene_matcher.run_matcher()
+
+        self.assertEqual(len([g.ncbi_id for g in gene_matcher.genes if g.ncbi_id]), 1)
+
+        gene_matcher = gene.GeneMatcher(organism, case_insensitive=True)
+        gene_matcher.genes = ['Pou4F1', 'pou4F1', 'POU4F1', 'pou4f1', original_name]
+        gene_matcher.run_matcher()
+
+        self.assertEqual(len([g.ncbi_id for g in gene_matcher.genes if g.ncbi_id]), 5)
+        self.assertEqual(set([g.ncbi_id for g in gene_matcher.genes if g.ncbi_id]).pop(), ncbi_id)
+
 
 class GeneInfo(unittest.TestCase):
 
