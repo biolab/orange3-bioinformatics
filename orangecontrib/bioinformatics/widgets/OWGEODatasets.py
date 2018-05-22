@@ -27,7 +27,9 @@ from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.geo.utils import gds_ensure_downloaded
 from orangecontrib.bioinformatics.geo.dataset import GDS, GDSInfo, DOMAIN
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME, TAX_ID, GENE_ID_COLUMN
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    GENE_AS_ATTRIBUTE_NAME, TAX_ID, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
+)
 from orangecontrib.bioinformatics.ncbi.gene import NCBI_ID
 
 
@@ -596,8 +598,11 @@ class OWGEODatasets(OWWidget):
 
         data.attributes[TAX_ID] = self.currentGds.get('taxid', '')
         data.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.outputRows)
+
         if not bool(self.outputRows):
             data.attributes[GENE_ID_COLUMN] = NCBI_ID
+        else:
+            data.attributes[GENE_ID_ATTRIBUTE] = NCBI_ID
 
         data.name = data_name
         self.send("Expression Data", data)
