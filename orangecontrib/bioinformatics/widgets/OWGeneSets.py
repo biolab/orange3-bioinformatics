@@ -16,22 +16,23 @@ from AnyQt.QtGui import (
 )
 
 from Orange.widgets.gui import (
-    vBox, comboBox, lineEdit, ProgressBar, widgetBox, LinkRole, LinkStyledItemDelegate,
-    auto_commit, widgetLabel, checkBox, attributeItem
+    vBox, lineEdit, ProgressBar, widgetBox, LinkRole, LinkStyledItemDelegate,
+    auto_commit, widgetLabel
 )
 
 from Orange.widgets.widget import OWWidget, Msg
-from Orange.widgets.utils import itemmodels
 from Orange.widgets.settings import Setting, ContextSetting
 from Orange.widgets.utils.signals import Output, Input
 
-from Orange.data import DiscreteVariable, StringVariable, Domain, Table
+from Orange.data import Domain, Table
 
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE,
+    ERROR_ON_MISSING_ANNOTATION, ERROR_ON_MISSING_GENE_ID, ERROR_ON_MISSING_TAX_ID
+)
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 from orangecontrib.bioinformatics.widgets.utils.settings import OrganismContextHandler
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics.ncbi import gene, taxonomy
 from orangecontrib.bioinformatics import geneset
 
 
@@ -56,7 +57,7 @@ def hierarchy_tree(tax_id, gene_sets):
     return tax_id, collection[tax_id]
 
 
-def get_collections(gene_sets, mapped_genes, partial_result, progress_callback):
+def get_collections(gene_sets, genes, partial_result, progress_callback):
 
     for gene_set in gene_sets:
         category_column = QStandardItem()
@@ -70,8 +71,8 @@ def get_collections(gene_sets, mapped_genes, partial_result, progress_callback):
         name_column.setData(gene_set.link, LinkRole)
         name_column.setForeground(QColor(Qt.blue))
 
-        if mapped_genes:
-            matched_set = gene_set.genes & {ncbi_id for input_name, ncbi_id in mapped_genes.items()}
+        if genes:
+            matched_set = gene_set.genes & genes
             matched_column.setData(matched_set, Qt.UserRole)
             matched_column.setData(len(matched_set), Qt.DisplayRole)
 
@@ -99,15 +100,10 @@ class OWGeneSets(OWWidget):
     icon = "icons/OWGeneSets.svg"
     priority = 9
     want_main_area = True
+    settingsHandler = OrganismContextHandler()
 
     # settings
-    selected_organism = Setting(0)
     auto_commit = Setting(True)
-    auto_apply = Setting(True)
-    gene_col_index = Setting(0)
-    use_attr_names = Setting(False)
-
-    settingsHandler = OrganismContextHandler()
     stored_selections = ContextSetting([])
     organism = ContextSetting(None)
 
@@ -121,6 +117,9 @@ class OWGeneSets(OWWidget):
         pass
 
     class Error(OWWidget.Error):
+        missing_annotation = Msg(ERROR_ON_MISSING_ANNOTATION)
+        missing_gene_id = Msg(ERROR_ON_MISSING_GENE_ID)
+        missing_tax_id = Msg(ERROR_ON_MISSING_TAX_ID)
         cant_reach_host = Msg("Host orange.biolab.si is unreachable.")
         cant_load_organisms = Msg("No available organisms, please check your connection.")
 
@@ -136,13 +135,15 @@ class OWGeneSets(OWWidget):
 
         # data
         self.input_data = None
-        self.tax_id = None
         self.input_genes = None
-        self.mapped_genes = None
-        self.organisms = list()
-        self.input_info = None
 
-        self.column_candidates = []
+        self.tax_id = None
+        self.use_attr_names = None
+        self.gene_id_attribute = None
+        self.gene_id_column = None
+
+        self.input_info = None
+        self.num_of_sel_genes = 0
 
         # filter
         self.lineEdit_filter = None
@@ -163,130 +164,67 @@ class OWGeneSets(OWWidget):
         self.hierarchy_widget = None
         self.hierarchy_state = None
 
-        # input options
-        self.gene_columns = None
-        self.gene_column_combobox = None
-        self.attr_names_checkbox = None
-
         # threads
         self.threadpool = QThreadPool(self)
         self.workers = None
 
         # gui
         self.setup_gui()
-        self._get_available_organisms()
-
-        # self.handle_input(self.input_genes)
-        # self.on_organism_change()
 
     def _progress_advance(self):
         # GUI should be updated in main thread. That's why we are calling advance method here
         if self.progress_bar:
             self.progress_bar.advance()
 
-    def _get_available_organisms(self):
-        available_organism = sorted([(tax_id, taxonomy.name(tax_id)) for tax_id in taxonomy.common_taxids()],
-                                    key=lambda x: x[1])
-
-        self.organisms = [tax_id[0] for tax_id in available_organism]
-
-        self.organism_select_combobox.addItems([tax_id[1] for tax_id in available_organism])
-
-    def _gene_names_from_table(self):
-        """ Extract and return gene names from `Orange.data.Table`.
-        """
+    def __get_genes(self):
         self.input_genes = []
-        if self.input_data:
-            if self.use_attr_names:
-                self.input_genes = [str(attr.name).strip() for attr in self.input_data.domain.attributes]
-            elif self.gene_columns:
-                column = self.gene_columns[self.gene_col_index]
-                self.input_genes = [str(e[column]) for e in self.input_data if not np.isnan(e[column])]
 
-    def _update_gene_matcher(self):
-        self._gene_names_from_table()
-        if not self.gene_matcher:
-            self.gene_matcher = gene.GeneMatcher(self.get_selected_organism())
-
-        self.gene_matcher.genes = self.input_genes
-        self.gene_matcher.organism = self.get_selected_organism()
-
-    def get_selected_organism(self):
-        return self.organisms[self.selected_organism]
-
-    def on_input_option_change(self):
-        self._update_gene_matcher()
-        self.match_genes()
+        if self.use_attr_names:
+            for variable in self.input_data.domain.attributes:
+                self.input_genes.append(str(variable.attributes.get(self.gene_id_attribute, '?')))
+        else:
+            genes, _ = self.input_data.get_column_view(self.gene_id_column)
+            self.input_genes = [str(g) for g in genes]
 
     @Inputs.genes
     def handle_input(self, data):
         self.closeContext()
-
+        self.Error.clear()
         if data:
             self.input_data = data
+            self.tax_id = str(self.input_data.attributes.get(TAX_ID, None))
+            self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
+            self.gene_id_attribute = self.input_data.attributes.get(GENE_ID_ATTRIBUTE, None)
+            self.gene_id_column = self.input_data.attributes.get(GENE_ID_COLUMN, None)
 
-            self.gene_column_combobox.clear()
-            self.column_candidates = [attr for attr in data.domain.variables + data.domain.metas
-                                      if isinstance(attr, (StringVariable, DiscreteVariable))]
+            if not(self.use_attr_names is not None
+                   and ((self.gene_id_attribute is None) ^ (self.gene_id_column is None))):
 
-            for var in self.column_candidates:
-                self.gene_column_combobox.addItem(*attributeItem(var))
+                if self.tax_id is None:
+                    self.Error.missing_annotation()
+                    return
 
-            self.tax_id = str(self.input_data.attributes.get(TAX_ID, ''))
-            self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.use_attr_names)
+                self.Error.missing_gene_id()
+                return
 
-            self.gene_col_index = min(self.gene_col_index, len(self.column_candidates) - 1)
-
-            if self.tax_id in self.organisms:
-                self.selected_organism = self.organisms.index(self.tax_id)
+            elif self.tax_id is None:
+                self.Error.missing_tax_id()
+                return
 
             self.openContext(self.tax_id)
 
-        self.on_input_option_change()
+        self.__get_genes()
+        self.download_gene_sets()
 
     def update_info_box(self):
         info_string = ''
         if self.input_genes:
             info_string += '{} unique gene names on input.\n'.format(len(self.input_genes))
-            mapped = self.gene_matcher.get_known_genes()
-            if mapped:
-                ratio = (len(mapped) / len(self.input_genes)) * 100
-                info_string += '{} ({:.2f}%) gene names matched.\n'.format(len(mapped), ratio)
+            info_string += '{} genes on output.\n'.format(self.num_of_sel_genes)
         else:
             info_string += 'No genes on input.\n'
 
         self.input_info.setText(info_string)
-
-    def match_genes(self):
-        if self.gene_matcher:
-            # init progress bar
-            self.progress_bar = ProgressBar(self, iterations=len(self.gene_matcher.genes))
-            # status message
-            self.setStatusMessage('gene matcher running')
-
-            worker = Worker(self.gene_matcher.run_matcher, progress_callback=True)
-            worker.signals.progress.connect(self._progress_advance)
-            worker.signals.finished.connect(self.handle_matcher_results)
-
-            # move download process to worker thread
-            self.threadpool.start(worker)
-
-    def handle_matcher_results(self):
-        assert threading.current_thread() == threading.main_thread()
-        self.openContext(self.get_selected_organism())
-
-        if self.progress_bar:
-            self.progress_bar.finish()
-            self.setStatusMessage('')
-
-        if self.gene_matcher.map_input_to_ncbi():
-            self.download_gene_sets()
-            self.update_info_box()
-        else:
-            # reset gene sets
-            self.init_item_model()
-            self.hierarchy_widget.clear()
-            self.update_info_box()
 
     def on_gene_sets_download(self, result):
         # make sure this happens in the main thread.
@@ -299,16 +237,15 @@ class OWGeneSets(OWWidget):
         self.set_hierarchy_model(self.hierarchy_widget, *hierarchy_tree(tax_id, sets))
         self.set_selected_hierarchies()
 
-        self.organism_select_combobox.setEnabled(True)  # re-enable combobox
-
         self.update_info_box()
-        self.mapped_genes = self.gene_matcher.map_input_to_ncbi()
         self.workers = defaultdict(list)
         self.progress_bar_iterations = dict()
 
         for selected_hierarchy in self.get_hierarchies():
             gene_sets = geneset.load_gene_sets(selected_hierarchy)
-            worker = Worker(get_collections, gene_sets, self.mapped_genes, progress_callback=True, partial_result=True)
+            worker = Worker(get_collections, gene_sets, set(self.input_genes),
+                            progress_callback=True,
+                            partial_result=True)
             worker.signals.error.connect(self.handle_error)
             worker.signals.finished.connect(self.handle_worker_finished)
             worker.signals.progress.connect(self._progress_advance)
@@ -368,18 +305,14 @@ class OWGeneSets(OWWidget):
                 item.hierarchy = ((key,), tax_id)
 
     def download_gene_sets(self):
-        tax_id = self.get_selected_organism()
-
         self.Error.clear()
-        # do not allow user to change organism when download task is running
-        self.organism_select_combobox.setEnabled(False)
         # reset hierarchy widget state
         self.hierarchy_widget.clear()
         # clear data view
         self.init_item_model()
 
         # get all gene sets for selected organism
-        gene_sets = geneset.list_all(organism=tax_id)
+        gene_sets = geneset.list_all(organism=self.tax_id)
         # init progress bar
         self.progress_bar = ProgressBar(self, iterations=len(gene_sets) * 100)
         # status message
@@ -418,14 +351,13 @@ class OWGeneSets(OWWidget):
         for selected_hierarchy in only_selected_hier:
             self.threadpool.start(self.workers[selected_hierarchy])
 
-        self.openContext(self.get_selected_organism())
+        self.openContext(self.tax_id)
 
     def handle_error(self, ex):
         self.progress_bar.finish()
         self.setStatusMessage('')
 
         if isinstance(ex, ConnectionError):
-            self.organism_select_combobox.setEnabled(True)  # re-enable combobox
             self.Error.cant_reach_host()
 
         print(ex)
@@ -492,50 +424,36 @@ class OWGeneSets(OWWidget):
             if matched_genes and self.input_genes:
                 genes = [model_index.data(Qt.UserRole) for model_index in matched_genes]
                 output_genes = [gene_name for gene_name in list(set.union(*genes))]
-                input_to_ncbi = self.gene_matcher.map_input_to_ncbi()
-                ncbi_to_input = {ncbi_id: input_name for input_name, ncbi_id
-                                 in self.gene_matcher.map_input_to_ncbi().items()}
+                self.num_of_sel_genes = len(output_genes)
+                self.update_info_box()
 
                 if self.use_attr_names:
-                    selected = [self.input_data.domain[ncbi_to_input[output_gene]] for output_gene in output_genes]
+                    selected = [column for column in self.input_data.domain.attributes
+                                if self.gene_id_attribute in column.attributes and
+                                str(column.attributes[self.gene_id_attribute]) in output_genes]
+
                     domain = Domain(selected, self.input_data.domain.class_vars, self.input_data.domain.metas)
                     new_data = self.input_data.from_table(domain, self.input_data)
                     self.Outputs.matched_genes.send(new_data)
 
-                elif self.column_candidates:
-                    column = self.column_candidates[self.gene_col_index]
+                else:
                     selected_rows = []
-
                     for row_index, row in enumerate(self.input_data):
-                        if str(row[column]) in input_to_ncbi.keys() and input_to_ncbi[str(row[column])] in output_genes:
+                        gene_in_row = str(row[self.gene_id_column])
+                        if gene_in_row in self.input_genes and gene_in_row in output_genes:
                             selected_rows.append(row_index)
+
                     if selected_rows:
                         selected = self.input_data[selected_rows]
                     else:
                         selected = None
+
                     self.Outputs.matched_genes.send(selected)
 
     def setup_gui(self):
         # control area
         info_box = vBox(self.controlArea, 'Input info')
         self.input_info = widgetLabel(info_box)
-
-        organism_box = vBox(self.controlArea, 'Organisms')
-        self.organism_select_combobox = comboBox(organism_box, self,
-                                                 'selected_organism',
-                                                 callback=self.on_input_option_change)
-
-        # Selection of genes attribute
-        box = widgetBox(self.controlArea, 'Gene attribute')
-        self.gene_columns = itemmodels.VariableListModel(parent=self)
-        self.gene_column_combobox = comboBox(box, self, 'gene_col_index', callback=self.on_input_option_change)
-        self.gene_column_combobox.setModel(self.gene_columns)
-
-        self.attr_names_checkbox = checkBox(box, self, 'use_attr_names', 'Use attribute names',
-                                            disables=[(-1, self.gene_column_combobox)],
-                                            callback=self.on_input_option_change)
-
-        self.gene_column_combobox.setDisabled(bool(self.use_attr_names))
 
         hierarchy_box = widgetBox(self.controlArea, "Entity Sets")
         self.hierarchy_widget = QTreeWidget(self)
