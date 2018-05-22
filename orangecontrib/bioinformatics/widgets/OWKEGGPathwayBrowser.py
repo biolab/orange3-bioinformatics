@@ -1,11 +1,9 @@
 """ KEGG Pathway """
 import sys
 import gc
-import numpy
 import Orange
 import webbrowser
 
-from operator import add, itemgetter
 from functools import reduce, partial
 from contextlib import contextmanager
 from collections import defaultdict
@@ -22,13 +20,15 @@ from AnyQt.QtGui import (
 from AnyQt.QtCore import Qt, QRectF, QSize, Slot, QItemSelectionModel
 
 from Orange.widgets import widget, gui, settings
-from Orange.widgets.utils import itemmodels, concurrent
+from Orange.widgets.utils import concurrent
 
 from orangecontrib.bioinformatics import kegg
 from orangecontrib.bioinformatics import geneset
 from orangecontrib.bioinformatics.utils import statistics
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_AS_ATTRIBUTE_NAME
-from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE,
+    ERROR_ON_MISSING_ANNOTATION, ERROR_ON_MISSING_GENE_ID, ERROR_ON_MISSING_TAX_ID
+)
 
 
 def relation_list_to_multimap(rellist, ncbi_gene_ids):
@@ -124,8 +124,7 @@ class GraphicsPathwayItem(QGraphicsPixmapItem):
         QGraphicsPixmapItem.__init__(self, *args)
         self.setTransformationMode(Qt.SmoothTransformation)
         self.setPathway(pathway)
-        self.setMarkedObjects(objects,
-                              name_mapper=kwargs.get("name_mapper", {}))
+        self.setMarkedObjects(objects)
 
     def setPathway(self, pathway):
         """
@@ -139,15 +138,14 @@ class GraphicsPathwayItem(QGraphicsPixmapItem):
             self._pixmap = QPixmap()
         self.setPixmap(self._pixmap)
 
-    def setMarkedObjects(self, objects, name_mapper={}):
+    def setMarkedObjects(self, objects,):
         for entry in self.pathway.entries() if self.pathway else []:
             if entry.type == "group":
                 continue
             graphics = entry.graphics
             contained_objects = [obj for obj in objects if obj in entry.name]
             item = EntryGraphicsItem(graphics, self)
-            item.setToolTip(self.tooltip(entry, contained_objects,
-                                         name_mapper))
+            item.setToolTip(self.tooltip(entry, contained_objects))
             item._actions = self.actions(entry, contained_objects)
             item.marked_objects = contained_objects
             if contained_objects:
@@ -172,9 +170,8 @@ class GraphicsPathwayItem(QGraphicsPixmapItem):
             actions.append(action)
         return actions
 
-    def tooltip(self, entry, objects, name_mapper={}):
+    def tooltip(self, entry, objects):
         names = [obj for obj in objects if obj in entry.name]
-        names = [name_mapper.get(name, name) for name in names]
         text = entry.name[:16] + " ..." if len(entry.name) > 20 else entry.name
         text = "<p>%s</p>" % text
         if names:
@@ -215,8 +212,7 @@ class PathwayView(QGraphicsView):
         self.pathway = pathway
         self.objects = objects
         self.pathwayItem = GraphicsPathwayItem(
-            pathway, objects, None,
-            name_mapper=getattr(self.master, "uniqueGenesDict", {})
+            pathway, objects, None
         )
 
         self.scene().addItem(self.pathwayItem)
@@ -246,12 +242,6 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
     outputs = [("Selected Data", Orange.data.Table, widget.Default),
                ("Unselected Data", Orange.data.Table)]
 
-    settingsHandler = settings.DomainContextHandler()
-
-    organismIndex = settings.ContextSetting(0)
-    geneAttrIndex = settings.ContextSetting(0)
-    useAttrNames = settings.ContextSetting(False)
-
     autoCommit = settings.Setting(False)
     autoResize = settings.Setting(True)
     useReference = settings.Setting(False)
@@ -259,10 +249,14 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
     Ready, Initializing, Running = 0, 1, 2
 
+    class Error(widget.OWWidget.Error):
+        missing_annotation = widget.Msg(ERROR_ON_MISSING_ANNOTATION)
+        missing_gene_id = widget.Msg(ERROR_ON_MISSING_GENE_ID)
+        missing_tax_id = widget.Msg(ERROR_ON_MISSING_TAX_ID)
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.organismCodes = []
         self._changedFlag = False
         self.__invalidated = False
         self.__runstate = OWKEGGPathwayBrowser.Initializing
@@ -272,32 +266,10 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         box = gui.widgetBox(self.controlArea, "Info")
         self.infoLabel = gui.widgetLabel(box, "No data on input\n")
 
-        # Organism selection.
-        box = gui.widgetBox(self.controlArea, "Organism")
-        self.organismComboBox = gui.comboBox(
-            box, self, "organismIndex",
-            items=[],
-            callback=self.Update,
-            addSpace=True,
-            tooltip="Select the organism of the input genes")
-
-        # Selection of genes attribute
-        box = gui.widgetBox(self.controlArea, "Gene attribute")
-        self.geneAttrCandidates = itemmodels.VariableListModel(parent=self)
-        self.geneAttrCombo = gui.comboBox(
-            box, self, "geneAttrIndex", callback=self.Update)
-        self.geneAttrCombo.setModel(self.geneAttrCandidates)
-
-        gui.checkBox(box, self, "useAttrNames",
-                    "Use variable names", disables=[(-1, self.geneAttrCombo)],
-                    callback=self.Update)
-
-        self.geneAttrCombo.setDisabled(bool(self.useAttrNames))
-
         gui.separator(self.controlArea)
 
         gui.checkBox(self.controlArea, self, "useReference",
-                    "From signal", box="Reference", callback=self.Update)
+                     "From signal", box="Reference", callback=self.Update)
 
         gui.separator(self.controlArea)
 
@@ -351,7 +323,21 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         self.addAction(select)
 
         self.data = None
-        self.refData = None
+        self.input_genes = []
+        self.tax_id = None
+        self.use_attr_names = None
+        self.gene_id_attribute = None
+        self.gene_id_column = None
+
+        self.ref_data = None
+        self.ref_genes = []
+        self.ref_tax_id = None
+        self.ref_use_attr_names = None
+        self.ref_gene_id_attribute = None
+        self.ref_gene_id_column = None
+
+        self.pathways = {}
+        self.org = None
 
         self._executor = concurrent.ThreadExecutor()
         self.setEnabled(False)
@@ -398,29 +384,14 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         self.setEnabled(True)
         self.setBlocking(False)
 
-        entries = [genome[key] for key in keys]
-        items = [entry.definition for entry in entries]
-        codes = [entry.organism_code for entry in entries]
-
-        self.organismCodes = codes
-        self.organismComboBox.clear()
-        self.organismComboBox.addItems(items)
-        self.organismComboBox.setCurrentIndex(self.organismIndex)
-
         self.infoLabel.setText("No data on input\n")
 
-    def Clear(self):
+    def clear(self):
         """
         Clear the widget state.
         """
-        self.queryGenes = []
-        self.referenceGenes = []
-        self.genes = {}
-        self.uniqueGenesDict = {}
-        self.revUniqueGenesDict = {}
         self.pathways = {}
         self.org = None
-        self.geneAttrCandidates[:] = []
 
         self.infoLabel.setText("No data on input\n")
         self.listView.clear()
@@ -433,55 +404,60 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         if self.__runstate == OWKEGGPathwayBrowser.Initializing:
             self.__initialize_finish()
 
-        self.data = data
-        self.warning(0)
-        self.error(0)
-        self.information(0)
+        self.Error.clear()
+        if data:
+            self.data = data
+            self.tax_id = str(self.data.attributes.get(TAX_ID, None))
+            self.use_attr_names = self.data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
+            self.gene_id_attribute = self.data.attributes.get(GENE_ID_ATTRIBUTE, None)
+            self.gene_id_column = self.data.attributes.get(GENE_ID_COLUMN, None)
 
-        if data is not None:
-            vars = data.domain.variables + data.domain.metas
-            vars = [var for var in vars
-                    if isinstance(var, Orange.data.StringVariable)]
-            self.geneAttrCandidates[:] = vars
+            if not (self.use_attr_names is not None
+                    and ((self.gene_id_attribute is None) ^ (self.gene_id_column is None))):
 
-            # Try to guess the gene name variable
-            if vars:
-                names_lower = [v.name.lower() for v in vars]
-                scores = [(name == "gene", "gene" in name)
-                          for name in names_lower]
-                imax, _ = max(enumerate(scores), key=itemgetter(1))
-            else:
-                imax = -1
+                if self.tax_id is None:
+                    self.Error.missing_annotation()
+                    return
 
-            self.geneAttrIndex = imax
+                self.Error.missing_gene_id()
+                return
 
-            taxid = str(data.attributes.get(TAX_ID, ''))
+            elif self.tax_id is None:
+                self.Error.missing_tax_id()
+                return
 
-            if taxid:
-                try:
-                    code = kegg.from_taxid(taxid)
-                    self.organismIndex = self.organismCodes.index(code)
-                except Exception as ex:
-                    print(ex, taxid)
+            self.warning(0)
+            self.error(0)
+            self.information(0)
 
-            self.useAttrNames = data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.useAttrNames)
-
-            if len(self.geneAttrCandidates) == 0:
-                self.useAttrNames = True
-                self.geneAttrIndex = -1
-            else:
-                self.geneAttrIndex = min(self.geneAttrIndex,
-                                         len(self.geneAttrCandidates) - 1)
+            self.__invalidated = True
         else:
-            self.Clear()
-
-        self.__invalidated = True
+            self.clear()
 
     def SetRefData(self, data=None):
-        self.refData = data
         self.information(1)
 
         if data is not None and self.useReference:
+            self.ref_data = data
+            self.ref_tax_id = str(self.ref_data.attributes.get(TAX_ID, None))
+            self.ref_use_attr_names = self.ref_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
+            self.ref_gene_id_attribute = self.ref_data.attributes.get(GENE_ID_ATTRIBUTE, None)
+            self.ref_gene_id_column = self.ref_data.attributes.get(GENE_ID_COLUMN, None)
+
+            if not (self.ref_use_attr_names is not None
+                    and ((self.ref_gene_id_attribute is None) ^ (self.ref_gene_id_column is None))):
+
+                if self.ref_tax_id is None:
+                    self.Error.missing_annotation()
+                    return
+
+                self.Error.missing_gene_id()
+                return
+
+            elif self.ref_tax_id is None:
+                self.Error.missing_tax_id()
+                return
+
             self.__invalidated = True
 
     def handleNewSignals(self):
@@ -501,8 +477,7 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         items = []
         kegg_pathways = kegg.KEGGPathways()
 
-        org_code = self.organismCodes[min(self.organismIndex,
-                                          len(self.organismCodes) - 1)]
+        org_code = self.org.org_code
 
         if self.showOrthology:
             self.koOrthology = kegg.KEGGBrite("ko00001")
@@ -540,8 +515,8 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
                     genes, p_value, ref = self.pathways[id]
                     item.setText(0, name)
                     item.setText(1, "%.5f" % p_value)
-                    item.setText(2, "%i of %i" % (len(genes), len(self.genes)))
-                    item.setText(3, "%i of %i" % (ref, len(self.referenceGenes)))
+                    item.setText(2, "%i of %i" % (len(genes), len(self.input_genes)))
+                    item.setText(3, "%i of %i" % (ref, len(self.ref_genes)))
                     item.pathway_id = id if p is not None else None
                 else:
                     if id in allPathways:
@@ -575,8 +550,8 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
                 item = QTreeWidgetItem(self.listView)
                 item.setText(0, kegg_pathways.get_entry(id).name)
                 item.setText(1, "%.5f" % p_value)
-                item.setText(2, "%i of %i" % (len(genes), len(self.genes)))
-                item.setText(3, "%i of %i" % (ref, len(self.referenceGenes)))
+                item.setText(2, "%i of %i" % (len(genes), len(self.input_genes)))
+                item.setText(3, "%i of %i" % (ref, len(self.ref_genes)))
                 item.pathway_id = id
                 items.append(item)
 
@@ -643,66 +618,28 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         # XXX: Check data in setData, do not even allow this to be executed if
         # data has no genes
         try:
-            genes = self.GeneNamesFromData(self.data)
+            self.__get_input_genes()
+            self.input_genes = set(self.input_genes)
         except ValueError:
             self.error(0, "Cannot extract gene names from input.")
-            genes = []
-
-        if not self.useAttrNames and any("," in gene for gene in genes):
-            genes = reduce(add, (split_and_strip(gene, ",")
-                                 for gene in genes),
-                           [])
-            self.information(0,
-                             "Separators detected in input gene names. "
-                             "Assuming multiple genes per instance.")
-
-        self.queryGenes = genes
 
         self.information(1)
-        reference = None
-        if self.useReference and self.refData:
-            reference = self.GeneNamesFromData(self.refData)
-            if not self.useAttrNames \
-                    and any("," in gene for gene in reference):
-                reference = reduce(add, (split_and_strip(gene, ",")
-                                         for gene in reference),
-                                   [])
-                self.information(1,
-                                 "Separators detected in reference gene "
-                                 "names. Assuming multiple genes per "
-                                 "instance.")
 
-        org_code = self.SelectedOrganismCode()
+        self.org = kegg.KEGGOrganism(kegg.from_taxid(self.tax_id))
 
-        gm = GeneMatcher(kegg.to_taxid(org_code))
-        gm.genes = genes
-        gm.run_matcher()
-        mapped_genes = {gene: str(ncbi_id) for gene, ncbi_id in gm.map_input_to_ncbi().items()}
+        if self.useReference and self.ref_data:
+            self.__get_ref_genes()
+            self.ref_genes = set(self.ref_genes)
+        else:
+            self.ref_genes = self.org.get_ncbi_ids()
 
-        def run_enrichment(org_code, genes, reference=None, progress=None):
-            org = kegg.KEGGOrganism(org_code)
-            if reference is None:
-                reference = org.get_ncbi_ids()
-
-            # This is here just to keep widget working without any major changes.
-            # map not needed, geneMatcher will not work on widget level.
-            unique_genes = genes
-            unique_ref_genes = dict([(gene, gene) for gene in set(reference)])
-
-            taxid = kegg.to_taxid(org.org_code)
-            # Map the taxid back to standard 'common' taxids
-            # (as used by 'geneset') if applicable
-            r_tax_map = dict((v, k) for k, v in
-                             kegg.KEGGGenome.TAXID_MAP.items())
-            if taxid in r_tax_map:
-                taxid = r_tax_map[taxid]
-
+        def run_enrichment(genes, reference, progress=None):
             # We use the kegg pathway gene sets provided by 'geneset' for
             # the enrichment calculation.
 
             kegg_api = kegg.api.CachedKeggApi()
-            linkmap = kegg_api.link(org.org_code, "pathway")
-            converted_ids = kegg_api.conv(org.org_code, 'ncbi-geneid')
+            linkmap = kegg_api.link(self.org.org_code, "pathway")
+            converted_ids = kegg_api.conv(self.org.org_code, 'ncbi-geneid')
             kegg_sets = relation_list_to_multimap(linkmap, dict((gene.upper(), ncbi.split(':')[-1])
                                                                 for ncbi, gene in converted_ids))
 
@@ -710,8 +647,7 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
                                                for ddi, genes in kegg_sets.items()])
 
             pathways = pathway_enrichment(
-                kegg_sets, unique_genes.values(),
-                unique_ref_genes.keys(),
+                kegg_sets, genes, reference,
                 callback=progress
             )
             # Ensure that pathway entries are pre-cached for later use in the
@@ -721,7 +657,7 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
                 pathways.keys(), progress_callback=progress
             )
 
-            return pathways, org, unique_genes, unique_ref_genes
+            return pathways
 
         self.progressBarInit()
         self.setEnabled(False)
@@ -731,7 +667,7 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
         self._enrichTask = concurrent.Task(
             function=lambda:
-                run_enrichment(org_code, mapped_genes, reference, progress)
+                run_enrichment(self.input_genes, self.ref_genes, progress)
         )
         self._enrichTask.finished.connect(self._onEnrichTaskFinished)
         self._executor.submit(self._enrichTask)
@@ -740,19 +676,12 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         self.setEnabled(True)
         self.setBlocking(False)
         try:
-            pathways, org, unique_genes, unique_ref_genes = \
-                self._enrichTask.result()
+            pathways = self._enrichTask.result()
         except Exception:
             raise
 
         self.progressBarFinished()
 
-        self.org = org
-        self.genes = unique_genes.keys()
-        self.uniqueGenesDict = {ncbi_id: input_name for input_name, ncbi_id in unique_genes.items()}
-        self.revUniqueGenesDict = dict([(val, key) for key, val in
-                                        self.uniqueGenesDict.items()])
-        self.referenceGenes = unique_ref_genes.keys()
         self.pathways = pathways
 
         if not self.pathways:
@@ -760,13 +689,8 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         else:
             self.warning(0)
 
-        count = len(set(self.queryGenes))
         self.infoLabel.setText(
-            "%i unique gene names on input\n"
-            "%i (%.1f%%) genes names matched" %
-            (count, len(unique_genes),
-             100.0 * len(unique_genes) / count if count else 0.0)
-        )
+            "{} unique gene names on input\n".format(len(set(self.input_genes))))
 
         self.UpdateListView()
 
@@ -779,27 +703,34 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         self.progressBarSet(value)
         self.__in_setProgress = False
 
-    def GeneNamesFromData(self, data):
+    def __get_input_genes(self):
         """
         Extract and return gene names from `data`.
         """
-        if self.useAttrNames:
-            genes = [str(v.name).strip() for v in data.domain.attributes]
-        elif self.geneAttrCandidates:
-            assert 0 <= self.geneAttrIndex < len(self.geneAttrCandidates)
-            geneAttr = self.geneAttrCandidates[self.geneAttrIndex]
-            genes = [str(e[geneAttr]) for e in data
-                     if not numpy.isnan(e[geneAttr])]
-        else:
-            raise ValueError("No gene names in data.")
-        return genes
+        self.input_genes = []
 
-    def SelectedOrganismCode(self):
+        if self.use_attr_names:
+            for variable in self.data.domain.attributes:
+                self.input_genes.append(str(variable.attributes.get(self.gene_id_attribute, '?')))
+        else:
+            genes, _ = self.data.get_column_view(self.gene_id_column)
+            self.input_genes = [str(g) for g in genes]
+
+        if len(self.input_genes) <= 0:
+            raise ValueError("No gene names in data.")
+
+    def __get_ref_genes(self):
         """
-        Return the selected organism code.
+        Extract and return gene names from `data`.
         """
-        return self.organismCodes[min(self.organismIndex,
-                                      len(self.organismCodes) - 1)]
+        self.ref_genes = []
+
+        if self.ref_use_attr_names:
+            for variable in self.ref_data.domain.attributes:
+                self.ref_genes.append(str(variable.attributes.get(self.ref_gene_id_attribute, '?')))
+        else:
+            genes, _ = self.ref_data.get_column_view(self.ref_gene_id_column)
+            self.ref_genes = [str(g) for g in genes]
 
     def selectAll(self):
         """
@@ -826,34 +757,30 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
             selectedGenes = reduce(set.union, [item.marked_objects
                                                for item in selectedItems],
                                    set())
-
-            if self.useAttrNames:
-                selected = [self.data.domain[self.uniqueGenesDict[gene]]
-                            for gene in selectedGenes]
-#                 newDomain = Orange.data.Domain(selectedVars, 0)
+            if self.use_attr_names:
+                selected = [column for column in self.data.domain.attributes
+                            if self.gene_id_attribute in column.attributes and
+                            str(column.attributes[self.gene_id_attribute]) in selectedGenes]
                 data = self.data[:, selected]
-#                 data = Orange.data.Table(newDomain, self.data)
                 self.send("Selected Data", data)
-            elif self.geneAttrCandidates:
-                assert 0 <= self.geneAttrIndex < len(self.geneAttrCandidates)
-                geneAttr = self.geneAttrCandidates[self.geneAttrIndex]
-                selectedIndices = []
-                otherIndices = []
-                for i, ex in enumerate(self.data):
-                    names = [self.revUniqueGenesDict.get(name, None)
-                             for name in split_and_strip(str(ex[geneAttr]), ",")]
-                    if any(name and name in selectedGenes for name in names):
-                        selectedIndices.append(i)
-                    else:
-                        otherIndices.append(i)
+            else:
+                selected_indices = []
+                other_indices = []
 
-                if selectedIndices:
-                    selected = self.data[selectedIndices]
+                for row_index, row in enumerate(self.data):
+                    gene_in_row = str(row[self.gene_id_column])
+                    if gene_in_row in self.input_genes and gene_in_row in selectedGenes:
+                        selected_indices.append(row_index)
+                    else:
+                        other_indices.append(row_index)
+
+                if selected_indices:
+                    selected = self.data[selected_indices]
                 else:
                     selected = None
 
-                if otherIndices:
-                    other = self.data[otherIndices]
+                if other_indices:
+                    other = self.data[other_indices]
                 else:
                     other = None
 
@@ -926,28 +853,27 @@ def disconnected(signal, slot):
         signal.connect(slot)
 
 
-def test_main(argv=sys.argv):
-    from AnyQt.QtWidgets import QApplication
-    app = QApplication(sys.argv)
-
-    if len(argv) > 1:
-        filename = argv[1]
-    else:
-        filename = "brown-selected"
-    data = Orange.data.Table(filename)
-
-    w = OWKEGGPathwayBrowser()
-    w.show()
-    w.raise_()
-
-    w.SetData(data)
-    w.handleNewSignals()
-
-    r = app.exec_()
-    w.saveSettings()
-    w.onDeleteWidget()
-    return r
-
-
 if __name__ == "__main__":
+    def test_main(argv=sys.argv):
+        from AnyQt.QtWidgets import QApplication
+        app = QApplication(sys.argv)
+
+        if len(argv) > 1:
+            filename = argv[1]
+        else:
+            filename = "brown-selected"
+        data = Orange.data.Table(filename)
+
+        w = OWKEGGPathwayBrowser()
+        w.show()
+        w.raise_()
+
+        w.SetData(data)
+        w.handleNewSignals()
+
+        r = app.exec_()
+        w.saveSettings()
+        w.onDeleteWidget()
+        return r
+
     sys.exit(test_main())
