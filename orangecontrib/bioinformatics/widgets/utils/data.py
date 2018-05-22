@@ -6,6 +6,8 @@ import Orange.data
 from operator import itemgetter
 from typing import Sequence, Tuple
 
+from Orange.widgets.widget import OWWidget, Msg
+
 # Data hints variables
 
 # species
@@ -21,6 +23,10 @@ GENE_ID_COLUMN = 'gene_id_column'
 # Name of the variable attribute that holds gene id
 GENE_ID_ATTRIBUTE = 'gene_id_attribute'
 
+# Error strings
+ERROR_ON_MISSING_ANNOTATION = 'Missing annotation on gene IDs and organism in the input data.'
+ERROR_ON_MISSING_GENE_ID = 'Missing Gene ID information in the input data'
+ERROR_ON_MISSING_TAX_ID = 'Missing organism information in the input data'
 
 col_spec = Sequence[Tuple[Orange.data.Variable, Sequence[numbers.Real]]]
 metas_spec = Sequence[Tuple[Orange.data.Variable, Sequence[str]]]
