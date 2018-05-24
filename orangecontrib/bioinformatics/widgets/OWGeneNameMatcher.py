@@ -21,13 +21,13 @@ from AnyQt.QtGui import (
 
 from Orange.widgets.gui import (
     vBox, comboBox, ProgressBar, widgetBox, auto_commit, widgetLabel, checkBox,
-    attributeItem, rubber, radioButtons, separator, hBox
+    rubber, radioButtons, separator, hBox
 )
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.utils import itemmodels
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output, Input
-from Orange.data import DiscreteVariable, StringVariable, Domain, Table, filter as table_filter
+from Orange.data import StringVariable, Domain, Table, filter as table_filter
 
 from orangecontrib.bioinformatics.widgets.utils.gui import horizontal_line
 
@@ -309,11 +309,12 @@ class OWGeneNameMatcher(OWWidget):
     priority = 5
     want_main_area = True
 
-    selected_organism = Setting(0)
-    selected_filter = Setting(0)
+    use_attr_names = Setting(True)
     selected_gene_col = Setting(None)
+    selected_organism = Setting(0)
+
+    selected_filter = Setting(0)
     gene_as_attr_name = Setting(0)
-    use_attr_names = Setting(False)
     filter_unknown = Setting(True)
     include_entrez_id = Setting(True)
     # include_ensembl_id = Setting(True)
@@ -429,11 +430,16 @@ class OWGeneNameMatcher(OWWidget):
         self.extended_view.set_info_model(genes)
 
     def _update_info_box(self):
-        num_genes = len(self.gene_matcher.genes)
-        known_genes = len(self.gene_matcher.get_known_genes())
 
-        info_text = 'Genes on input:  {}\n' \
-                    'Known genes :    {} ({:.2f} %)\n'.format(num_genes, known_genes, known_genes * 100 / num_genes)
+        if self.input_genes and self.gene_matcher:
+            num_genes = len(self.gene_matcher.genes)
+            known_genes = len(self.gene_matcher.get_known_genes())
+
+            info_text = 'Genes on input:  {}\n' \
+                        'Known genes :    {} ({:.2f} %)\n'.format(num_genes, known_genes, known_genes * 100 / num_genes)
+
+        else:
+            info_text = 'No genes on input'
 
         self.info_box.setText(info_text)
 
@@ -449,13 +455,13 @@ class OWGeneNameMatcher(OWWidget):
             self.progress_bar.finish()
             self.setStatusMessage('')
 
-        self._update_info_box()
-
         # if no known genes, clean up and return
         if not len(self.gene_matcher.get_known_genes()):
+            self._update_info_box()
             self.__reset_widget_state()
             return
 
+        self._update_info_box()
         self.extended_view.set_genes_model(self.gene_matcher.genes)
         self.proxy_model.setSourceModel(self.extended_view.genes_model)
         self.extended_view.genes_view.resizeRowsToContents()
@@ -471,22 +477,26 @@ class OWGeneNameMatcher(OWWidget):
     def gene_names_from_table(self):
         """ Extract and return gene names from `Orange.data.Table`.
         """
+        self.input_genes = []
         if self.input_data:
             if self.use_attr_names:
                 self.input_genes = [str(attr.name).strip() for attr in self.input_data.domain.attributes]
             elif self.selected_gene_col:
-                self.input_genes = [str(e[self.selected_gene_col]) for e in self.input_data
-                                    if not np.isnan(e[self.selected_gene_col])]
+                if self.selected_gene_col in self.input_data.domain:
+                    self.input_genes = [str(e[self.selected_gene_col]) for e in self.input_data
+                                        if not np.isnan(e[self.selected_gene_col])]
 
     def _update_gene_matcher(self):
         self.gene_names_from_table()
 
-        if self.input_genes:
-            if not self.gene_matcher:
-                self.gene_matcher = GeneMatcher(self.get_selected_organism(), case_insensitive=True)
+        if not self.input_genes:
+            self._update_info_box()
 
-            self.gene_matcher.genes = self.input_genes
-            self.gene_matcher.organism = self.get_selected_organism()
+        if not self.gene_matcher:
+            self.gene_matcher = GeneMatcher(self.get_selected_organism(), case_insensitive=True)
+
+        self.gene_matcher.genes = self.input_genes
+        self.gene_matcher.organism = self.get_selected_organism()
 
     def get_selected_organism(self):
         return self.organisms[self.selected_organism]
@@ -496,7 +506,6 @@ class OWGeneNameMatcher(OWWidget):
             # init progress bar
             self.progress_bar = ProgressBar(self, iterations=len(self.gene_matcher.genes))
             # status message
-            self.info_box.setText('Gene matcher running\n')
             self.setStatusMessage('Gene matcher running')
 
             worker = Worker(self.gene_matcher.run_matcher, progress_callback=True)
@@ -507,15 +516,18 @@ class OWGeneNameMatcher(OWWidget):
             self.threadpool.start(worker)
 
     def on_input_option_change(self):
+        self.__reset_widget_state()
         self._update_gene_matcher()
         self.match_genes()
 
     @Inputs.data_table
     def handle_input(self, data):
+        self.__reset_widget_state()
         self.gene_columns_model.set_domain(None)
 
         if data:
             self.input_data = data
+
             self.gene_columns_model.set_domain(self.input_data.domain)
 
             if self.gene_columns_model:
@@ -528,10 +540,6 @@ class OWGeneNameMatcher(OWWidget):
                 self.selected_organism = self.organisms.index(self.tax_id)
 
             self.on_input_option_change()
-        else:
-            self.info_box.setText('No data on input\n')
-            self.__reset_widget_state()
-            self.gene_matcher = None
 
     @staticmethod
     def get_gene_id_identifier(gene_id_strings):
@@ -611,6 +619,12 @@ class OWGeneNameMatcher(OWWidget):
 
     def commit(self):
         self.Outputs.custom_data_table.send(None)
+
+        if not self.input_data:
+            return
+
+        if not self.use_attr_names and not self.gene_columns_model:
+            return
 
         output_data_table = self.input_data.transform(self.input_data.domain.copy())
         output_data_table, gene_id = self.__apply_filters(output_data_table.copy())
