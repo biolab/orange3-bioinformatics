@@ -183,7 +183,7 @@ class GeneSets(set):
                 columns = [column.strip() for column in line.split('\t')]
                 gs_info = columns[1].split(',')
                 hierarchy = tuple(gs_info[index['hierarchy']].split('-'))
-                genes = set([int(gene) for gene in columns[2:]])
+                genes = set([str(gene) for gene in columns[2:]])
 
                 gene_set = GeneSet(gs_id=columns[0],
                                    genes=genes,

@@ -34,7 +34,11 @@ from Orange.widgets import widget, gui, settings
 from orangecontrib.bioinformatics import go
 from orangecontrib.bioinformatics.ncbi import taxonomy
 from orangecontrib.bioinformatics.utils import serverfiles, statistics
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME, TAX_ID
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    GENE_AS_ATTRIBUTE_NAME, TAX_ID, GENE_ID_ATTRIBUTE, GENE_ID_COLUMN,
+    ERROR_ON_MISSING_TAX_ID, ERROR_ON_MISSING_GENE_ID, ERROR_ON_MISSING_ANNOTATION
+
+)
 from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY, FILENAME_ANNOTATION
 
 
@@ -124,7 +128,6 @@ class OWGOBrowser(widget.OWWidget):
 
     settingsHandler = settings.DomainContextHandler()
 
-    annotationIndex = settings.ContextSetting(0)
     geneAttrIndex = settings.ContextSetting(0)
     useAttrNames = settings.ContextSetting(False)
     useReferenceDataset = settings.Setting(False)
@@ -143,16 +146,20 @@ class OWGOBrowser(widget.OWWidget):
 
     selectionDirectAnnotation = settings.Setting(0)
     selectionDisjoint = settings.Setting(0)
-    selectionAddTermAsClass = settings.Setting(0)
+
+    class Error(widget.OWWidget.Error):
+        missing_annotation = widget.Msg(ERROR_ON_MISSING_ANNOTATION)
+        missing_gene_id = widget.Msg(ERROR_ON_MISSING_GENE_ID)
+        missing_tax_id = widget.Msg(ERROR_ON_MISSING_TAX_ID)
 
     def __init__(self, parent=None):
         super().__init__(self, parent)
 
-        self.clusterDataset = None
-        self.referenceDataset = None
+        self.input_data = None
+        self.ref_data = None
         self.ontology = None
         self.annotations = None
-        self.loadedAnnotationCode = None
+        self.loaded_annotation_code = None
         self.treeStructRootKey = None
         self.probFunctions = [statistics.Binomial(), statistics.Hypergeometric()]
         self.selectedTerms = []
@@ -174,25 +181,6 @@ class OWGOBrowser(widget.OWWidget):
         gui.button(box, self, "Ontology/Annotation Info",
                    callback=self.ShowInfo,
                    tooltip="Show information on loaded ontology and annotations")
-
-        box = gui.widgetBox(self.inputTab, "Organism")
-        self.annotationComboBox = gui.comboBox(
-            box, self, "annotationIndex", items=[],
-            callback=self.__invalidateAnnotations, tooltip="Select organism"
-        )
-
-        genebox = gui.widgetBox(self.inputTab, "Gene Names")
-        self.geneAttrIndexCombo = gui.comboBox(
-            genebox, self, "geneAttrIndex", callback=self.__invalidate,
-            tooltip="Use this attribute to extract gene names from input data")
-        self.geneAttrIndexCombo.setDisabled(self.useAttrNames)
-
-
-        self.useAttrNames_checkbox = gui.checkBox(genebox, self, "useAttrNames", "Use column names",
-                                                  tooltip="Use column names for gene names",
-                                                  callback=self.__invalidate)
-        self.useAttrNames_checkbox.toggled[bool].connect(self.geneAttrIndexCombo.setDisabled)
-
 
         self.referenceRadioBox = gui.radioButtonsInBox(
             self.inputTab, self, "useReferenceDataset",
@@ -274,11 +262,6 @@ class OWGOBrowser(widget.OWWidget):
             tooltips=["Outputs genes annotated to all selected GO terms",
                       "Outputs genes that appear in only one of selected GO terms",
                       "Outputs genes common to all selected GO terms"],
-            callback=[self.ExampleSelection,
-                      self.UpdateAddClassButton])
-
-        self.addClassCB = gui.checkBox(
-            box, self, "selectionAddTermAsClass", "Add GO Term as class",
             callback=self.ExampleSelection)
 
         # ListView for DAG, and table for significant GOIDs
@@ -334,7 +317,7 @@ class OWGOBrowser(widget.OWWidget):
             def parse_tax_id(f_name):
                 return f_name.split('.')[1]
 
-        available_annotations = [
+        self.available_annotations = [
             AnnotationSlot(
                 taxid=AnnotationSlot.parse_tax_id(annotation_file),
                 name=taxonomy.common_taxid_to_name(AnnotationSlot.parse_tax_id(annotation_file)),
@@ -344,17 +327,6 @@ class OWGOBrowser(widget.OWWidget):
             if annotation_file != FILENAME_ONTOLOGY
 
         ]
-        self.availableAnnotations = sorted(
-            available_annotations, key=lambda a: a.name
-        )
-        self.annotationComboBox.clear()
-
-        for a in self.availableAnnotations:
-            self.annotationComboBox.addItem(a.name)
-
-        self.annotationComboBox.setCurrentIndex(self.annotationIndex)
-        self.annotationIndex = self.annotationComboBox.currentIndex()
-
         self._executor = ThreadExecutor()
 
     def sizeHint(self):
@@ -369,60 +341,73 @@ class OWGOBrowser(widget.OWWidget):
         self.infoLabel.setText("No data on input\n")
         self.warning(0)
         self.warning(1)
-        self.geneAttrIndexCombo.clear()
         self.ClearGraph()
 
         self.send("Data on Selected Genes", None)
         self.send("Enrichment Report", None)
 
     def setDataset(self, data=None):
-
         self.closeContext()
         self.clear()
-        self.clusterDataset = data
+        self.Error.clear()
+        if data:
+            self.input_data = data
+            self.tax_id = str(self.input_data.attributes.get(TAX_ID, None))
+            self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
+            self.gene_id_attribute = self.input_data.attributes.get(GENE_ID_ATTRIBUTE, None)
+            self.gene_id_column = self.input_data.attributes.get(GENE_ID_COLUMN, None)
+            self.annotation_index = None
 
-        if data is not None:
-            domain = data.domain
-            allvars = domain.variables + domain.metas
-            self.candidateGeneAttrs = [var for var in allvars if isstring(var)]
+            if not(self.use_attr_names is not None
+                   and ((self.gene_id_attribute is None) ^ (self.gene_id_column is None))):
 
-            self.geneAttrIndexCombo.clear()
-            for var in self.candidateGeneAttrs:
-                self.geneAttrIndexCombo.addItem(*gui.attributeItem(var))
+                if self.tax_id is None:
+                    self.Error.missing_annotation()
+                    return
 
-            tax_id = str(data.attributes.get(TAX_ID, ''))
+                self.Error.missing_gene_id()
+                return
 
-            if tax_id is not None:
-                _c2i = {a.taxid: i for i, a in enumerate(self.availableAnnotations)}
-                try:
-                    self.annotationIndex = _c2i[tax_id]
-                except KeyError:
-                    pass
+            elif self.tax_id is None:
+                self.Error.missing_tax_id()
+                return
 
-            self.useAttrNames = data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.useAttrNames)
-
-            self.geneAttrIndex = min(self.geneAttrIndex, len(self.candidateGeneAttrs) - 1)
-            if len(self.candidateGeneAttrs) == 0:
-                self.useAttrNames = True
-                self.geneAttrIndex = -1
-            elif self.geneAttrIndex < len(self.candidateGeneAttrs):
-                self.geneAttrIndex = len(self.candidateGeneAttrs) - 1
+            _c2i = {a.taxid: i for i, a in enumerate(self.available_annotations)}
+            try:
+                self.annotation_index = _c2i[self.tax_id]
+            except KeyError:
+                raise ValueError('Taxonomy {} not supported.'.format(self.tax_id))
 
             self.__invalidate()
 
     def setReferenceDataset(self, data=None):
-        self.referenceDataset = data
+        self.Error.clear()
+        if data:
+            self.ref_data = data
+            self.ref_tax_id = str(self.ref_data.attributes.get(TAX_ID, None))
+            self.ref_use_attr_names = self.ref_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
+            self.ref_gene_id_attribute = self.ref_data.attributes.get(GENE_ID_ATTRIBUTE, None)
+            self.ref_gene_id_column = self.ref_data.attributes.get(GENE_ID_COLUMN, None)
+
+            if not (self.ref_use_attr_names is not None
+                    and ((self.ref_gene_id_attribute is None) ^ (self.ref_gene_id_column is None))):
+
+                if self.ref_tax_id is None:
+                    self.Error.missing_annotation()
+                    return
+
+                self.Error.missing_gene_id()
+                return
+
+            elif self.ref_tax_id is None:
+                self.Error.missing_tax_id()
+                return
+
         self.referenceRadioBox.buttons[1].setDisabled(not bool(data))
         self.referenceRadioBox.buttons[1].setText("Reference set")
-        if self.clusterDataset is not None and self.useReferenceDataset:
+        if self.input_data is not None and self.useReferenceDataset:
             self.useReferenceDataset = 0 if not data else 1
             self.__invalidate()
-        elif self.clusterDataset:
-            self.__updateReferenceSetButton()
-
-    def handleNewSignals(self):
-        super().handleNewSignals()
-        self.__update()
 
     @Slot()
     def __invalidate(self):
@@ -433,21 +418,20 @@ class OWGOBrowser(widget.OWWidget):
             self.__state |= State.Stale
 
         self.SetGraph({})
-        self.referenceGenes = None
-        self.clusterGenes = None
+        self.ref_genes = None
+        self.input_genes = None
 
     def __invalidateAnnotations(self):
         self.annotations = None
-        self.loadedAnnotationCode = None
-        if self.clusterDataset:
+        self.loaded_annotation_code = None
+        if self.input_data:
             self.infoLabel.setText("...\n")
-        self.__updateReferenceSetButton()
         self.__invalidate()
 
     @Slot()
     def __update(self):
         self.__scheduletimer.stop()
-        if self.clusterDataset is None:
+        if self.input_data is None:
             return
 
         if self.__state & State.Running:
@@ -462,30 +446,25 @@ class OWGOBrowser(widget.OWWidget):
                 assert self.__state & State.Downloading
                 assert self.isBlocking()
 
-    def __updateReferenceSetButton(self):
-        allgenes, refgenes = None, None
-        if self.referenceDataset and self.annotations is not None:
+    def __get_ref_genes(self):
+        self.ref_genes = []
 
-            try:
-                allgenes = self.genesFromTable(self.referenceDataset)
-            except Exception:
-                allgenes = []
-
-        self.referenceRadioBox.buttons[1].setDisabled(not bool(allgenes))
-        self.referenceRadioBox.buttons[1].setText(
-            "Reference set " + ("(%i genes, %i matched)" % (len(allgenes), len(refgenes))
-            if allgenes and refgenes else ""))
-
-    def genesFromTable(self, data):
-        if self.useAttrNames:
-            genes = [v.name for v in data.domain.variables]
+        if self.ref_use_attr_names:
+            for variable in self.input_data.domain.attributes:
+                self.ref_genes.append(str(variable.attributes.get(self.ref_gene_id_attribute, '?')))
         else:
-            attr = self.candidateGeneAttrs[min(self.geneAttrIndex, len(self.candidateGeneAttrs) - 1)]
-            genes = [str(ex[attr]) for ex in data if not numpy.isnan(ex[attr])]
-            if any("," in gene for gene in genes):
-                self.information(0, "Separators detected in gene names. Assuming multiple genes per example.")
-                genes = reduce(operator.iadd, (genes.split(",") for genes in genes), [])
-        return genes
+            genes, _ = self.ref_data.get_column_view(self.ref_gene_id_column)
+            self.ref_genes = [str(g) for g in genes]
+
+    def __get_input_genes(self):
+        self.input_genes = []
+
+        if self.use_attr_names:
+            for variable in self.input_data.domain.attributes:
+                self.input_genes .append(str(variable.attributes.get(self.gene_id_attribute, '?')))
+        else:
+            genes, _ = self.input_data.get_column_view(self.gene_id_column)
+            self.input_genes = [str(g) for g in genes]
 
     def FilterAnnotatedGenes(self, genes):
         matchedgenes = self.annotations.get_gene_names_translator(genes).values()
@@ -539,7 +518,7 @@ class OWGOBrowser(widget.OWWidget):
         # the background. Return True if all dbs are present and false
         # otherwise
         assert self.__state == State.Ready
-        annotation = self.availableAnnotations[self.annotationIndex]
+        annotation = self.available_annotations[self.annotation_index]
         go_files = [fname for domain, fname in serverfiles.listfiles(DOMAIN)]
         files = []
 
@@ -556,16 +535,16 @@ class OWGOBrowser(widget.OWWidget):
             return True
 
     def Load(self):
-        a = self.availableAnnotations[self.annotationIndex]
+        a = self.available_annotations[self.annotation_index]
 
         if self.ontology is None:
             self.ontology = go.Ontology()
 
-        if a.taxid != self.loadedAnnotationCode:
+        if a.taxid != self.loaded_annotation_code:
             self.annotations = None
             gc.collect()  # Force run garbage collection
             self.annotations = go.Annotations(a.taxid)
-            self.loadedAnnotationCode = a.taxid
+            self.loaded_annotation_code = a.taxid
             count = defaultdict(int)
             geneSets = defaultdict(set)
 
@@ -577,10 +556,8 @@ class OWGOBrowser(widget.OWWidget):
                 ecb.setEnabled(bool(count[etype]))
                 ecb.setText(etype + ": %i annots(%i genes)" % (count[etype], len(geneSets[etype])))
 
-            self.__updateReferenceSetButton()
-
     def Enrichment(self):
-        assert self.clusterDataset is not None
+        assert self.input_data is not None
         assert self.__state == State.Ready
 
         if not self.annotations.ontology:
@@ -589,71 +566,47 @@ class OWGOBrowser(widget.OWWidget):
         self.error(1)
         self.warning([0, 1])
 
-        if self.useAttrNames:
-            clusterGenes = [v.name for v in self.clusterDataset.domain.attributes]
-            self.information(0)
-        elif 0 <= self.geneAttrIndex < len(self.candidateGeneAttrs):
-            geneAttr = self.candidateGeneAttrs[self.geneAttrIndex]
-            clusterGenes = [str(ex[geneAttr]) for ex in self.clusterDataset
-                            if not numpy.isnan(ex[geneAttr])]
-            if any("," in gene for gene in clusterGenes):
-                self.information(0, "Separators detected in cluster gene names. Assuming multiple genes per example.")
-                clusterGenes = reduce(operator.iadd, (genes.split(",") for genes in clusterGenes), [])
-            else:
-                self.information(0)
-        else:
-            self.error(1, "Failed to extract gene names from input dataset!")
-            return {}
+        self.__get_input_genes()
+        self.input_genes = set(self.input_genes)
+        self.known_input_genes = self.annotations.get_genes_with_known_annotation(self.input_genes)
 
-        genesSetCount = len(set(clusterGenes))
-
-        self.clusterGenes = clusterGenes = self.annotations.map_to_ncbi_id(clusterGenes).values()
+        # self.clusterGenes = clusterGenes = self.annotations.map_to_ncbi_id(self.input_genes).values()
 
         self.infoLabel.setText("%i unique genes on input\n%i (%.1f%%) genes with known annotations" %
-                               (genesSetCount, len(clusterGenes), 100.0*len(clusterGenes)/genesSetCount if genesSetCount else 0.0))
+                               (len(self.input_genes), len(self.known_input_genes),
+                                100.0*len(self.known_input_genes)/len(self.input_genes)
+                                if len(self.input_genes) else 0.0))
 
-        referenceGenes = None
-        if not self.useReferenceDataset or self.referenceDataset is None:
+        if not self.useReferenceDataset or self.ref_data is None:
             self.information(2)
             self.information(1)
-            referenceGenes = self.annotations.genes()
+            self.ref_genes = self.annotations.genes()
+            self.ref_genes = set(self.ref_genes)
 
-        elif self.referenceDataset is not None:
-            if self.useAttrNames:
-                referenceGenes = [v.name for v in self.referenceDataset.domain.attributes]
-                self.information(1)
-            elif geneAttr in (self.referenceDataset.domain.variables +
-                              self.referenceDataset.domain.metas):
-                referenceGenes = [str(ex[geneAttr]) for ex in self.referenceDataset
-                                  if not numpy.isnan(ex[geneAttr])]
-                if any("," in gene for gene in clusterGenes):
-                    self.information(1, "Separators detected in reference gene names. Assuming multiple genes per example.")
-                    referenceGenes = reduce(operator.iadd, (genes.split(",") for genes in referenceGenes), [])
-                else:
-                    self.information(1)
-            else:
-                self.information(1)
-                referenceGenes = None
+        elif self.ref_data is not None:
+            self.__get_ref_genes()
+            self.ref_genes = set(self.ref_genes)
 
-            if referenceGenes is None:
-                referenceGenes = list(self.annotations.genes())
+            ref_count = len(self.ref_genes)
+            if ref_count == 0:
+                self.ref_genes = self.annotations.genes()
                 self.referenceRadioBox.buttons[1].setText("Reference set")
                 self.referenceRadioBox.buttons[1].setDisabled(True)
-                self.information(2, "Unable to extract gene names from reference dataset. Using entire genome for reference")
+                self.information(2, "Unable to extract gene names from reference dataset. "
+                                    "Using entire genome for reference")
                 self.useReferenceDataset = 0
             else:
-                refc = len(referenceGenes)
-                # referenceGenes = self.annotations.get_gene_names_translator(referenceGenes).values()
-                self.referenceRadioBox.buttons[1].setText("Reference set (%i genes, %i matched)" % (refc, len(referenceGenes)))
+                self.referenceRadioBox.buttons[1].setText("Reference set ({} genes)".format(ref_count))
                 self.referenceRadioBox.buttons[1].setDisabled(False)
                 self.information(2)
         else:
             self.useReferenceDataset = 0
-        if not referenceGenes:
+            self.ref_genes = []
+
+        if not self.ref_genes:
             self.error(1, "No valid reference set")
             return {}
 
-        self.referenceGenes = referenceGenes
         evidences = []
         for etype in go.evidenceTypesOrdered:
             if self.useEvidenceType[etype]:
@@ -664,10 +617,10 @@ class OWGOBrowser(widget.OWWidget):
         self.setBlocking(True)
         self.__state = State.Running
 
-        if clusterGenes:
+        if self.input_genes:
             f = self._executor.submit(
                 self.annotations.get_enriched_terms,
-                clusterGenes, referenceGenes, evidences, aspect=aspect,
+                self.input_genes, self.ref_genes, evidences, aspect=aspect,
                 prob=self.probFunctions[self.probFunc], use_fdr=False,
 
                 progress_callback=methodinvoke(
@@ -760,14 +713,14 @@ class OWGOBrowser(widget.OWWidget):
 
         terms = [[t_id,
                   self.ontology[t_id].name,
-                  len(genes) / len(self.clusterGenes),
+                  len(genes) / len(self.input_genes),
                   len(genes),
-                  r_count / len(self.referenceGenes),
+                  r_count / len(self.ref_genes),
                   r_count,
                   p_value,
                   fdr,
-                  len(genes) / len(self.clusterGenes) * \
-                  len(self.referenceGenes) / r_count,
+                  len(genes) / len(self.input_genes) * \
+                  len(self.ref_genes) / r_count,
                   ",".join(genes)
                   ]
                  for t_id, (genes, p_value, r_count, fdr) in terms
@@ -802,7 +755,7 @@ class OWGOBrowser(widget.OWWidget):
         return graph
 
     def FilterAndDisplayGraph(self):
-        if self.clusterDataset and self.originalGraph is not None:
+        if self.input_data and self.originalGraph is not None:
             self.graph = self.FilterGraph(self.originalGraph)
             if self.originalGraph and not self.graph:
                 self.warning(1, "All found terms were filtered out.")
@@ -831,7 +784,7 @@ class OWGOBrowser(widget.OWWidget):
 
         def enrichment(t):
             try:
-                return len(t[0]) / t[2] * (len(self.referenceGenes) / len(self.clusterGenes))
+                return len(t[0]) / t[2] * (len(self.ref_genes) / len(self.input_genes))
             except ZeroDivisionError:
                 # TODO: find out why this happens
                 return 0
@@ -842,7 +795,8 @@ class OWGOBrowser(widget.OWWidget):
             if (parent, term) in fromParentDict:
                 return
             if term in self.graph:
-                displayNode = GOTreeWidgetItem(self.ontology[term], self.graph[term], len(self.clusterGenes), len(self.referenceGenes), maxFoldEnrichment, parentDisplayNode)
+                displayNode = GOTreeWidgetItem(self.ontology[term], self.graph[term], len(self.input_genes),
+                                               len(self.ref_genes), maxFoldEnrichment, parentDisplayNode)
                 displayNode.goId = term
                 self.listViewItems.append(displayNode)
                 if term in self.termListViewItemDict:
@@ -868,8 +822,8 @@ class OWGOBrowser(widget.OWWidget):
         for i, (t_id, (genes, p_value, refCount, fdr)) in enumerate(terms):
             item = GOTreeWidgetItem(self.ontology[t_id],
                                     (genes, p_value, refCount, fdr),
-                                    len(self.clusterGenes),
-                                    len(self.referenceGenes),
+                                    len(self.input_genes),
+                                    len(self.ref_genes),
                                     maxFoldEnrichment,
                                     self.sigTerms)
             item.goId = t_id
@@ -920,14 +874,11 @@ class OWGOBrowser(widget.OWWidget):
         self.selectionChanging = 0
         self.ExampleSelection()
 
-    def UpdateAddClassButton(self):
-        self.addClassCB.setEnabled(self.selectionDisjoint == 1)
-
     def ExampleSelection(self):
         self.commit()
 
     def commit(self):
-        if self.clusterDataset is None or self.originalGraph is None or \
+        if self.input_data is None or self.originalGraph is None or \
                 self.annotations is None:
             return
         if self.__state & State.Stale:
@@ -952,56 +903,34 @@ class OWGOBrowser(widget.OWWidget):
                 for g in allTerms.get(term, []):
                     count[g] += 1
             ccount = 1 if self.selectionDisjoint == 1 else len(self.selectedTerms)
-            selectedGenes = [gene for gene, c in count.items()
-                             if c == ccount and gene in genes]
+            selected_genes = [gene for gene, c in count.items() if c == ccount and gene in genes]
         else:
-            selectedGenes = reduce(
+            selected_genes = reduce(
                 operator.ior,
-                (set(allTerms.get(term, [])) for term in self.selectedTerms),
-                set())
+                (set(allTerms.get(term, [])) for term in self.selectedTerms), set())
 
-        if self.useAttrNames:
-            vars = [self.clusterDataset.domain[gene]
-                    for gene in set(selectedGenes)]
-            domain = Orange.data.Domain(
-                vars, self.clusterDataset.domain.class_vars,
-                self.clusterDataset.domain.metas)
-            newdata = self.clusterDataset.from_table(domain, self.clusterDataset)
+        if self.use_attr_names:
+            selected = [column for column in self.input_data.domain.attributes
+                        if self.gene_id_attribute in column.attributes and
+                        str(column.attributes[self.gene_id_attribute]) in set(selected_genes)]
 
-            self.send("Data on Selected Genes", newdata)
+            domain = Orange.data.Domain(selected, self.input_data.domain.class_vars, self.input_data.domain.metas)
+            new_data = self.input_data.from_table(domain, self.input_data)
+            self.send("Data on Selected Genes", new_data)
 
-        elif self.candidateGeneAttrs:
-            selectedExamples = []
+        else:
+            selected_rows = []
+            for row_index, row in enumerate(self.input_data):
+                gene_in_row = str(row[self.gene_id_column])
+                if gene_in_row in self.input_genes and gene_in_row in selected_genes:
+                    selected_rows.append(row_index)
 
-            geneAttr = self.candidateGeneAttrs[min(self.geneAttrIndex, len(self.candidateGeneAttrs)-1)]
+                if selected_rows:
+                    selected = self.input_data[selected_rows]
+                else:
+                    selected = None
 
-            if self.selectionDisjoint == 1:
-                goVar = Orange.data.DiscreteVariable(
-                    "GO Term", values=list(self.selectedTerms))
-                newDomain = Orange.data.Domain(
-                    self.clusterDataset.domain.variables, goVar,
-                    self.clusterDataset.domain.metas)
-                goColumn = []
-            for i, ex in enumerate(self.clusterDataset):
-                if not numpy.isnan(ex[geneAttr]) and any(gene in selectedGenes for gene in str(ex[geneAttr]).split(",")):
-                    if self.selectionDisjoint == 1 and self.selectionAddTermAsClass:
-                        terms = filter(lambda term: any(gene in self.graph[term][0]
-                                                        for gene in str(ex[geneAttr]).split(",")), self.selectedTerms)
-                        term = sorted(terms)[0]
-                        goColumn.append(goVar.values.index(term))
-                    selectedExamples.append(i)
-
-            if selectedExamples:
-                selectedExamples = self.clusterDataset[selectedExamples]
-                if self.selectionDisjoint == 1 and self.selectionAddTermAsClass:
-                    selectedExamples = Orange.data.Table.from_table(newDomain, selectedExamples)
-                    view, issparse = selectedExamples.get_column_view(goVar)
-                    assert not issparse
-                    view[:] = goColumn
-            else:
-                selectedExamples = None
-
-            self.send("Data on Selected Genes", selectedExamples)
+                self.send("Data on Selected Genes", selected)
 
     def ShowInfo(self):
         dialog = QDialog(self)

@@ -60,4 +60,4 @@ class OrganismContextHandler(settings.ContextHandler):
             return
 
         # get taxonomy id from the widget
-        context.organism = widget.get_selected_organism()
+        context.organism = widget.tax_id

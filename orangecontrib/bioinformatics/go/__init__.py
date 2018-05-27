@@ -12,7 +12,6 @@ from collections import namedtuple
 
 from orangecontrib.bioinformatics.utils import progress_bar_milestones, serverfiles, statistics
 from orangecontrib.bioinformatics.ncbi import taxonomy
-from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
 
 from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ANNOTATION, FILENAME_ONTOLOGY
 
@@ -505,7 +504,6 @@ class Annotations:
 
         self._gene_names = None
         self._gene_names_dict = None
-        self.gene_matcher = GeneMatcher(organism)
 
         #: A list of all :class:`AnnotationRecords` instances.
         self.annotations = []
@@ -554,25 +552,14 @@ class Annotations:
         if not a.gene_id or not a.go_id or a.qualifier == 'NOT':
             return
 
-        self.gene_annotations[int(a.gene_id)].append(a)
+        self.gene_annotations[a.gene_id].append(a)
         self.term_anotations[a.go_id].append(a)
 
         self.annotations.append(a)
         self.all_annotations = defaultdict(list)
 
-    def map_to_ncbi_id(self, genes):
-        """ Run gene name matching and return only known genes """
-        self.gene_matcher.genes = genes
-        self.gene_matcher.run_matcher()
-
-        if self.gene_matcher:
-            return {input_gene: ncbi_id for input_gene, ncbi_id in self.gene_matcher.map_input_to_ncbi().items()
-                    if self.gene_annotations[ncbi_id]}
-
-    def map_from_ncbi_id(self):
-        if self.gene_matcher:
-            return {ncbi_id: input_gene for input_gene, ncbi_id in self.gene_matcher.map_input_to_ncbi().items()
-                    if self.gene_annotations[ncbi_id]}
+    def get_genes_with_known_annotation(self, genes):
+        return {gene for gene in genes if self.gene_annotations[gene]}
 
     def _collect_annotations(self, go_id, visited):
         """ Recursive function collects and caches all annotations for id
@@ -627,7 +614,7 @@ class Annotations:
         return list(set([int(ann.gene_id) for ann in annotations if ann.evidence in evidence_codes]))
 
     def genes(self):
-        return set([int(ann.gene_id) for ann in self.annotations])
+        return set([ann.gene_id for ann in self.annotations])
 
     def get_enriched_terms(self, genes,
                            reference=None,
@@ -659,10 +646,7 @@ class Annotations:
         """
 
         all_genes = set(genes)
-
-        if not reference:
-            reference = all_genes
-
+        
         if aspect is None:
             aspects_set = {'Process', 'Component', 'Function'}
         elif isinstance(aspect, str):
@@ -698,13 +682,12 @@ class Annotations:
         res = {}
 
         milestones = progress_bar_milestones(len(terms), 100)
-        unmatch = self.map_from_ncbi_id()
 
         for i, term in enumerate(terms):
             if slims_only and term not in self.ontology.slims_subset:
                 continue
             all_annotations = self.get_annotations_by_go_id(term).intersection(ref_annotations)
-            all_annotated_genes = set([int(ann.gene_id) for ann in all_annotations])
+            all_annotated_genes = set([ann.gene_id for ann in all_annotations])
             mapped_genes = all_genes.intersection(all_annotated_genes)
 
             if len(reference) > len(all_annotated_genes):
@@ -712,7 +695,7 @@ class Annotations:
             else:
                 mapped_reference_genes = all_annotated_genes.intersection(reference)
 
-            res[term] = ([unmatch[gene] for gene in mapped_genes],
+            res[term] = ([gene for gene in mapped_genes],
                          prob.p_value(len(mapped_genes),
                                       len(reference),
                                       len(mapped_reference_genes),
@@ -734,16 +717,14 @@ class Annotations:
         """
 
         genes = [genes] if type(genes) == str else genes
-        match = self.map_to_ncbi_id(genes)
-        unmatch = self.map_from_ncbi_id()
-        genes = set([match[gene] for gene in genes])
+        genes = set([gene for gene in genes])
 
         evidence_codes = set(evidence_codes or evidenceDict.keys())
         annotations = [ann for gene in genes for ann in self.gene_annotations[gene] if ann.evidence in evidence_codes]
 
         dd = defaultdict(set)
         for ann in annotations:
-            dd[ann.go_id].add(unmatch[int(ann.gene_id)])
+            dd[ann.go_id].add(ann.gene_id)
 
         if not direct_annotation_only:
             self._ensure_ontology()
@@ -757,7 +738,7 @@ class Annotations:
             terms = self.ontology.extract_super_graph(filtered_terms)
             for i, term in enumerate(terms):
                 term_annotations = self.get_annotations_by_go_id(term).intersection(annotations)
-                dd[term].update([unmatch[int(ann.gene_id)] for ann in term_annotations])
+                dd[term].update([ann.gene_id for ann in term_annotations])
         return dict(dd)
 
     def __add__(self, iterable):
