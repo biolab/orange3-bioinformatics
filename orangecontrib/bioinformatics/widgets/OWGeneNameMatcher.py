@@ -310,8 +310,7 @@ class OWGeneNameMatcher(OWWidget):
     want_main_area = True
 
     use_attr_names = Setting(True)
-    selected_gene_col = Setting(None)
-    selected_organism = Setting(0)
+    selected_organism = Setting(11)
 
     selected_filter = Setting(0)
     gene_as_attr_name = Setting(0)
@@ -341,6 +340,7 @@ class OWGeneNameMatcher(OWWidget):
         self.input_genes = None
         self.tax_id = None
         self.column_candidates = []
+        self.selected_gene_col = None
 
         # input options
         self.organisms = []
@@ -369,6 +369,9 @@ class OWGeneNameMatcher(OWWidget):
         self.organism_select_combobox = comboBox(organism_box, self,
                                                  'selected_organism',
                                                  callback=self.on_input_option_change)
+
+        self.get_available_organisms()
+        self.organism_select_combobox.setCurrentIndex(self.selected_organism)
 
         box = widgetBox(self.controlArea, 'Gene names')
         self.gene_columns_model = itemmodels.DomainModel(valid_types=(StringVariable, ))
@@ -416,8 +419,6 @@ class OWGeneNameMatcher(OWWidget):
         self.extended_view.genes_selection_model().selectionChanged.connect(self.__selection_changed)
 
         self.mainArea.layout().addWidget(self.extended_view, 1)
-
-        self.get_available_organisms()
 
     def __reset_widget_state(self):
         self.Outputs.custom_data_table.send(None)
