@@ -134,12 +134,30 @@ class GeneSets(set):
             for org in hierarchies:
                 return org
 
+    def delete_sets_by_hierarchy(self, hier):
+        selected_sets = self.map_hierarchy_to_sets().get(hier, None)
+        if selected_sets:
+            [self.remove(gene_set) for gene_set in selected_sets]
+
+    def map_hierarchy_to_sets(self):
+        try:
+            split_by_hier = {hier: GeneSets() for hier in self.hierarchies()}
+            [split_by_hier[gs.hierarchy].update([gs]) for gs in self]
+            return split_by_hier
+
+        except GeneSetException:
+            return {}
+
     def split_by_hierarchy(self):
         """ Split gene sets by hierarchies. Return a list of :class:`GeneSets` objects. """
-        split_by_hier = {hier: GeneSets() for hier in self.hierarchies()}
-        [split_by_hier[gs.hierarchy].update([gs]) for gs in self]
 
-        return list(split_by_hier.values())
+        try:
+            split_by_hier = {hier: GeneSets() for hier in self.hierarchies()}
+            [split_by_hier[gs.hierarchy].update([gs]) for gs in self]
+            return list(split_by_hier.values())
+
+        except GeneSetException:
+            return []
 
     def to_gmt_file_format(self, file_path):  # type: (str) -> None
         """ The GMT file format is a tab delimited file format that describes gene sets.
