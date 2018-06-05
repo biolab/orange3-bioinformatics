@@ -14,11 +14,11 @@ def list_all(**kwargs):
     all_available = [filename_parse(f_name) for domain, f_name
                      in serverfiles.ServerFiles().listfiles(DOMAIN) + serverfiles.listfiles(DOMAIN)]
     if organism:
-        return [(hier, org) for hier, org in all_available if org == organism]
+        return [hier for hier, org in all_available if org == organism]
     else:
         return all_available
 
 
-def load_gene_sets(hierarchy):
-    file_path = serverfiles.localpath_download(DOMAIN, filename(*hierarchy))
+def load_gene_sets(hierarchy, tax_id):
+    file_path = serverfiles.localpath_download(DOMAIN, filename(hierarchy, tax_id))
     return GeneSets.from_gmt_file_format(file_path)
