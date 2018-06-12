@@ -1,7 +1,12 @@
 """ GeneSets utility functions """
-from typing import List, Tuple
+import numpy as np
+
+
+from typing import List, Tuple, NamedTuple
+
 from orangecontrib.bioinformatics.geneset.config import GENE_SET_ATTRIBUTES
 from orangecontrib.bioinformatics.utils import ensure_type
+from orangecontrib.bioinformatics.utils.statistics import Hypergeometric
 
 
 def filename(hierarchy, organism):  # type: (Tuple[str, str], str) -> str
@@ -32,6 +37,17 @@ def filename_parse(fn):  # type: (str) -> (Tuple[Tuple[str, str], str])
     hierarchy = tuple(parts[:-1])
     org = parts[-1] if parts[-1] != '' else None
     return hierarchy, org
+
+
+HYPERGEOMETRIC = Hypergeometric()
+
+# change this when python 3.4 is not supported anymore
+enrichment_result = NamedTuple('enrichment_result', [
+    ('query', set),
+    ('reference', set),
+    ('p_value', float),
+    ('enrichment_score', float)
+])
 
 
 class GeneSet:
@@ -67,6 +83,27 @@ class GeneSet:
                 return all(getattr(self, attr) == getattr(other, attr) for attr in self.__slots__)
 
         return False
+
+    def set_enrichment(self, reference, query):  # type: (List, List) -> enrichment_result
+        """
+        Args:
+            reference:
+            query:
+        """
+
+        assert len(reference) > 0
+        query_mapped = self.genes.intersection(query)
+        reference_mapped = self.genes.intersection(reference)
+
+        query_p = len(query_mapped) / len(query) if query else np.nan
+        ref_p = len(reference_mapped) / len(reference) if reference else np.nan
+        enrichment = query_p / ref_p if ref_p else np.nan
+
+        return enrichment_result(
+            set(query_mapped), set(reference_mapped),
+            HYPERGEOMETRIC.p_value(len(query_mapped), len(reference),
+                                   len(reference_mapped), len(query)),
+            enrichment)
 
     def gmt_description(self):
         """ Represent GeneSet as line in GMT file format
@@ -158,6 +195,15 @@ class GeneSets(set):
 
         except GeneSetException:
             return []
+
+    def genes(self):
+        """
+        Returns:
+            All genes from GeneSets
+        """
+        genes = set()
+        [genes.update(gene_set.genes) for gene_set in self]
+        return genes
 
     def to_gmt_file_format(self, file_path):  # type: (str) -> None
         """ The GMT file format is a tab delimited file format that describes gene sets.
