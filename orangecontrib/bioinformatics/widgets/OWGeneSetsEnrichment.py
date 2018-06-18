@@ -1,12 +1,12 @@
 """ Gene Sets Enrichment"""
 from AnyQt.QtWidgets import (
-    QTreeView, QTreeWidget
+    QTreeView, QTreeWidget, QHBoxLayout
 )
 from AnyQt.QtCore import (
     Qt
 )
 from AnyQt.QtGui import (
-    QColor, QStandardItemModel, QStandardItem
+    QColor, QStandardItemModel, QStandardItem,
 )
 
 from Orange.data import Table
@@ -16,7 +16,7 @@ from Orange.widgets.widget import OWWidget, Msg
 
 from Orange.widgets.gui import (
     vBox, lineEdit, LinkRole,
-    auto_commit, widgetLabel, spin, comboBox, widgetBox, QHBoxLayout, doubleSpin, radioButtonsInBox
+    auto_commit, widgetLabel, spin, comboBox, widgetBox, doubleSpin, radioButtonsInBox
 )
 
 from orangecontrib.bioinformatics.widgets.utils.gui import NumericalColumnDelegate, FilterProxyModel
