@@ -1,6 +1,7 @@
 """ GUI utils for widgets """
 from collections import namedtuple
 from numbers import Integral, Real
+from typing import Sequence
 
 from AnyQt.QtWidgets import (
     QFrame, QStyledItemDelegate
@@ -9,7 +10,6 @@ from AnyQt.QtWidgets import (
 from AnyQt.QtCore import (
     Qt, QSortFilterProxyModel,
 )
-
 
 from .list_completer import TokenListCompleter
 from .label_selection import (
@@ -42,6 +42,10 @@ class FilterProxyModel(QSortFilterProxyModel):
         super().__init__(*args, **kwargs)
         self.__filters = []
 
+    def reset_filters(self):
+        self.__filters = []
+        self.invalidateFilter()
+
     def set_filters(self, filters):
         # type: (Sequence[FilterProxyModel.Filter]) -> None
 
@@ -67,16 +71,16 @@ class NumericalColumnDelegate(QStyledItemDelegate):
     """
     An Item delegate for displaying numerical columns
     """
-    def __init__(self, parent=None, precision=4, **kwargs):
-        super().__init__(parent, **kwargs)
+    def __init__(self, parent=None, precision=4, notation='f'):
+        super().__init__(parent)
         self.precision = precision
+        self.notation = notation
 
     def displayText(self, value, locale):
         if isinstance(value, Integral):
             return locale.toString(int(value))
         elif isinstance(value, Real):
-            # print('i get here', type(locale), self.precision)
-            return locale.toString(float(value), 'f', self.precision)
+            return locale.toString(float(value), self.notation, self.precision)
         else:
             return super().displayText(value, locale)
 
