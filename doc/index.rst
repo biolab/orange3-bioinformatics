@@ -25,3 +25,4 @@ Scripting Reference
    scripting_references/ncbi_taxonomy
    scripting_references/ncbi_gene
    scripting_references/resolwe
+   scripting_references/geo
