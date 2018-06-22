@@ -226,6 +226,16 @@ class Ontology:
         A filename of an .obo formated file.
     :param progress_callback:
         Optional `float -> None` function.
+
+
+    Example
+    --------
+        >>> # Load the current ontology (downloading it if necessary)
+        >>> ontology = Ontology()
+
+        >>> term_ids = list(ontology)
+        >>> term = ontology[term_ids[0]]
+
     """
     version = 1
 
@@ -246,7 +256,8 @@ class Ontology:
 
     @classmethod
     def load(cls, progress_callback=None):
-        """ A class method that tries to load the ontology file from
+        """
+        A class method that tries to load the ontology file from
         default_database_path. It looks for a filename starting with
         'gene_ontology'. If not found it will download it.
 
@@ -258,7 +269,8 @@ class Ontology:
     Load = load
 
     def parse_file(self, file, progress_callback=None):
-        """ Parse the file. file can be a filename string or an open filelike
+        """
+        Parse the file. file can be a filename string or an open file like
         object. The optional progressCallback will be called with a single
         argument to report on the progress.
         """
@@ -313,7 +325,7 @@ class Ontology:
         """
         Return a list of defined subsets in the ontology.
 
-        :rtype: list-of-str
+        :rtype: :class:`list` of :class:`str`
 
         """
         return [line.split()[1] for line in self.header.splitlines()
@@ -324,7 +336,7 @@ class Ontology:
         Return all term IDs in a named `subset`.
 
         :param str subset: A string naming a subset in the ontology.
-        :rtype: list-of-str
+        :rtype: :class:`list` of :class:`str`
 
         .. seealso:: :func:`defined_slims_subsets`
 
@@ -559,6 +571,11 @@ class Annotations:
         self.all_annotations = defaultdict(list)
 
     def get_genes_with_known_annotation(self, genes):
+        """ Return only genes with known annotation
+
+        :param genes: List of genes
+
+        """
         return {gene for gene in genes if self.gene_annotations[gene]}
 
     def _collect_annotations(self, go_id, visited):
@@ -585,8 +602,7 @@ class Annotations:
         """ Return a set of all annotations (instances of :obj:`AnnotationRecord`)
         for GO term `id` and all it's subterms.
 
-        Args:
-            go_id (:obj:`str`): GO term id
+        :param :class:`str` go_id: GO term id
 
         """
         self._ensure_ontology()
@@ -605,8 +621,7 @@ class Annotations:
         :param str go_id: GO term id
 
         :param list-of-strings evidence_codes:
-            List of evidence codes to consider when matching annotations
-            to terms.
+               List of evidence codes to consider when matching annotations to terms.
 
         """
         evidence_codes = set(evidence_codes or evidenceDict.keys())
@@ -624,25 +639,21 @@ class Annotations:
                            prob=statistics.Binomial(),
                            use_fdr=True,
                            progress_callback=None):
-
-        """ Return a dictionary of enriched terms, with tuples of
+        """
+        Return a dictionary of enriched terms, with tuples of
         (list_of_genes, p_value, reference_count) for items and term
         ids as keys. P-Values are FDR adjusted if use_fdr is True (default).
 
-         Args:
-            genes: List of genes
-            reference: List of genes (if None all genes included in the annotations will be used).
-            evidence_codes: List of evidence codes to consider.
-            slims_only: If `True` return only slim terms.
-            aspect: Which aspects to use. Use all by default;
-                        one of Process (biological process),
-                               Function (molecular function) or
-                               Component (cellular component)
-
-            prob:
-            use_fdr:
-            progress_callback:
-
+        :param genes: List of genes
+        :param reference: List of genes (if None all genes included in the annotations will be used).
+        :param evidence_codes:  List of evidence codes to consider.
+        :param slims_only: If `True` return only slim terms.
+        :param aspect: Which aspects to use. Use all by default;
+                       one of Process (biological process),
+                       Function (molecular function) or Component (cellular component)
+        :param prob:
+        :param use_fdr:
+        :param progress_callback:
         """
 
         all_genes = set(genes)
@@ -653,6 +664,9 @@ class Annotations:
             aspects_set = {aspect}
         else:
             aspects_set = aspect
+
+        if reference is None:
+            reference = self.genes()
 
         evidence_codes = set(evidence_codes or evidenceDict.keys())
         annotations = [ann for gene in genes for ann in self.gene_annotations[gene]
@@ -666,6 +680,7 @@ class Annotations:
             annotations_dict[ann.go_id].add(ann)
 
         self._ensure_ontology()
+
         if slims_only and not self.ontology.slims_subset:
             warnings.warn("Unspecified slims subset in the ontology! " "Using 'goslim_generic' subset", UserWarning)
             self.ontology.set_slims_subset('goslim_generic')

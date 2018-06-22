@@ -26,3 +26,4 @@ Scripting Reference
    scripting_references/ncbi_gene
    scripting_references/resolwe
    scripting_references/geo
+   scripting_references/go
