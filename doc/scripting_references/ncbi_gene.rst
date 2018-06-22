@@ -1,4 +1,4 @@
-.. py:currentmodule:: from orangecontrib.bioinformatics.ncbi.gene
+.. py:currentmodule:: orangecontrib.bioinformatics.ncbi.gene
 
 .. index:: gene name matching
 .. index:: gene info
@@ -53,3 +53,19 @@ Output::
     nomenclature_status: O
     other_designations: keratin, type II cuticular Hb1|K81|MLN 137|ghHb1|hair keratin K2.9|hard keratin, type II, 1|keratin 81, type II|keratin, hair, basic, 1|metastatic lymph node 137 gene protein|type II hair keratin Hb1|type-II keratin Kb21
     modification_date: 20171105
+
+
+Class References
+----------------
+
+.. autoclass:: Gene()
+   :members:
+   :special-members: __init__
+
+.. autoclass:: GeneInfo()
+   :members:
+   :special-members: __init__
+
+.. autoclass:: GeneMatcher()
+   :members:
+   :special-members: __init__
