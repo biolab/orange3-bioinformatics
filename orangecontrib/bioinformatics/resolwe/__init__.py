@@ -5,15 +5,19 @@ from .genapi import GenAPI, DEFAULT_EMAIL, DEFAULT_PASSWD, cache_backend, cache_
 def connect(username, password, url, server_type):
     """ Connect to Resolwe server
 
-    Args:
-        username (:obj:`str`)
-        password (:obj:`str`)
-        url (:obj:`str`): url of the server you are connecting
-        server_type (:obj:`str`): genesis or resolwe
+    :param username:
+    :type username: str
 
-    Returns:
-        Instance of GenAPI or ResolweAPI
+    :param password:
+    :type password: str
 
+    :param url:
+    :type url: str
+
+    :param server_type: genesis or resolwe
+    :type server_type: str
+
+    :return: Instance of GenAPI or ResolweAPI
     """
 
     if server_type == 'genesis':
@@ -29,6 +33,3 @@ def connect(username, password, url, server_type):
 
 class ResolweAuthException(Exception):
     """ A login error occurred. """
-
-
-

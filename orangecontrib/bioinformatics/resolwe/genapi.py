@@ -15,18 +15,12 @@ DEFAULT_URL = 'https://dictyexpress.research.bcm.edu'
 
 
 class GenAPI:
+    """ Python module that leverages Genesis PyAPI (Python API for accsess to DictyExpress database).
+
+     It supports connection to the server and data retrieval functionalities.
+    """
 
     def __init__(self, email=DEFAULT_EMAIL, password=DEFAULT_PASSWD, url=DEFAULT_URL):
-        """ Python module that leverages Genesis PyAPI (Python API for accsess to DictyExpress database).
-
-        It supports connection to the server and data retrieval functionalities.
-
-        Args:
-            email (str):
-            password (str):
-            url (str):
-        """
-
         self._gen = Genesis(email, password, url)
         self.email = email
         self._data_endpoint = url + '/data/'
@@ -48,9 +42,7 @@ class GenAPI:
     def fetch_etc_objects(self, **kwargs):
         """ Function downloads all available :obj:`GenData` etc objects from DictyExpress database.
 
-        Returns:
-            :obj:`list`: :obj:`GenData` objects
-
+        :rtype: list of GenData objects
         """
 
         callback = kwargs.get("progress_callback", None)
@@ -77,13 +69,10 @@ class GenAPI:
     def download_etc_data(self, gen_data_id, **kwargs):
         """ Function downloads etc data of a chosen experiment from the server.
 
-        Args:
-            gen_data_id (str): id of :obj:`GenData` object to download.
+        :param gen_data_id: id of GeneData object
+        :type gen_data_id: str
 
-        Returns:
-             :obj:`dict`: data in json like format
-
-
+        :rtype: data in json like format
         """
         callback = kwargs.get("progress_callback", None)
         table_name = kwargs.get("table_name", '')
