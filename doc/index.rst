@@ -28,3 +28,4 @@ Scripting Reference
    scripting_references/geo
    scripting_references/go
    scripting_references/geneset
+   scripting_references/dicty_phenotypes

@@ -16,9 +16,9 @@ class DictyMutant:
     def __init__(self, mutant_entry):  # type: (str) -> None
         """ A single Dictyostelium discoideum mutant from the Dictybase.
 
-        Args:
-            mutant_entry: A single mutant entry from `curated mutants file
+        :param mutant_entry: A single mutant entry from `curated mutants file
             <http://dictybase.org/db/cgi-bin/dictyBase/download/download.pl?area=mutant_phenotypes&ID=all-mutants.txt>`_.
+        
         """
 
         mutant = mutant_entry.split("\t")
@@ -46,11 +46,10 @@ class DictyMutants:
     DEFAULT_DATABASE_PATH = serverfiles.localpath(DOMAIN)  # use a default local folder for storing the genesets
 
     def __init__(self, local_database_path=None):
-        """ A collection of Dictybase mutants as a dictionary of :obj:`DictyMutant` objects.
+        """  A collection of Dictybase mutants as a dictionary of :obj:`DictyMutant` objects.
 
-        Args:
-            local_database_path: A path for storing D. dictyostelium mutants objects. If `None` then
-                                a default database path is used.
+        :param local_database_path: A path for storing D. dictyostelium mutants objects. If `None` then
+                                    a default database path is used.
         """
 
         self.local_database_path = local_database_path \
@@ -123,7 +122,7 @@ class DictyMutants:
         return instance
 
     def mutants(self):
-        return self._mutants.keys()
+        return list(self._mutants.keys())
 
     def genes(self):
         return sorted(set(reduce(list.__add__, [self.mutant_genes(mutant) for mutant in self.mutants()], [])))
