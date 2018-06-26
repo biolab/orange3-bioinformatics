@@ -7,24 +7,31 @@ from orangecontrib.bioinformatics.utils import ensure_type
 def filename(hierarchy, organism):  # type: (Tuple[str, str], str) -> str
     """ Obtain a filename for given hierarchy and organism.
 
-    Args:
-        hierarchy: GeneSet hierarchy, example: ('GO', 'biological_process')
-        organism: Taxonomy ID
+    :param hierarchy: GeneSet hierarchy, example: ('GO', 'biological_process')
+    :param organism: Taxonomy ID
 
-    Returns:
-        Filename for given hierarchy and organism
+    :return: Filename for given hierarchy and organism
+
+    Example
+    --------
+        >>> filename(('CustomSet', 'subsets'), '6500')
+        'CustomSet-subsets-6500.gmt'
     """
+
     return '-'.join(hierarchy + (organism if organism is not None else '',)) + '.gmt'
 
 
 def filename_parse(fn):  # type: (str) -> (Tuple[Tuple[str, str], str])
     """ Returns a hierarchy and the organism from the gene set filename format.
 
-    Args:
-        fn: GeneSets file name (.gmt)
+    :param fn: GeneSets file name (.gmt)
 
-    Returns:
-        A hierarchy and taxonomy id for given filename
+    :return: A hierarchy and taxonomy id for given filename
+
+    Example
+    --------
+        >>> filename_parse('Custom-set-6500.gmt')
+        (('Custom', 'set'), '6500')
     """
 
     file_name = fn[:-4]  # removes .gmt extension
@@ -40,14 +47,13 @@ class GeneSet:
     def __init__(self, gs_id=None, hierarchy=None, organism=None, name=None, genes=None, description=None, link=None):
         """ Object representing a single set of genes
 
-        Args:
-            gs_id: Short gene set ID.
-            hierarchy: Hierarchy should be formated as a tuple, for example ``("GO", "biological_process")``
-            organism: Organism as a NCBI taxonomy ID.
-            name: Gene set name.
-            genes: A set of genes. Genes are strings.
-            description: Gene set description.
-            link: Link to further information about this gene set.
+        :param gs_id: Short gene set ID.
+        :param hierarchy: Hierarchy should be formated as a tuple, for example ``("GO", "biological_process")``
+        :param organism: Organism as a NCBI taxonomy ID.
+        :param name: Gene set name.
+        :param genes: A set of genes. Genes are strings.
+        :param description: Gene set description.
+        :param link: Link to further information about this gene set.
         """
 
         self.gs_id = gs_id
@@ -71,8 +77,7 @@ class GeneSet:
     def gmt_description(self):
         """ Represent GeneSet as line in GMT file format
 
-        Returns:
-             Comma-separated GeneSet attributes.
+        :return: Comma-separated GeneSet attributes.
         """
 
         # this is just so that we preserve order from GENE_SET_ATTRIBUTES for easy access
@@ -89,7 +94,7 @@ class GeneSet:
 
 
 class GeneSets(set):
-    """ A collection of gene sets: contains :class:`GeneSet` objects.
+    """ A collection of gene sets: contains :obj:`GeneSet` objects.
     """
     
     def __init__(self, sets=None):
@@ -148,12 +153,7 @@ class GeneSets(set):
         Columns: gs_id    gmt_description    Gene    Gene    Gene    ...
         gmt_description: 'gs_id','hierarchy','organism','name','genes','description','link'
 
-        Args:
-            file_path: Path to where file will be created
-
-
-        Returns:
-            None
+        :param file_path: Path to where file will be created
 
         """
 
@@ -167,12 +167,8 @@ class GeneSets(set):
     def from_gmt_file_format(file_path):  # type: (str) -> GeneSets
         """ Load GeneSets object from GMT file.
 
-        Args:
-            file_path: GeneSets file path
-
-        Returns:
-            GeneSets object
-
+        :param file_path: path to a file on local disk
+        :rtype: :obj:`GeneSets`
         """
         index = {label: index for index, label in enumerate(GENE_SET_ATTRIBUTES)}
 

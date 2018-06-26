@@ -27,3 +27,4 @@ Scripting Reference
    scripting_references/resolwe
    scripting_references/geo
    scripting_references/go
+   scripting_references/geneset
