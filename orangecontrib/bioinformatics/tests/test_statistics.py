@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-
+from time import time
 
 from orangecontrib.bioinformatics.utils import statistics
 
@@ -25,6 +25,23 @@ class TestStatistics(unittest.TestCase):
                       [0.29, 0.87, 1.57, 0.36, 0.18, 2.67, 0.65, 0.65]])
 
         scores = statistics.hypergeometric_test(X, cluster, treshold)
+        self.assertIsNotNone(scores)
+
+
+    def test_hypergeometric_speed(self):
+
+        # Generate data
+        treshold = 0.5
+        n, m = 1000, 10000
+        X = np.random.rand(n, m)
+        cluster = np.arange(50).astype(int)
+
+        # Measure time
+        t = time()
+        scores = statistics.hypergeometric_test(X, cluster, treshold)
+        t = time() - t
+        print("Time (orig., %d cells, %d genes): %.2f (s)" % (n, m, t))
+
         self.assertIsNotNone(scores)
 
 
