@@ -29,6 +29,31 @@ def hypergeometric_test(X, cluster, treshold):
     return scores
 
 
+def hypergeometric_test_vector(a, b, threshold=1):
+    # type: (np.ndarray, np.ndarray, float) -> np.ndarray
+
+    # Binary expression matrices
+    A = (a >= threshold).astype(int)
+    B = (b >= threshold).astype(int)
+
+    # Test Parameters
+    M = len(A) + len(B)
+    N = len(A)
+    n_expr = A.sum(axis=0) + B.sum(axis=0) # Number of cells expressing genes (overall)
+    n_expr_clust = A.sum(axis=0)           # Number of cells expressing genes (in cluster)
+
+    # Test results --- both tails
+    # Note: cumulatives do sum to >1 due to overlap at 1 point
+    test = np.array(list(map(lambda t: (hypergeom.cdf(k=t[1], n=t[0], M=M, N=N),
+                                        hypergeom.sf(k=t[1]-1, n=t[0], M=M, N=N)),
+                                     zip(n_expr, n_expr_clust))))
+    pvalues = test.min(axis=1)
+    signs = 2 * np.argmin(test, axis=1) - 1
+    scores = -np.log(pvalues) * signs
+    return scores, pvalues
+
+
+
 def _lngamma(z):
     x = 0
     x += 0.1659470187408462e-06 / (z + 7)

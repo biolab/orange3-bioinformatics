@@ -8,9 +8,7 @@ from orangecontrib.bioinformatics.utils import statistics
 class TestStatistics(unittest.TestCase):
 
     def test_hypergeometric(self):
-        cluster = np.array([0, 1, 2, 3])
-
-        treshold = 1
+        threshold = 1
 
         # Expression matrix (cells x genes)
         X = np.array([[1.2, 0.38, 0.14, 0.5, 0.94, 0.55, 3.88, 0.49],
@@ -24,24 +22,11 @@ class TestStatistics(unittest.TestCase):
                       [1.49, 0.41, 0.15, 0.6, 0.73, 0.44, 3.49, 0.48],
                       [0.29, 0.87, 1.57, 0.36, 0.18, 2.67, 0.65, 0.65]])
 
-        scores = statistics.hypergeometric_test(X, cluster, treshold)
-        self.assertIsNotNone(scores)
-
-
-    def test_hypergeometric_speed(self):
-
-        # Generate data
-        treshold = 0.5
-        n, m = 1000, 10000
-        X = np.random.rand(n, m)
-        cluster = np.arange(50).astype(int)
-
-        # Measure time
-        t = time()
-        scores = statistics.hypergeometric_test(X, cluster, treshold)
-        t = time() - t
-        print("Time (orig., %d cells, %d genes): %.2f (s)" % (n, m, t))
-
+        cluster = np.zeros((X.shape[0], ), dtype=bool)
+        cluster[:4] = True
+        scores, pvalues = statistics.hypergeometric_test_vector(a=X[cluster],
+                                                    b=X[np.logical_not(cluster),],
+                                                    threshold=threshold)
         self.assertIsNotNone(scores)
 
 
