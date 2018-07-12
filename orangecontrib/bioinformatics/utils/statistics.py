@@ -44,11 +44,12 @@ def hypergeometric_test_vector(a, b, threshold=1):
 
     # Test results --- both tails
     # Note: cumulatives do sum to >1 due to overlap at 1 point
-    test = np.array(list(map(lambda t: (hypergeom.cdf(k=t[1], n=t[0], M=M, N=N),
-                                        hypergeom.sf(k=t[1]-1, n=t[0], M=M, N=N)),
-                                     zip(n_expr, n_expr_clust))))
-    pvalues = test.min(axis=1)
-    signs = 2 * np.argmin(test, axis=1) - 1
+    under = np.fromiter(map(lambda t: hypergeom.cdf(k=t[1], n=t[0], M=M, N=N),
+                            zip(n_expr, n_expr_clust)), dtype=float)
+    over = np.fromiter(map(lambda t: hypergeom.sf(k=t[1]-1, n=t[0], M=M, N=N),
+                           zip(n_expr, n_expr_clust)), dtype=float)
+    pvalues = np.minimum(under, over)
+    signs = np.sign(under - over)
     scores = -np.log(pvalues) * signs
     return scores, pvalues
 
