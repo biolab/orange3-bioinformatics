@@ -9,35 +9,50 @@ from scipy.stats import hypergeom
 def hypergeometric_test(X, cluster, treshold):
     # type: (np.ndarray, np.ndarray, float) -> np.ndarray
 
-    scores = np.zeros((X.shape[1],))
-
     # Binary expression matrix
     Y = (X >= treshold).astype(int)
 
-    # Process each gene
-    for gi, g in enumerate(Y.T):
-        # Test parameters
-        M = X.shape[0]  # Number of cells
-        n = g.sum()  # Number of cells expressing g
-        N = len(cluster)  # Number of cells belonging to cluster(s)
-        hg = hypergeom(M, n, N)
+    # Test Parameters
+    M, G = X.shape
+    N = len(cluster)
+    n_expr = Y.sum(axis=0) # Number of cells expressing genes (overall)
+    n_expr_clust = Y[cluster,].sum(axis=0)
 
-        # Test for over expression
-        x = g[cluster].sum()
-        x_over = np.arange(x, n + 1)  # x or more
-        pvalue_over = hg.pmf(x_over).sum()
-
-        # Test for under expression
-        x_under = np.arange(0, x + 1)  # x or less
-        pvalue_under = hg.pmf(x_under).sum()
-
-        # Proposed scoring:
-        p = min(pvalue_under, pvalue_over)
-        s = -1 if pvalue_under < pvalue_over else 1
-        score = -np.log(p) * s
-        scores[gi] = score
-
+    # Test results --- both directions
+    # Note: cumulatives do not sum to 1 because of overlap at 1 point
+    test = np.array(list(map(lambda t: (hypergeom.cdf(k=t[1], n=t[0], M=M, N=N),
+                                        hypergeom.sf(k=t[1]+1, n=t[0], M=M, N=N)),
+                                     zip(n_expr, n_expr_clust))))
+    pvalues = test.min(axis=1)
+    signs = 2 * np.argmin(test, axis=1) - 1
+    scores = -np.log(pvalues) * signs
     return scores
+
+
+def hypergeometric_test_vector(a, b, threshold=1):
+    # type: (np.ndarray, np.ndarray, float) -> np.ndarray
+
+    # Binary expression matrices
+    A = (a >= threshold).astype(int)
+    B = (b >= threshold).astype(int)
+
+    # Test Parameters
+    M = len(A) + len(B)
+    N = len(A)
+    n_expr = A.sum(axis=0) + B.sum(axis=0) # Number of cells expressing genes (overall)
+    n_expr_clust = A.sum(axis=0)           # Number of cells expressing genes (in cluster)
+
+    # Test results --- both tails
+    # Note: cumulatives do sum to >1 due to overlap at 1 point
+    under = np.fromiter(map(lambda t: hypergeom.cdf(k=t[1], n=t[0], M=M, N=N),
+                            zip(n_expr, n_expr_clust)), dtype=float)
+    over = np.fromiter(map(lambda t: hypergeom.sf(k=t[1]-1, n=t[0], M=M, N=N),
+                           zip(n_expr, n_expr_clust)), dtype=float)
+    pvalues = np.minimum(under, over)
+    signs = np.sign(under - over)
+    scores = -np.log(pvalues) * signs
+    return scores, pvalues
+
 
 
 def _lngamma(z):

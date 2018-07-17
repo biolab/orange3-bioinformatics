@@ -6,7 +6,6 @@ import scipy.special
 import scipy.stats
 import Orange.data
 
-from scipy.stats import hypergeom
 from types import SimpleNamespace as namespace
 from AnyQt.QtGui import (
     QStandardItemModel, QPen
@@ -24,7 +23,7 @@ from Orange.widgets.utils.datacaching import data_hints
 from orangecontrib.bioinformatics.widgets.utils.settings import SetContextHandler
 from orangecontrib.bioinformatics.widgets.utils import gui as guiutils
 from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME
-from orangecontrib.bioinformatics.utils.statistics import hypergeometric_test
+from orangecontrib.bioinformatics.utils.statistics import hypergeometric_test_vector
 
 
 def score_fold_change(a, b, **kwargs):
@@ -232,11 +231,9 @@ class InfiniteLine(pg.InfiniteLine):
 
 def hypergeometric_test_score(*args, **kwargs):
 
-    X = kwargs.get('X', None)
-    cell_cluster = kwargs.get('cell_cluster', None)
     expression_treshold = kwargs.get('treshold', None)
-
-    return hypergeometric_test(X, cell_cluster, expression_treshold)
+    scores, _ = hypergeometric_test_vector(*args, expression_treshold)
+    return scores
 
 
 class Histogram(pg.PlotWidget):
@@ -847,8 +844,6 @@ class OWDifferentialExpression(widget.OWWidget):
             arrays = [X[ind] for ind in group_indices]
             ss = score_func(*arrays,
                             axis=0,
-                            X=X,
-                            cell_cluster=group_indices[0],
                             treshold=self.expression_threshold_value)
 
             return ss[0] if isinstance(ss, tuple) and not warn else ss
