@@ -8,15 +8,14 @@ import re
 from typing import Set
 
 from AnyQt.QtWidgets import (
-    QSplitter, QTableView, QWidget, QVBoxLayout, QItemDelegate, QStyledItemDelegate, QHeaderView, QStyleOptionViewItem,
-    QStyle, QAbstractItemView, QApplication
+    QSplitter, QTableView, QWidget, QVBoxLayout, QItemDelegate, QHeaderView, QAbstractItemView
 )
 from AnyQt.QtCore import (
     Qt, QSize, QThreadPool, QSortFilterProxyModel, QAbstractListModel, QVariant,
 
 )
 from AnyQt.QtGui import (
-    QIcon, QFont, QAbstractTextDocumentLayout, QFontMetrics, QTextDocument
+    QIcon, QFont, QFontMetrics
 )
 
 from Orange.widgets.gui import (
@@ -29,7 +28,7 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output, Input
 from Orange.data import StringVariable, Domain, Table, filter as table_filter
 
-from orangecontrib.bioinformatics.widgets.utils.gui import horizontal_line
+from orangecontrib.bioinformatics.widgets.utils.gui import horizontal_line, HTMLDelegate
 
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
@@ -61,48 +60,6 @@ class FilterProxyModel(QSortFilterProxyModel):
                 return True
 
         return False
-
-
-class HTMLDelegate(QStyledItemDelegate):
-    """
-    https://stackoverflow.com/questions/1956542/how-to-make-item-view-render-rich-html-text-in-qt
-    https://stackoverflow.com/questions/2375763/how-to-open-an-url-in-a-qtableview
-    """
-
-    def sizeHint(self, option, index):
-        options = QStyleOptionViewItem(option)
-        gene_obj = index.data(Qt.DisplayRole)
-        self.initStyleOption(options, index)
-
-        doc = QTextDocument()
-        doc.setHtml(gene_obj.to_html())
-        doc.setTextWidth(options.rect.width() - 10)
-
-        return QSize(doc.idealWidth(), doc.size().height())
-
-    def paint(self, painter, option, index):
-        options = QStyleOptionViewItem(option)
-        gene_obj = index.data(Qt.DisplayRole)
-        self.initStyleOption(options, index)
-
-        style = QApplication.style() if options.widget is None else options.widget.style()
-
-        doc = QTextDocument()
-        doc.setHtml(gene_obj.to_html())
-        doc.setTextWidth(option.rect.width() - 10)
-
-        options.text = ""
-        style.drawControl(QStyle.CE_ItemViewItem, options, painter)
-
-        ctx = QAbstractTextDocumentLayout.PaintContext()
-
-        text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, options)
-        painter.save()
-        painter.translate(text_rect.topLeft())
-        painter.setClipRect(text_rect.translated(-text_rect.topLeft()))
-        doc.documentLayout().draw(painter, ctx)
-
-        painter.restore()
 
 
 class GeneItemDelegate(QItemDelegate):
