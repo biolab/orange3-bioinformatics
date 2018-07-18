@@ -4,7 +4,6 @@ import threading
 import numpy as np
 import re
 
-
 from typing import Set
 
 from AnyQt.QtWidgets import (
@@ -12,7 +11,7 @@ from AnyQt.QtWidgets import (
     QStyle, QAbstractItemView, QApplication
 )
 from AnyQt.QtCore import (
-    Qt, QSize, QThreadPool, QSortFilterProxyModel, QAbstractListModel, QVariant,
+    Qt, QSize, QThreadPool, QSortFilterProxyModel, QAbstractTableModel, QVariant,
 
 )
 from AnyQt.QtGui import (
@@ -36,270 +35,79 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
 )
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 from orangecontrib.bioinformatics.ncbi import taxonomy
-from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, NCBI_ID
+from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, NCBI_ID, GENE_MATCHER_HEADER
 
 
-class FilterProxyModel(QSortFilterProxyModel):
-    def __init__(self, parent=None):
-        super(FilterProxyModel, self).__init__(parent)
-        self.ow = parent
+class GeneInfoModel(QAbstractTableModel):
 
-    def filterAcceptsRow(self, source_row, source_parent):
-        model = self.sourceModel()
-        if isinstance(model, GeneMatcherModel):
-            rows = model.get_rows()
-            unique, partial, unknown = range(len(self.ow.filter_labels))
+    def __init__(self):
+        QAbstractTableModel.__init__(self)
+        self.__items = np.array([])
+        self.__data_matrix = np.array([])
 
-            possible_hits = rows[source_row].possible_hits
-            ncbi_id = rows[source_row].ncbi_id
+        self.header_labels, self.header_tags = GENE_MATCHER_HEADER
 
-            if self.ow.selected_filter == unique and ncbi_id is not None:
-                return True
-            elif self.ow.selected_filter == partial and possible_hits:
-                return True
-            elif self.ow.selected_filter == unknown and ncbi_id is None and not possible_hits:
-                return True
-
-        return False
-
-
-class HTMLDelegate(QStyledItemDelegate):
-    """
-    https://stackoverflow.com/questions/1956542/how-to-make-item-view-render-rich-html-text-in-qt
-    https://stackoverflow.com/questions/2375763/how-to-open-an-url-in-a-qtableview
-    """
-
-    def sizeHint(self, option, index):
-        options = QStyleOptionViewItem(option)
-        gene_obj = index.data(Qt.DisplayRole)
-        self.initStyleOption(options, index)
-
-        doc = QTextDocument()
-        doc.setHtml(gene_obj.to_html())
-        doc.setTextWidth(options.rect.width() - 10)
-
-        return QSize(doc.idealWidth(), doc.size().height())
-
-    def paint(self, painter, option, index):
-        options = QStyleOptionViewItem(option)
-        gene_obj = index.data(Qt.DisplayRole)
-        self.initStyleOption(options, index)
-
-        style = QApplication.style() if options.widget is None else options.widget.style()
-
-        doc = QTextDocument()
-        doc.setHtml(gene_obj.to_html())
-        doc.setTextWidth(option.rect.width() - 10)
-
-        options.text = ""
-        style.drawControl(QStyle.CE_ItemViewItem, options, painter)
-
-        ctx = QAbstractTextDocumentLayout.PaintContext()
-
-        text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, options)
-        painter.save()
-        painter.translate(text_rect.topLeft())
-        painter.setClipRect(text_rect.translated(-text_rect.topLeft()))
-        doc.documentLayout().draw(painter, ctx)
-
-        painter.restore()
-
-
-class GeneItemDelegate(QItemDelegate):
-    """
-    https://stackoverflow.com/questions/6905147/qt-qlistwidgetitem-multiple-lines
-    """
-
-    def sizeHint(self, option, index):
-        return QSize(option.rect.width(), 60)
-
-    def paint(self, painter, option, index):
-
-        image_space = 5
-        icon = index.data(Qt.DecorationRole)
-        gene_obj = index.data(Qt.DisplayRole)
-
-        bold_font = QFont()
-        bold_font.setBold(True)
-        fm = QFontMetrics(QFont())
-
-        input_name_str = 'Input name:  '
-        type_of_match_str = 'Input type:  '
-        gene_id_str = 'Gene ID:  '
-
-        if not icon.isNull():
-            # paint icon
-            icon.paint(painter, option.rect.adjusted(image_space, image_space, -image_space, -image_space),
-                       Qt.AlignVCenter | Qt.AlignLeft)
-            # if image is set, change space variable
-            image_space = 55
-
-        # paint gene object data
-
-        # input string
-        r = option.rect.adjusted(image_space, 7, 0, 0)  # left, top, width and height
-
-        painter.setFont(bold_font)
-        painter.drawText(r.left(), r.top(), r.width(), r.height(),
-                         Qt.AlignLeft,
-                         input_name_str)
-
-        painter.setFont(QFont())
-        painter.drawText(r.left() + fm.width(input_name_str), r.top(), r.width(), r.height(),
-                         Qt.AlignLeft,
-                         str(gene_obj.input_name))
-
-        # gene id string
-        r = option.rect.adjusted(image_space, 22, 0, 0)  # left, top, width and height
-
-        painter.setFont(bold_font)
-        painter.drawText(r.left(), r.top(), r.width(), r.height(),
-                         Qt.AlignLeft,
-                         type_of_match_str)
-
-        painter.setFont(QFont())
-        painter.drawText(r.left() + fm.width(input_name_str), r.top(), r.width(), r.height(),
-                         Qt.AlignLeft,
-                         str(gene_obj.type_of_match) if gene_obj.type_of_match else 'Unknown')
-
-        # type of match string
-        r = option.rect.adjusted(image_space, 37, 0, 0)  # left, top, width and height
-
-        painter.setFont(bold_font)
-        painter.drawText(r.left(), r.top(), r.width(), r.height(),
-                         Qt.AlignLeft,
-                         gene_id_str)
-
-        painter.setFont(QFont())
-        painter.drawText(r.left() + fm.width(input_name_str), r.top(), r.width(), r.height(),
-                         Qt.AlignLeft,
-                         str(gene_obj.ncbi_id) if gene_obj.ncbi_id else 'Unknown')
-
-
-class GeneMatcherModel(QAbstractListModel):
-
-    def __init__(self, show_icon=True):
-        QAbstractListModel.__init__(self)
-        self.icon_path = ''
-        self.show_icon = show_icon
-        self.__items = []
-
-    def add_rows(self, rows):
-        self.__items = rows
-
-    def get_rows(self):
+    @property
+    def model_items(self):
         return self.__items
 
-    def __handle_icon(self, gene_obj):
-        if gene_obj.ncbi_id is None:
-            if gene_obj.possible_hits:
-                self.icon_path = 'icons/gene_icon_orange.svg'
-            else:
-                self.icon_path = 'icons/gene_icon_red.svg'
-        else:
-            self.icon_path = 'icons/gene_icon_green.svg'
+    @model_items.setter
+    def model_items(self, gene_objects):
+        self.__items = np.array(gene_objects)
 
-        return QIcon(os.path.join(os.path.dirname(__file__), self.icon_path))
+        for gene in gene_objects:
+            # load info from database
+            gene.load_ncbi_info()
+            # populate data matrix
+            if self.__data_matrix.size == 0:
+                self.__data_matrix = np.append(self.__data_matrix, self.__gene_object_to_list(gene))
+            else:
+                self.__data_matrix = np.vstack((self.__data_matrix, self.__gene_object_to_list(gene)))
+
+    def __gene_object_to_list(self, gene_object):
+        output_list = []
+
+        for tag in self.header_tags:
+            gene_attr = gene_object.__getattribute__(tag)
+
+            if isinstance(gene_attr, dict):
+                # note: db_refs are stored as dicts
+                gene_attr = ', '.join('{}: {}'.format(key, val)
+                                      for (key, val) in gene_attr.items()) if gene_attr else ' '
+            elif isinstance(gene_attr, list):
+                # note: synonyms are stored as lists
+                gene_attr = ', '.join(gene_attr) if gene_attr else ' '
+
+            output_list.append(gene_attr)
+
+        return output_list
 
     def rowCount(self, *args, **kwargs):
-        return len(self.__items)
+        return self.__data_matrix.shape[0]
+
+    def columnCount(self, *args, **kwargs):
+        return self.__data_matrix.shape[1]
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return self.header_labels[section]
+        return QAbstractTableModel.headerData(self, section, orientation, role)
 
     def data(self, model_index, role=None):
         # check if data is set
-        if not self.__items:
+        if self.__data_matrix.size == 0 or len(self.__items) == 0:
             return QVariant()
 
         # return empty QVariant if model index is unknown
-        if not model_index.isValid() or not (0 <= model_index.row() < len(self.__items)):
+        if not model_index.isValid() \
+                or not (0 <= model_index.row() < self.rowCount()) \
+                or not (0 <= model_index.column() < self.columnCount()):
             return QVariant()
 
-        gene_obj = self.__items[model_index.row()]
-
         if role == Qt.DisplayRole:
-            return gene_obj
-        elif role == Qt.DecorationRole and self.show_icon:
-            return self.__handle_icon(gene_obj)
-
-
-class ExtendedTableView(QWidget):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ow = kwargs.get('parent', None)
-
-        # set layout
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(layout)
-
-        # set splitter
-        self.splitter = QSplitter()
-        self.splitter.setOrientation(Qt.Horizontal)
-
-        # data models
-        self.genes_model = None
-        self.info_model = None
-
-        # left side list view
-        self.genes_view = QTableView()
-        self.genes_view.horizontalHeader().hide()
-
-        self.genes_view.setItemDelegate(GeneItemDelegate())
-        self.genes_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-        # right side list view
-        self.info_view = QTableView()
-        self.info_view.setItemDelegate(HTMLDelegate())
-        self.info_view.horizontalHeader().hide()
-
-        self.info_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-        self.splitter.addWidget(self.genes_view)
-        self.splitter.addWidget(self.info_view)
-
-        # self.splitter.setStretchFactor(0, 60)
-        # self.splitter.setStretchFactor(1, 40)
-
-        self.layout().addWidget(self.splitter)
-
-    def set_genes_model(self, rows):
-        self.genes_model = GeneMatcherModel()
-        self.genes_model.add_rows(rows)
-
-    def get_selected_gens(self):
-        # return a list of QModelIndex
-        return self.genes_selection_model().selectedRows()
-
-    def reset_genes_model(self):
-        if self.genes_model:
-            self.genes_model.deleteLater()
-            self.genes_model = None
-
-    def genes_selection_model(self):
-        return self.genes_view.selectionModel()
-
-    def reset_info_model(self):
-        if self.info_model:
-            self.info_model.deleteLater()
-            self.info_model = None
-            self.info_view.setModel(None)
-
-    def set_info_model(self, rows):
-        unique, partial, unknown = range(len(self.ow.filter_labels))
-
-        if self.ow.selected_filter == unique:
-            # create model
-            self.info_model = GeneMatcherModel(show_icon=False)
-            # add rows
-            self.info_model.add_rows(rows)
-            # add model to the view
-            self.info_view.setModel(self.info_model)
-            # disable selection of gene info cards
-            self.info_view.setSelectionMode(QAbstractItemView.NoSelection)
-            # call sizeHint function
-            self.info_view.resizeRowsToContents()
-        else:
-            self.reset_info_model()
+            # note: Data is not displayed if QVariant is returned, why?
+            #       return QVariant(self.__data_matrix[model_index.row()][model_index.column()])
+            return '{}'.format(self.__data_matrix[model_index.row()][model_index.column()])
 
 
 class OWGeneNameMatcher(OWWidget):
@@ -413,18 +221,21 @@ class OWGeneNameMatcher(OWWidget):
         rubber(self.radio_group)
         self.mainArea.layout().addWidget(filter_box)
 
-        self.proxy_model = FilterProxyModel(self)
-        self.extended_view = ExtendedTableView(parent=self)
-        self.extended_view.genes_view.setModel(self.proxy_model)
-        self.extended_view.genes_selection_model().selectionChanged.connect(self.__selection_changed)
+        self.proxy_model = QSortFilterProxyModel()
+        # left side list view
+        self.table_view = QTableView()
+        self.table_view.setModel(self.proxy_model)
+        self.table_view.horizontalHeader().setStretchLastSection(True)
+        # self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # self.table_view.selectionModel().selectionChanged.connect(self.__selection_changed)
 
-        self.mainArea.layout().addWidget(self.extended_view, 1)
+        self.mainArea.layout().addWidget(self.table_view, 1)
 
     def __reset_widget_state(self):
         self.Outputs.custom_data_table.send(None)
-        self.proxy_model.setSourceModel(None)
-        self.extended_view.reset_genes_model()
-        self.extended_view.reset_info_model()
+        # self.proxy_model.setSourceModel(None)
+        # self.extended_view.reset_genes_model()
+        # self.extended_view.reset_info_model()
 
     def __selection_changed(self):
         genes = [model_index.data() for model_index in self.extended_view.get_selected_gens()]
@@ -463,10 +274,11 @@ class OWGeneNameMatcher(OWWidget):
             return
 
         self._update_info_box()
-        self.extended_view.set_genes_model(self.gene_matcher.genes)
-        self.proxy_model.setSourceModel(self.extended_view.genes_model)
-        self.extended_view.genes_view.resizeRowsToContents()
-        self.commit()
+        self.table_model = GeneInfoModel()
+        self.table_model.model_items = self.gene_matcher.genes
+        self.proxy_model.setSourceModel(self.table_model)
+        # self.table_view.resizeRowsToContents()
+        # self.commit()
 
     def get_available_organisms(self):
         available_organism = sorted([(tax_id, taxonomy.name(tax_id)) for tax_id in taxonomy.common_taxids()],
@@ -523,7 +335,7 @@ class OWGeneNameMatcher(OWWidget):
 
     @Inputs.data_table
     def handle_input(self, data):
-        self.__reset_widget_state()
+        # self.__reset_widget_state()
         self.gene_columns_model.set_domain(None)
 
         if data:

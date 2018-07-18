@@ -2,6 +2,7 @@
 import pickle
 
 from collections import defaultdict
+from functools import lru_cache
 from typing import List
 
 from orangecontrib.bioinformatics.ncbi.gene.config import *
@@ -44,6 +45,7 @@ class Gene:
             possible_match.ncbi_id = gene
             self._possible_hits.append(possible_match)
 
+    @lru_cache()
     def load_ncbi_info(self):
         if not self.ncbi_id:
             return
