@@ -91,7 +91,7 @@ def dicty_mutant_gene_sets(org):
         gene_matcher = GeneMatcher('352472')
 
         for phenotype, mutants in phenotypes.phenotype_mutants().items():
-            print(phenotype, mutants)
+            phenotype = phenotype.replace(",", " ")
             gene_symbols = [phenotypes.mutant_genes(mutant)[0] for mutant in mutants]
             gene_matcher.genes = gene_symbols
             gene_matcher.run_matcher()
@@ -166,9 +166,9 @@ def reactome_gene_sets(org):
                     for gene in gene_matcher.genes:
                         if gene.ncbi_id is not None:
                             genes.append(int(gene.ncbi_id))
-
-                    gs = GeneSet(gs_id=path.split('\t')[0],
-                                 name=path.split('\t')[0],
+                    pathway = path.split('\t')[0].replace(',', ' ')
+                    gs = GeneSet(gs_id=pathway,
+                                 name=pathway,
                                  genes=genes,
                                  hierarchy=('Reactome', 'pathways'),
                                  organism='9606', link='')
