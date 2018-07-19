@@ -20,7 +20,7 @@ from AnyQt.QtGui import (
 
 from Orange.widgets.gui import (
     vBox, comboBox, ProgressBar, widgetBox, auto_commit, widgetLabel, checkBox,
-    rubber, radioButtons, separator, hBox
+    rubber, radioButtons, separator, hBox, lineEdit
 )
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.utils import itemmodels
@@ -120,7 +120,7 @@ class OWGeneNameMatcher(OWWidget):
     use_attr_names = Setting(True)
     selected_organism = Setting(11)
 
-    selected_filter = Setting(0)
+    search_pattern = Setting('')
     gene_as_attr_name = Setting(0)
     filter_unknown = Setting(True)
     include_entrez_id = Setting(True)
@@ -214,22 +214,26 @@ class OWGeneNameMatcher(OWWidget):
         rubber(self.controlArea)
 
         # Main area
-        filter_box = hBox(self.mainArea, 'Filter results')
-        self.radio_group = radioButtons(filter_box, self, value='selected_filter',
-                                        btnLabels=self.filter_labels,
-                                        orientation=Qt.Horizontal, callback=self.on_filter_changed)
-        rubber(self.radio_group)
-        self.mainArea.layout().addWidget(filter_box)
+        self.filter = lineEdit(self.mainArea, self,
+                               'search_pattern', 'Filter:',
+                               callbackOnType=True, callback=self.apply_filter)
+        # rubber(self.radio_group)
+        self.mainArea.layout().addWidget(self.filter)
 
         self.proxy_model = QSortFilterProxyModel()
+        self.proxy_model.setFilterKeyColumn(-1)
         # left side list view
         self.table_view = QTableView()
         self.table_view.setModel(self.proxy_model)
+        self.table_view.setSortingEnabled(True)
         self.table_view.horizontalHeader().setStretchLastSection(True)
         # self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         # self.table_view.selectionModel().selectionChanged.connect(self.__selection_changed)
 
         self.mainArea.layout().addWidget(self.table_view, 1)
+
+    def apply_filter(self):
+            self.proxy_model.setFilterRegExp(str(self.search_pattern))
 
     def __reset_widget_state(self):
         self.Outputs.custom_data_table.send(None)
@@ -277,6 +281,7 @@ class OWGeneNameMatcher(OWWidget):
         self.table_model = GeneInfoModel()
         self.table_model.model_items = self.gene_matcher.genes
         self.proxy_model.setSourceModel(self.table_model)
+        self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
         # self.table_view.resizeRowsToContents()
         # self.commit()
 
