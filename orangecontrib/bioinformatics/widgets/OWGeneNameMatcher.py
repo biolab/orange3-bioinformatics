@@ -1,37 +1,32 @@
 """ GeneNameMatching """
-import os
 import threading
 import numpy as np
 import re
 
 
-from numbers import Number, Integral
-from math import isnan, isinf
 from typing import Set, List
 
 from AnyQt.QtWidgets import (
-    QSplitter, QTableView, QWidget, QVBoxLayout, QItemDelegate, QStyledItemDelegate, QHeaderView, QStyleOptionViewItem,
-    QStyle, QAbstractItemView, QApplication, QLineEdit, QTableWidget
+    QSplitter, QTableView,  QHeaderView, QAbstractItemView
 )
 from AnyQt.QtCore import (
-    Qt, QSize, QThreadPool, QSortFilterProxyModel, QAbstractTableModel, QVariant,
+    Qt, QSize, QThreadPool, QSortFilterProxyModel, QAbstractTableModel
 
 )
 from AnyQt.QtGui import (
-    QIcon, QFont, QColor, QAbstractTextDocumentLayout, QFontMetrics, QTextDocument,
+    QFont, QColor
 )
 
 from Orange.widgets.gui import (
     vBox, comboBox, ProgressBar, widgetBox, auto_commit, widgetLabel, checkBox,
-    rubber, radioButtons, separator, hBox, lineEdit, LinkRole, LinkStyledItemDelegate
+    rubber, lineEdit, LinkRole, LinkStyledItemDelegate
 )
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.utils import itemmodels
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output, Input
-from Orange.data import StringVariable, Domain, Table, filter as table_filter
+from Orange.data import StringVariable, DiscreteVariable, Domain, Table, filter as table_filter
 
-from orangecontrib.bioinformatics.widgets.utils.gui import horizontal_line
 
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
@@ -163,9 +158,11 @@ class OWGeneNameMatcher(OWWidget):
 
     search_pattern = Setting('')
     gene_as_attr_name = Setting(0)
-    filter_unknown = Setting(True)
+    exclude_unmatched = Setting(True)
     include_entrez_id = Setting(True)
-    # include_ensembl_id = Setting(True)
+    replace_id_with_symbol = Setting(True)
+    include_gene_info = Setting(False)
+
     auto_commit = Setting(True)
 
     class Inputs:
@@ -197,6 +194,11 @@ class OWGeneNameMatcher(OWWidget):
         # gene matcher
         self.gene_matcher = None
 
+        # output data
+        self.output_data_table = None
+        self.gene_id_column = None
+        self.gene_id_attribute = None
+
         # threads
         self.threadpool = QThreadPool(self)
         self.workers = None
@@ -222,35 +224,41 @@ class OWGeneNameMatcher(OWWidget):
         self.get_available_organisms()
         self.organism_select_combobox.setCurrentIndex(self.selected_organism)
 
-        box = widgetBox(self.controlArea, 'Gene names')
-        self.gene_columns_model = itemmodels.DomainModel(valid_types=(StringVariable, ))
+        box = widgetBox(self.controlArea, 'Gene IDs in input data')
+        self.gene_columns_model = itemmodels.DomainModel(valid_types=(StringVariable, DiscreteVariable))
         self.gene_column_combobox = comboBox(box, self, 'selected_gene_col',
+                                             label='Stored in data column',
                                              model=self.gene_columns_model,
                                              sendSelectedValue=True,
                                              callback=self.on_input_option_change)
 
-        self.attr_names_checkbox = checkBox(box, self, 'use_attr_names', 'Use attribute names',
+        self.attr_names_checkbox = checkBox(box, self, 'use_attr_names', 'Stored as feature (column) names',
                                             disables=[(-1, self.gene_column_combobox)],
                                             callback=self.on_input_option_change)
 
         self.gene_column_combobox.setDisabled(bool(self.use_attr_names))
 
-        output_box = vBox(self.controlArea, 'Output settings')
-
-        # TODO: will widget support transposing tables?
-        # radioButtonsInBox(output_box, self, "gene_as_attr_name", ["Genes in rows", "Genes in columns"],
-        # callback=self.on_output_option_change)
+        output_box = vBox(self.controlArea, 'Output')
 
         # separator(output_box)
-        checkBox(output_box, self, 'filter_unknown', 'Filter unknown genes', callback=self.on_output_option_change)
-        separator(output_box)
-        output_box.layout().addWidget(horizontal_line())
-        checkBox(output_box, self, 'include_entrez_id', 'Include Entrez ID', callback=self.on_output_option_change)
+        # output_box.layout().addWidget(horizontal_line())
+        # separator(output_box)
+        self.exclude_radio = checkBox(output_box, self,
+                                      'exclude_unmatched',
+                                      'Exclude unmatched genes',
+                                      callback=self.on_output_option_change)
 
-        # TODO: provide support for ensembl ids as output option
-        # checkBox(output_box, self, 'include_ensembl_id', 'Include Ensembl ID', callback=self.on_output_option_change)
+        self.replace_radio = checkBox(output_box, self,
+                                      'replace_id_with_symbol',
+                                      'Replace feature IDs with gene names',
+                                      callback=self.on_output_option_change)
 
-        auto_commit(self.controlArea, self, "auto_commit", label="Commit")
+        self.include_radio = checkBox(output_box, self,
+                                      'include_gene_info',
+                                      'Include all other available information',
+                                      callback=self.on_output_option_change)
+
+        auto_commit(self.controlArea, self, "auto_commit", "&Commit", box=False)
 
         rubber(self.controlArea)
 
@@ -276,7 +284,7 @@ class OWGeneNameMatcher(OWWidget):
         self.table_view.setSortingEnabled(True)
         self.table_view.horizontalHeader().setStretchLastSection(True)
         # self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        # self.table_view.selectionModel().selectionChanged.connect(self.__selection_changed)
+        self.table_view.selectionModel().selectionChanged.connect(self.invalidate)
 
         self.unknown_model = UnknownGeneInfoModel()
 
@@ -300,9 +308,9 @@ class OWGeneNameMatcher(OWWidget):
 
     def __reset_widget_state(self):
         self.Outputs.custom_data_table.send(None)
-        # self.proxy_model.setSourceModel(None)
-        # self.extended_view.reset_genes_model()
-        # self.extended_view.reset_info_model()
+        self.proxy_model.setSourceModel(None)
+        self.table_model.clear()
+        self.unknown_model.clear()
 
     def __selection_changed(self):
         genes = [model_index.data() for model_index in self.extended_view.get_selected_gens()]
@@ -314,8 +322,9 @@ class OWGeneNameMatcher(OWWidget):
             num_genes = len(self.gene_matcher.genes)
             known_genes = len(self.gene_matcher.get_known_genes())
 
-            info_text = 'Genes on input:  {}\n' \
-                        'Known genes :    {} ({:.2f} %)\n'.format(num_genes, known_genes, known_genes * 100 / num_genes)
+            info_text = '{} genes in input data\n' \
+                        '{} genes match Entrez database\n' \
+                        '{} genes with match conflicts\n'.format(num_genes, known_genes, num_genes - known_genes)
 
         else:
             info_text = 'No genes on input'
@@ -334,14 +343,16 @@ class OWGeneNameMatcher(OWWidget):
             self.progress_bar.finish()
             self.setStatusMessage('')
 
-        # if no known genes, clean up and return
-        if not len(self.gene_matcher.get_known_genes()):
-            self._update_info_box()
-            self.__reset_widget_state()
-            return
-
         # update info box
         self._update_info_box()
+
+        # set output options
+        self.toggle_radio_options()
+
+        # if no known genes, clean up and return
+        if not len(self.gene_matcher.get_known_genes()):
+            self.__reset_widget_state()
+            return
 
         # set known genes
         self.table_model.initialize(self.gene_matcher.genes)
@@ -357,7 +368,7 @@ class OWGeneNameMatcher(OWWidget):
         self.unknown_view.resizeColumnsToContents()
         self.unknown_view.verticalHeader().setStretchLastSection(True)
 
-        # self.commit()
+        self.on_output_option_change()
 
     def get_available_organisms(self):
         available_organism = sorted([(tax_id, taxonomy.name(tax_id)) for tax_id in taxonomy.common_taxids()],
@@ -414,7 +425,7 @@ class OWGeneNameMatcher(OWWidget):
 
     @Inputs.data_table
     def handle_input(self, data):
-        # self.__reset_widget_state()
+        self.__reset_widget_state()
         self.gene_columns_model.set_domain(None)
 
         if data:
@@ -445,27 +456,45 @@ class OWGeneNameMatcher(OWWidget):
 
         return NCBI_ID + ' ({})'.format(len(set(filtered)) + 1)
 
-    def __handle_ids(self, data_table):
+    def __handle_output_data_table(self, data_table):
         """
         If 'use_attr_names' is True, genes from the input data are in columns.
         """
+        # set_of_attributes = set([key for attr in data_table.domain[:] for key in attr.attributes.keys()
+        #                          if key == NCBI_ID])
+        # gene_id = NCBI_ID if NCBI_ID in data_table.domain or set_of_attributes else None
+        if self.exclude_unmatched:
+            data_table = self.__filter_unknown(data_table)
+
         if self.use_attr_names:
             # set_of_attributes = set([key for attr in data_table.domain[:] for key in attr.attributes.keys()
             # if key.startswith(NCBI_ID)])
             # gene_id = self.get_gene_id_identifier(set_of_attributes)
-            gene_id = NCBI_ID
+            self.gene_id_attribute = gene_id = NCBI_ID
 
             for gene in self.gene_matcher.genes:
-                if gene.ncbi_id:
-                    data_table.domain[gene.input_name].attributes[gene_id] = str(gene.ncbi_id)
+                if gene.input_name in data_table.domain:
+
+                    if gene.ncbi_id:
+                        data_table.domain[gene.input_name].attributes[gene_id] = str(gene.ncbi_id)
+
+                    if self.replace_id_with_symbol:
+                        gene.load_ncbi_info()
+                        try:
+                            data_table.domain[gene.input_name].name = str(gene.symbol)
+                        except AttributeError:
+                            pass
+
         else:
             set_of_variables = set([var.name for var in data_table.domain.variables + data_table.domain.metas
                                     if var.name.startswith(NCBI_ID)])
 
-            gene_id = self.get_gene_id_identifier(set_of_variables)
+            available_rows, _ = data_table.get_column_view(self.selected_gene_col)
+            self.gene_id_column = gene_id = self.get_gene_id_identifier(set_of_variables)
 
             temp_domain = Domain([], metas=[StringVariable(gene_id)])
-            temp_data = [[str(gene.ncbi_id) if gene.ncbi_id else '?'] for gene in self.gene_matcher.genes]
+            temp_data = [[str(gene.ncbi_id) if gene.ncbi_id else ''] for gene in self.gene_matcher.genes
+                         if gene.input_name in available_rows]
             temp_table = Table(temp_domain, temp_data)
 
             # if columns differ, then concatenate.
@@ -481,59 +510,98 @@ class OWGeneNameMatcher(OWWidget):
 
         return data_table, gene_id
 
-    def __apply_filters(self, data_table):
-        set_of_attributes = set([key for attr in data_table.domain[:] for key in attr.attributes.keys()
-                                 if key == NCBI_ID])
+    def __filter_unknown(self, data_table):
 
-        gene_id = NCBI_ID if NCBI_ID in data_table.domain or set_of_attributes else None
+        # data_table, gene_id = self.__handle_output_data_table(data_table)
+        # if self.exclude_unmatched:
 
-        if self.include_entrez_id:
-            data_table, gene_id = self.__handle_ids(data_table)
+        known_input_genes = [gene.input_name for gene in self.gene_matcher.get_known_genes()]
 
-        if self.filter_unknown:
-            known_input_genes = [gene.input_name for gene in self.gene_matcher.get_known_genes()]
+        if self.use_attr_names:
+            temp_domain = Domain(
+                [attr for attr in data_table.domain.attributes if attr.name in known_input_genes],
+                metas=data_table.domain.metas,
+                class_vars=data_table.domain.class_vars
+            )
+            data_table = data_table.transform(temp_domain)
+        else:
 
-            if self.use_attr_names:
-                temp_domain = Domain(
-                    [attr for attr in data_table.domain.attributes if attr.name in known_input_genes],
-                    metas=data_table.domain.metas,
-                    class_vars=data_table.domain.class_vars
-                )
-                data_table = data_table.transform(temp_domain)
-            else:
+            # create filter from selected column for genes
+            only_known = table_filter.FilterStringList(self.selected_gene_col, known_input_genes)
+            # apply filter to the data
+            data_table = table_filter.Values([only_known])(data_table)
 
-                # create filter from selected column for genes
-                only_known = table_filter.FilterStringList(self.selected_gene_col, known_input_genes)
-                # apply filter to the data
-                data_table = table_filter.Values([only_known])(data_table)
-
-        return data_table, gene_id
+        return data_table
 
     def commit(self):
         self.Outputs.custom_data_table.send(None)
 
+        if self.output_data_table:
+            selection = self.table_view.selectionModel().selectedRows(self.table_model.entrez_column_index)
+            selected_genes = [row.data() for row in selection]
+
+            if selected_genes:
+                if self.use_attr_names:
+                    selected = [column for column in self.output_data_table.domain.attributes
+                                if self.gene_id_attribute in column.attributes and
+                                str(column.attributes[self.gene_id_attribute]) in selected_genes]
+
+                    domain = Domain(
+                        selected, self.output_data_table.domain.class_vars,
+                        self.output_data_table.domain.metas
+                    )
+                    new_data = self.output_data_table.from_table(domain, self.output_data_table)
+                    self.Outputs.custom_data_table.send(new_data)
+
+                else:
+                    selected_rows = []
+                    for row_index, row in enumerate(self.output_data_table):
+                        gene_in_row = str(row[self.gene_id_column])
+
+                        if gene_in_row in selected_genes:
+                            selected_rows.append(row_index)
+
+                    if selected_rows:
+                        selected = self.output_data_table[selected_rows]
+                    else:
+                        selected = None
+
+                    self.Outputs.custom_data_table.send(selected)
+            else:
+                self.Outputs.custom_data_table.send(self.output_data_table)
+
+    def toggle_radio_options(self):
+        self.replace_radio.setEnabled(bool(self.use_attr_names))
+
+        if self.gene_matcher.genes:
+            # enable checkbox if unknown genes are detected
+            self.exclude_radio.setEnabled(len(self.gene_matcher.genes) != len(self.gene_matcher.get_known_genes()))
+            self.exclude_unmatched = len(self.gene_matcher.genes) != len(self.gene_matcher.get_known_genes())
+
+    def on_output_option_change(self):
         if not self.input_data:
             return
 
         if not self.use_attr_names and not self.gene_columns_model:
             return
 
-        output_data_table = self.input_data.transform(self.input_data.domain.copy())
-        output_data_table, gene_id = self.__apply_filters(output_data_table.copy())
+        self.output_data_table = self.input_data.transform(self.input_data.domain.copy())
+        self.output_data_table, gene_id = self.__handle_output_data_table(self.output_data_table.copy())
 
         # handle table attributes
-        output_data_table.attributes[TAX_ID] = self.get_selected_organism()
-        output_data_table.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.use_attr_names)
+        self.output_data_table.attributes[TAX_ID] = self.get_selected_organism()
+
+        self.output_data_table.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.use_attr_names)
 
         if not bool(self.use_attr_names):
-            output_data_table.attributes[GENE_ID_COLUMN] = gene_id
+            self.output_data_table.attributes[GENE_ID_COLUMN] = gene_id
         else:
-            output_data_table.attributes[GENE_ID_ATTRIBUTE] = gene_id
+            self.output_data_table.attributes[GENE_ID_ATTRIBUTE] = gene_id
 
-        self.Outputs.custom_data_table.send(output_data_table)
-        # gene_objs = [self.proxy_model.index(row, 0).data() for row in range(self.proxy_model.rowCount())]
+        # print(self.output_data_table)
+        self.invalidate()
 
-    def on_output_option_change(self):
+    def invalidate(self):
         self.commit()
 
     def on_filter_changed(self):
