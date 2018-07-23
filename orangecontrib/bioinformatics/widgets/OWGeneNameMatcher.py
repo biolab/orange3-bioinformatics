@@ -7,10 +7,10 @@ import re
 from typing import Set, List
 
 from AnyQt.QtWidgets import (
-    QSplitter, QTableView,  QHeaderView, QAbstractItemView
+    QSplitter, QTableView,  QHeaderView, QAbstractItemView, QStyle
 )
 from AnyQt.QtCore import (
-    Qt, QSize, QThreadPool, QSortFilterProxyModel, QAbstractTableModel
+    Qt, QSize, QThreadPool, QAbstractTableModel, QVariant, QModelIndex
 
 )
 from AnyQt.QtGui import (
@@ -35,6 +35,8 @@ from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 from orangecontrib.bioinformatics.ncbi import taxonomy
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, Gene, NCBI_ID, GENE_MATCHER_HEADER, NCBI_DETAIL_LINK
 
+from functools import lru_cache
+
 
 class GeneInfoModel(itemmodels.PyTableModel):
     def __init__(self,  *args, **kwargs):
@@ -49,51 +51,71 @@ class GeneInfoModel(itemmodels.PyTableModel):
         except ValueError as e:
             raise ValueError("Make sure 'ncbi_id' is set in gene.GENE_MATCHER_HEADER")
 
-        self.genes = []
+        self.genes = None
+        self.data_table = None
+
+        self.font = QFont()
+        self.font.setUnderline(True)
+        self.color = QColor(Qt.blue)
+
+        @lru_cache(maxsize=10000)
+        def _row_instance(row, column):
+            return self[int(row)][int(column)]
+        self._row_instance = _row_instance
 
     def initialize(self, list_of_genes):
         self.genes = list_of_genes
         self.__table_from_genes([gene for gene in list_of_genes if gene.ncbi_id])
-        self.__set_ncbi_link()
+        self.show_table()
 
-    def data(self, index, role=Qt.DisplayRole):
-        # do not alignt text (confilct with LinkStyledItemDelegate)
-        if not index.isValid():
-            return
+    def columnCount(self, parent=QModelIndex()):
+        return 0 if parent.isValid() else self._table.shape[1]
 
-        row, column = self.mapToSourceRows(index.row()), index.column()
-        role_value = self._roleData.get(row, {}).get(column, {}).get(role)
+    def clear(self):
+        self.beginResetModel()
+        self._table = np.array([[]])
+        self.resetSorting()
+        self._roleData.clear()
+        self.endResetModel()
 
-        if role_value is not None:
-            return role_value
+    def data(self, index, role,
+             _str=str,
+             _Qt_DisplayRole=Qt.DisplayRole,
+             _Qt_EditRole=Qt.EditRole,
+             _Qt_FontRole=Qt.FontRole,
+             _Qt_ForegroundRole=Qt.ForegroundRole,
+             _LinkRolee=LinkRole,
+             _recognizedRoles=frozenset([Qt.DisplayRole, Qt.EditRole, Qt.FontRole, Qt.ForegroundRole, LinkRole])):
+
+        if role not in _recognizedRoles:
+            return None
+
+        row, col = index.row(), index.column()
+        if not 0 <= row <= self.rowCount():
+            return None
+        row = self.mapToSourceRows(row)
 
         try:
-            value = self[row][column]
+            # value = self[row][col]
+            value = self._row_instance(row, col)
         except IndexError:
             return
 
         if role == Qt.DisplayRole:
-            return str(value)
-        if role == Qt.ToolTipRole:
-            return str(value)
+            return QVariant(str(value))
+        elif role == Qt.ToolTipRole:
+            return QVariant(str(value))
 
-    def __set_ncbi_link(self):
-        font = QFont()
-        font.setUnderline(True)
-        color = QColor(Qt.blue)
-
-        for row_index, gene_obj in enumerate(self.genes):
-            # note: we expect ncbi_id to be loaded in gene_obj
-            link = NCBI_DETAIL_LINK.format(gene_obj.ncbi_id)
-
-            if link:
-                self._roleData[row_index][self.entrez_column_index][LinkRole] = link
-                self._roleData[row_index][self.entrez_column_index][Qt.FontRole] = font
-                self._roleData[row_index][self.entrez_column_index][Qt.ForegroundRole] = color
+        if col == self.entrez_column_index:
+            if role == _Qt_ForegroundRole:
+                return self.color
+            elif role == _Qt_FontRole:
+                return self.font
+            elif role == _LinkRolee:
+                return NCBI_DETAIL_LINK.format(value)
 
     def __list_from_gene(self, gene_object):
         # type: (Gene) -> List[str]
-
         output_list = []
         for tag in self.gene_attributes:
             gene_attr = gene_object.__getattribute__(tag)
@@ -109,15 +131,33 @@ class GeneInfoModel(itemmodels.PyTableModel):
             output_list.append(gene_attr)
         return output_list
 
-    def __table_from_genes(self, list_of_genes):
+    def __table_from_genes(self, list_of_genes, ):
         # type: (list) -> None
-
         table = []
         for gene in list_of_genes:
             gene.load_ncbi_info()
             table.append(self.__list_from_gene(gene))
 
-        self.wrap(table)
+        self.data_table = np.asarray(table)
+
+    def filter_table(self, filter_pattern):
+        _, col_size = self.data_table.shape
+        invalid_result = np.array([-1 for _ in range(col_size)])
+
+        filtered_rows = []
+        for row in self.data_table:
+            match_result = np.core.defchararray.rfind(row.astype(str), filter_pattern)
+            filtered_rows.append(not np.array_equal(match_result, invalid_result))
+        return filtered_rows
+
+    def show_table(self, filter_pattern=None):
+        # Don't call filter if filter_pattern is empty
+        if filter_pattern:
+            # clear cache if model changes
+            self._row_instance.cache_clear()
+            self.wrap(self.data_table[self.filter_table(filter_pattern)])
+        else:
+            self.wrap(self.data_table)
 
 
 class UnknownGeneInfoModel(itemmodels.PyListModel):
@@ -273,18 +313,14 @@ class OWGeneNameMatcher(OWWidget):
         self.splitter = QSplitter()
         self.splitter.setOrientation(Qt.Vertical)
 
-        self.proxy_model = QSortFilterProxyModel()
-        self.proxy_model.setFilterKeyColumn(-1)  # note: filter by all columns
-
         self.table_model = GeneInfoModel()
-
         self.table_view = QTableView()
-        self.table_view.setModel(self.proxy_model)
+        self.table_view.setAlternatingRowColors(True)
         self.table_view.viewport().setMouseTracking(True)
         self.table_view.setSortingEnabled(True)
-        self.table_view.horizontalHeader().setStretchLastSection(True)
+        self.table_view.setShowGrid(False)
+        self.table_view.verticalHeader().hide()
         # self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table_view.selectionModel().selectionChanged.connect(self.invalidate)
 
         self.unknown_model = UnknownGeneInfoModel()
 
@@ -304,11 +340,15 @@ class OWGeneNameMatcher(OWWidget):
         self.mainArea.layout().addWidget(self.splitter)
 
     def apply_filter(self):
-            self.proxy_model.setFilterRegExp(str(self.search_pattern))
+        self.table_view.clearSpans()
+        self.table_view.setModel(None)
+        self.table_view.setSortingEnabled(False)
+        self.table_model.show_table(str(self.search_pattern))
+        self.table_view.setModel(self.table_model)
+        self.table_view.setSortingEnabled(True)
 
     def __reset_widget_state(self):
         self.Outputs.custom_data_table.send(None)
-        self.proxy_model.setSourceModel(None)
         self.table_model.clear()
         self.unknown_model.clear()
 
@@ -356,16 +396,25 @@ class OWGeneNameMatcher(OWWidget):
 
         # set known genes
         self.table_model.initialize(self.gene_matcher.genes)
-        self.proxy_model.setSourceModel(self.table_model)
+        self.table_view.setModel(self.table_model)
+        self.table_view.selectionModel().selectionChanged.connect(self.invalidate)
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+
         self.table_view.setItemDelegateForColumn(
             self.table_model.entrez_column_index, LinkStyledItemDelegate(self.table_view)
         )
+        v_header = self.table_view.verticalHeader()
+        option = self.table_view.viewOptions()
+        size = self.table_view.style().sizeFromContents(
+            QStyle.CT_ItemViewItem, option,
+            QSize(20, 20), self.table_view)
+
+        v_header.setDefaultSectionSize(size.height() + 2)
+        v_header.setMinimumSectionSize(5)
+        self.table_view.horizontalHeader().setStretchLastSection(True)
 
         # set unknown genes
         self.unknown_model.initialize(self.gene_matcher.genes)
-        self.unknown_view.resizeRowsToContents()
-        self.unknown_view.resizeColumnsToContents()
         self.unknown_view.verticalHeader().setStretchLastSection(True)
 
         self.on_output_option_change()
@@ -604,6 +653,3 @@ class OWGeneNameMatcher(OWWidget):
     def invalidate(self):
         self.commit()
 
-    def on_filter_changed(self):
-        self.proxy_model.invalidateFilter()
-        self.extended_view.genes_view.resizeRowsToContents()
