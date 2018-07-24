@@ -11,7 +11,7 @@ from AnyQt.QtCore import (
 )
 
 from Orange.widgets.gui import (
-    vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox, radioButtonsInBox
+    vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox
 )
 from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandler
@@ -25,7 +25,7 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
     ERROR_ON_MISSING_ANNOTATION, ERROR_ON_MISSING_GENE_ID, ERROR_ON_MISSING_TAX_ID
 )
 from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSetsSelection, GeneScoringWidget
-from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel
+from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, GENE_SETS_COUNT, GENE_COUNT
 
 
 class OWClusterAnalysis(OWWidget):
@@ -60,26 +60,25 @@ class OWClusterAnalysis(OWWidget):
 
     scoring_method_selection = ContextSetting(0)
     scoring_method_design = ContextSetting(0)
-    genome_as_reference = ContextSetting(False)
 
     # genes filter
     min_gene_count = Setting(20)
     use_gene_count_filter = Setting(True)
 
-    max_gene_p_value = Setting(0.0001)
+    max_gene_p_value = Setting(0.1)
     use_gene_pval_filter = Setting(False)
 
-    max_gene_fdr = Setting(0.01)
+    max_gene_fdr = Setting(0.1)
     use_gene_fdr_filter = Setting(True)
 
     # gene sets filter
     min_gs_count = Setting(5)
     use_gs_count_filter = Setting(True)
 
-    max_gs_p_value = Setting(0.0001)
+    max_gs_p_value = Setting(0.1)
     use_gs_pval_filter = Setting(False)
 
-    max_gs_fdr = Setting(0.01)
+    max_gs_fdr = Setting(0.1)
     use_gs_max_fdr = Setting(True)
 
     # auto commit results
@@ -106,6 +105,7 @@ class OWClusterAnalysis(OWWidget):
         self.custom_use_attr_names = None
         self.custom_gene_id_attribute = None
         self.custom_gene_id_column = None
+        self.num_of_custom_sets = None
 
         self.rows_by_cluster = None
         self.clusters = []
@@ -146,18 +146,12 @@ class OWClusterAnalysis(OWWidget):
                                           model=self.feature_model, callback=self.handle_custom_gene_sets)
         self.gs_label_combobox.setDisabled(True)
 
-        # reference genes area
-        self.reference_radio_box = radioButtonsInBox(
-            self.controlArea, self, 'genome_as_reference', ['All genes in the data set', 'Entire genome'],
-            tooltips=['Use reference set of genes', 'Use entire genome (for gene set enrichment)'],
-            box='Reference', callback=self.invalidate)
-
         # main area
         splitter = QSplitter(Qt.Horizontal, self.mainArea)
         self.mainArea.layout().addWidget(splitter)
 
         genes_filter = widgetBox(splitter, 'Filter Genes', orientation=QHBoxLayout())
-        spin(genes_filter, self, 'min_gene_count', 0, 25,
+        spin(genes_filter, self, 'min_gene_count', 0, GENE_COUNT,
              label='Count',
              tooltip='Minimum genes count',
              checked='use_gene_count_filter',
@@ -184,7 +178,7 @@ class OWClusterAnalysis(OWWidget):
                    )
 
         gene_sets_filter = widgetBox(splitter, 'Filter Gene Sets', orientation=QHBoxLayout())
-        spin(gene_sets_filter, self, 'min_gs_count', 0, 5,
+        spin(gene_sets_filter, self, 'min_gs_count', 0, GENE_SETS_COUNT,
              label='Count',
              tooltip='Minimum genes count',
              checked='use_gs_count_filter',
@@ -224,9 +218,14 @@ class OWClusterAnalysis(OWWidget):
     def __update_info_box(self):
         info_string = ''
         if self.input_genes_ids:
-            info_string += '{} unique gene on input.\n'.format(len(self.input_genes_ids))
+            info_string += '{} samples, {} clusters\n'.format(
+                self.input_data.X.shape[0], len(self.clusters) if self.clusters else '?')
+            info_string += '{:,d} unique genes\n'.format(len(self.input_genes_ids))
         else:
             info_string += 'No genes on input.\n'
+
+        if self.custom_data:
+            info_string += '{} marker genes in {} sets\n'.format(self.custom_data.X.shape[0], self.num_of_custom_sets)
 
         self.input_info.setText(info_string)
 
@@ -266,7 +265,7 @@ class OWClusterAnalysis(OWWidget):
             # filter genes
             # note: after gene filter is applied, we need to recalculate gene set enrichment
             self.cluster_info_model.apply_gene_filters(
-                self.min_gene_count if self.use_gene_count_filter else 20,
+                self.min_gene_count if self.use_gene_count_filter else GENE_COUNT,
                 self.max_gene_p_value if self.use_gene_pval_filter else None,
                 self.max_gene_fdr if self.use_gene_fdr_filter else None)
 
@@ -279,7 +278,7 @@ class OWClusterAnalysis(OWWidget):
         if self.cluster_info_model:
             # filter gene sets
             self.cluster_info_model.apply_gene_sets_filters(
-                self.min_gs_count if self.use_gs_count_filter else 5,
+                self.min_gs_count if self.use_gs_count_filter else GENE_SETS_COUNT,
                 self.max_gs_p_value if self.use_gs_pval_filter else None,
                 self.max_gs_fdr if self.use_gs_max_fdr else None)
 
@@ -304,8 +303,7 @@ class OWClusterAnalysis(OWWidget):
         # save setting on selected hierarchies
         self.stored_gene_sets_selection = tuple(selected_sets)
 
-        ref_genes = set(self.input_genes_ids) if not self.genome_as_reference else self.gs_widget.gs_object.genes()
-
+        ref_genes = set(self.input_genes_ids)
         try:
             self.cluster_info_model.gene_sets_enrichment(self.gs_widget.gs_object, selected_sets, ref_genes)
         except Exception as e:
@@ -373,6 +371,12 @@ class OWClusterAnalysis(OWWidget):
     @Inputs.custom_sets
     def handle_custom_input(self, data):
         self.closeContext()
+        self.custom_data = None
+        self.custom_tax_id = None
+        self.custom_use_attr_names = None
+        self.custom_gene_id_attribute = None
+        self.custom_gene_id_column = None
+        self.num_of_custom_sets = None
         self.feature_model.set_domain(None)
 
         if data:
@@ -447,10 +451,12 @@ class OWClusterAnalysis(OWWidget):
                 else:
                     gene_sets_names, _ = self.custom_data.get_column_view(self.custom_gene_set_indicator)
 
+                self.num_of_custom_sets = len(set(gene_sets_names))
                 gene_names, _ = self.custom_data.get_column_view(self.custom_gene_id_column)
                 self.gs_widget.add_custom_sets(gene_sets_names, gene_names)
 
         self.__gene_sets_enrichment()
+        self.__update_info_box()
 
     def refresh_custom_gene_sets(self):
         self.gs_widget.clear_custom_sets()

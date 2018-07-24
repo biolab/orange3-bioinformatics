@@ -56,7 +56,7 @@ class GeneScoringWidget(QWidget):
         self.scoring_method_design = settings_var
 
         radioButtons(self.widget, self.parent, self.scoring_method_design,
-                     ['Cluster vs. rest', 'Cluster vs. Cluster (max)'],
+                     ['Cluster vs. rest', 'Cluster vs. cluster (max p-value)'],
                      callback=self.on_design_selection_changed,
                      label='Design')
 

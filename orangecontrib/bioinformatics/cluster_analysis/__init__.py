@@ -14,6 +14,9 @@ from orangecontrib.bioinformatics.geneset import GeneSet
 from orangecontrib.bioinformatics.widgets.utils.gui import gene_scoring_method
 from orangecontrib.bioinformatics.utils.statistics import FDR
 
+GENE_COUNT = 20
+GENE_SETS_COUNT = 5
+
 
 class ClusterGene(Gene):
     __slots__ = ['score', 'p_val', 'fdr']
@@ -118,10 +121,10 @@ class Cluster:
 
         cluster = table_x[rows_by_cluster == self.index]
         rest = table_x[rows_by_cluster != self.index]
-        scores, p_values = method.score_function(cluster, rest)
-        fdr_values = FDR(p_values)
-
-        self.__update_gene_objects(p_values, fdr_values)
+        if cluster.any():
+            scores, p_values = method.score_function(cluster, rest)
+            fdr_values = FDR(p_values)
+            self.__update_gene_objects(p_values, fdr_values)
 
     def cluster_vs_cluster(self, table_x, rows_by_cluster, method, **kwargs):
         # type: (np.ndarray, np.ndarray, gene_scoring_method) -> None
@@ -146,10 +149,23 @@ class Cluster:
             self.__update_gene_objects(max_p_values, fdr_values)
 
     def to_html(self):
+        gene_sets = '(no enriched gene sets)'
+        if self.filtered_gene_sets:
+            gene_sets = '<br>'.join(['<b>{}</b> (FDR={:0.2e}, n={})'.format(g_set.name, g_set.fdr, g_set.count)
+                                    for g_set in self.filtered_gene_sets])
+
+        genes = '(all genes are filtered out)'
+        if self.filtered_genes:
+            genes = ', '.join([gene.input_name for gene in self.filtered_genes])
+            if len(self.filtered_genes) < GENE_COUNT:
+                genes += ', ... ({} more genes)'.format(GENE_COUNT - len(self.filtered_genes))
+
         html_string = """
         <html>
         <body>
         <table >
+            <tr>
+            </tr>
             <tr>
                 <td width=\"20%\" heigth=\"100%\" align=left valign=top><p>{}</p></td>
                 <td width=\"80%\" heigth=\"100%\" align=left valign=top>
@@ -159,15 +175,12 @@ class Cluster:
             <tr> </tr>
             <tr>
                 <td width=\"20%\" ></td>
-                <td width=\"80%\" align=left valign=top><b>Genes:</b> {}, ...</td>
+                <td width=\"80%\" align=left valign=top>{}</td>
             </tr>
         </table>
         </body>
         </html>
-        """.format(self.name,
-                   '<br>'.join(['<b>{}</b> (FDR={:0.2e}, n={})'.format(g_set.name, g_set.fdr, g_set.count)
-                                for g_set in self.filtered_gene_sets]),
-                   ', '.join([gene.input_name for gene in self.filtered_genes]))
+        """.format(self.name, gene_sets, genes)
         return html_string
 
 
@@ -235,11 +248,11 @@ class ClusterModel(QAbstractListModel):
             genes = [gene.ncbi_id for gene in item.filtered_genes]
             item.gene_set_enrichment(gs_object, gene_sets, set(genes), reference_genes)
 
-    def apply_gene_filters(self, count=20, p_val=None, fdr=None):
+    def apply_gene_filters(self, count=GENE_COUNT, p_val=None, fdr=None):
         [item.filter_enriched_genes(count, p_val, fdr) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 
-    def apply_gene_sets_filters(self, count=5, p_val=None, fdr=None):
+    def apply_gene_sets_filters(self, count=GENE_SETS_COUNT, p_val=None, fdr=None):
         [item.filter_gene_sets(count, p_val, fdr) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 
