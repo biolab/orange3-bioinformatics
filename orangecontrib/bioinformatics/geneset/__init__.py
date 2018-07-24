@@ -30,13 +30,13 @@ def list_all(**kwargs):
     all_available = set([filename_parse(f_name) for domain, f_name
                          in serverfiles.ServerFiles().listfiles(DOMAIN) + serverfiles.listfiles(DOMAIN)])
     if organism:
-        return [(hier, org) for hier, org in all_available if org == organism]
+        return [hier for hier, org in all_available if org == organism]
     else:
         return all_available
 
-
-def load_gene_sets(hierarchy):
-    # type: (Tuple[Tuple(str, str), str]) -> GeneSets
+      
+def load_gene_sets(hierarchy, tax_id):
+      # type: (Tuple[Tuple(str, str), str]) -> GeneSets
     """ Initialize gene sets from a given hierarchy.
 
     :param tuple hierarchy: gene set hierarchy.
@@ -54,5 +54,5 @@ def load_gene_sets(hierarchy):
         >>> load_gene_sets(list_of_genesets[0])
 
     """
-    file_path = serverfiles.localpath_download(DOMAIN, filename(*hierarchy))
+    file_path = serverfiles.localpath_download(DOMAIN, filename(hierarchy, tax_id))
     return GeneSets.from_gmt_file_format(file_path)
