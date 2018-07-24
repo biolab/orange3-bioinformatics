@@ -3,12 +3,15 @@ import pickle
 
 from collections import defaultdict
 from functools import lru_cache
-from typing import List
+from typing import List, Union
+
+from Orange.data import StringVariable, DiscreteVariable, Domain, Table
+
 
 from orangecontrib.bioinformatics.ncbi.gene.config import *
 from orangecontrib.bioinformatics.ncbi.gene.utils import GeneInfoDB, parse_sources, parse_synonyms
 from orangecontrib.bioinformatics.utils import serverfiles, ensure_type
-
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
 
 _no_hits, _single_hit, _multiple_hits = 0, 1, 2
 _source, _symbol, _synonym, _locus, _gene_id, _nom_symbol = \
@@ -34,6 +37,10 @@ class Gene:
         self.ncbi_id = None
         self._possible_hits = []
 
+    def __getattr__(self, attribute):
+        if attribute not in self.__slots__:
+            return ''
+
     @property
     def possible_hits(self):
         return self._possible_hits
@@ -45,7 +52,7 @@ class Gene:
             possible_match.ncbi_id = gene
             self._possible_hits.append(possible_match)
 
-    @lru_cache()
+    @lru_cache(10000)
     def load_ncbi_info(self):
         if not self.ncbi_id:
             return
@@ -133,7 +140,7 @@ class GeneMatcher:
 
     def __init__(self,  tax_id, **kwargs):
         self._organism = ensure_type(tax_id, str)  # type: str
-        self._genes = []                           # type: (List[str])
+        self._genes = []                           # type: (List[Union[str, Gene]])
 
         self._case_insensitive = kwargs.get("case_insensitive", False)
         self._matcher = self.load_matcher_file(DOMAIN, MATCHER_FILENAME.format(tax_id))
@@ -171,6 +178,69 @@ class GeneMatcher:
             for gene in self.genes:
                 if gene.ncbi_id:
                     data_table.domain[gene.input_name].attributes[NCBI_ID] = gene.ncbi_id
+
+    @staticmethod
+    def gene_match_status(gene):
+        # type: (Gene) -> str
+
+        if gene.ncbi_id:
+            return 'Matched'
+        elif gene.possible_hits:
+            return 'Match Conflict'
+        else:
+            return 'Unmatched'
+
+    def to_data_table(self):
+        data_x = []
+
+        metas = [
+            StringVariable('Input gene ID'),
+            DiscreteVariable('Match result', values=['Matched', 'Match Conflict', 'Unmatched']),
+            StringVariable(NCBI_ID),
+            StringVariable('Symbol'),
+            StringVariable('Synonyms'),
+            StringVariable('Description'),
+            StringVariable('Other IDs'),
+            StringVariable('Type of gene'),
+            StringVariable('Chromosome'),
+            StringVariable('Map location'),
+            StringVariable('Locus tag'),
+            StringVariable('Symbol from nomenclature authority'),
+            StringVariable('Full name from nomenclature authority'),
+            StringVariable('Nomenclature status'),
+            StringVariable('Other designations'),
+            StringVariable('Taxonomy ID'),
+        ]
+
+        domain = Domain([], metas=metas)
+
+        tax_id = set()
+        for gene in self.genes:
+            gene.load_ncbi_info()
+            tax_id.add(gene.tax_id)
+            match_status = self.gene_match_status(gene)
+
+            db_refs = ', '.join('{}: {}'.format(key, val)
+                                for (key, val) in gene.db_refs.items()) if gene.db_refs else ''
+            synonyms = ', '.join(gene.synonyms) if gene.synonyms else ''
+
+            line = [
+                gene.input_name, match_status, gene.ncbi_id, gene.symbol, synonyms, gene.description, db_refs,
+                gene.type_of_gene, gene.chromosome, gene.map_location, gene.locus_tag,
+                gene.symbol_from_nomenclature_authority, gene.full_name_from_nomenclature_authority,
+                gene.nomenclature_status, gene.other_designations, tax_id
+            ]
+
+            data_x.append(line)
+
+        tax_id = filter(None.__ne__, tax_id)
+
+        table = Table(domain, data_x)
+        table.name = 'Gene Matcher Results'
+        table.attributes[TAX_ID] = next(tax_id)
+        table.attributes[GENE_AS_ATTRIBUTE_NAME] = False
+        table.attributes[GENE_ID_COLUMN] = NCBI_ID
+        return table
 
     def run_matcher(self, progress_callback=None):
         """ This will try to match genes, with ncbi ids, based on provided input of genes.

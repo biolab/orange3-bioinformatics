@@ -201,7 +201,6 @@ class OWGeneNameMatcher(OWWidget):
     exclude_unmatched = Setting(True)
     include_entrez_id = Setting(True)
     replace_id_with_symbol = Setting(True)
-    include_gene_info = Setting(False)
 
     auto_commit = Setting(True)
 
@@ -210,6 +209,7 @@ class OWGeneNameMatcher(OWWidget):
 
     class Outputs:
         custom_data_table = Output("Data", Table)
+        gene_matcher_results = Output("Genes", Table)
 
     class Information(OWWidget.Information):
         pass
@@ -264,7 +264,7 @@ class OWGeneNameMatcher(OWWidget):
         self.get_available_organisms()
         self.organism_select_combobox.setCurrentIndex(self.selected_organism)
 
-        box = widgetBox(self.controlArea, 'Gene IDs in input data')
+        box = widgetBox(self.controlArea, 'Gene IDs in the input data')
         self.gene_columns_model = itemmodels.DomainModel(valid_types=(StringVariable, DiscreteVariable))
         self.gene_column_combobox = comboBox(box, self, 'selected_gene_col',
                                              label='Stored in data column',
@@ -291,11 +291,6 @@ class OWGeneNameMatcher(OWWidget):
         self.replace_radio = checkBox(output_box, self,
                                       'replace_id_with_symbol',
                                       'Replace feature IDs with gene names',
-                                      callback=self.on_output_option_change)
-
-        self.include_radio = checkBox(output_box, self,
-                                      'include_gene_info',
-                                      'Include all other available information',
                                       callback=self.on_output_option_change)
 
         auto_commit(self.controlArea, self, "auto_commit", "&Commit", box=False)
@@ -349,6 +344,9 @@ class OWGeneNameMatcher(OWWidget):
 
     def __reset_widget_state(self):
         self.Outputs.custom_data_table.send(None)
+        self.Outputs.gene_matcher_results.send(None)
+        self.table_view.clearSpans()
+        self.table_view.setModel(None)
         self.table_model.clear()
         self.unknown_model.clear()
 
@@ -394,6 +392,7 @@ class OWGeneNameMatcher(OWWidget):
             self.__reset_widget_state()
             return
 
+        self.Outputs.gene_matcher_results.send(self.gene_matcher.to_data_table())
         # set known genes
         self.table_model.initialize(self.gene_matcher.genes)
         self.table_view.setModel(self.table_model)
@@ -475,6 +474,8 @@ class OWGeneNameMatcher(OWWidget):
     @Inputs.data_table
     def handle_input(self, data):
         self.__reset_widget_state()
+        self.input_data = None
+        self.input_genes = None
         self.gene_columns_model.set_domain(None)
 
         if data:
@@ -560,9 +561,6 @@ class OWGeneNameMatcher(OWWidget):
         return data_table, gene_id
 
     def __filter_unknown(self, data_table):
-
-        # data_table, gene_id = self.__handle_output_data_table(data_table)
-        # if self.exclude_unmatched:
 
         known_input_genes = [gene.input_name for gene in self.gene_matcher.get_known_genes()]
 
