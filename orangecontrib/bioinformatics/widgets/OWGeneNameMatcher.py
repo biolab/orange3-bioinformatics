@@ -114,31 +114,9 @@ class GeneInfoModel(itemmodels.PyTableModel):
             elif role == _LinkRolee:
                 return NCBI_DETAIL_LINK.format(value)
 
-    def __list_from_gene(self, gene_object):
-        # type: (Gene) -> List[str]
-        output_list = []
-        for tag in self.gene_attributes:
-            gene_attr = gene_object.__getattribute__(tag)
-
-            if isinstance(gene_attr, dict):
-                # note: db_refs are stored as dicts
-                gene_attr = ', '.join('{}: {}'.format(key, val)
-                                      for (key, val) in gene_attr.items()) if gene_attr else ' '
-            elif isinstance(gene_attr, list):
-                # note: synonyms are stored as lists
-                gene_attr = ', '.join(gene_attr) if gene_attr else ' '
-
-            output_list.append(gene_attr)
-        return output_list
-
-    def __table_from_genes(self, list_of_genes, ):
+    def __table_from_genes(self, list_of_genes):
         # type: (list) -> None
-        table = []
-        for gene in list_of_genes:
-            gene.load_ncbi_info()
-            table.append(self.__list_from_gene(gene))
-
-        self.data_table = np.asarray(table)
+        self.data_table = np.asarray([gene.to_list() for gene in list_of_genes])
 
     def filter_table(self, filter_pattern):
         _, col_size = self.data_table.shape
@@ -529,11 +507,12 @@ class OWGeneNameMatcher(OWWidget):
                         data_table.domain[gene.input_name].attributes[gene_id] = str(gene.ncbi_id)
 
                     if self.replace_id_with_symbol:
-                        gene.load_ncbi_info()
+                        # gene.load_ncbi_info()
                         try:
                             data_table.domain[gene.input_name].name = str(gene.symbol)
                         except AttributeError:
                             pass
+
 
         else:
             set_of_variables = set([var.name for var in data_table.domain.variables + data_table.domain.metas

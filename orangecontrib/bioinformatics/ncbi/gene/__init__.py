@@ -66,6 +66,24 @@ class Gene:
 
             setattr(self, attr, value)
 
+    def to_list(self):
+        _, header_tags = GENE_MATCHER_HEADER
+
+        def parse_attribute(tag):
+            gene_attr = getattr(self, '{}'.format(tag))
+            # print(tag)
+            if isinstance(gene_attr, dict):
+                # note: db_refs are stored as dicts
+                gene_attr = ', '.join('{}: {}'.format(key, val)
+                                      for (key, val) in gene_attr.items()) if gene_attr else ' '
+            elif isinstance(gene_attr, list):
+                # note: synonyms are stored as lists
+                gene_attr = ', '.join(gene_attr) if gene_attr else ' '
+
+            return gene_attr
+
+        return [parse_attribute(tag) for tag in header_tags]
+
     def to_html(self):
         self.load_ncbi_info()
         db_refs = getattr(self, 'db_refs')
@@ -271,6 +289,7 @@ class GeneMatcher:
                 if ncbi_match:
                     gene.ncbi_id = ncbi_match[0][MAP_GENE_ID]
                     gene.type_of_match = _gene_id
+                    gene.load_ncbi_info()
                     continue
             except ValueError:
                 # NCBI ids are stored as Integers. If ValueError is raised, probably not NCBI ID.
@@ -287,12 +306,14 @@ class GeneMatcher:
             if source_match:
                 gene.ncbi_id = source_match[0][MAP_GENE_ID]
                 gene.type_of_match = _source
+                gene.load_ncbi_info()
                 continue
 
             symbol_match = match_input(self._matcher[MAP_SYMBOL], input_name)
             if len(symbol_match) == _single_hit:
                 gene.ncbi_id = symbol_match[0][MAP_GENE_ID]
                 gene.type_of_match = _symbol
+                gene.load_ncbi_info()
                 continue
             elif len(symbol_match) >= _multiple_hits:
                 gene.possible_hits = symbol_match
@@ -302,6 +323,7 @@ class GeneMatcher:
             if len(locus_match) == _single_hit:
                 gene.ncbi_id = locus_match[0][MAP_GENE_ID]
                 gene.type_of_match = _locus
+                gene.load_ncbi_info()
                 continue
             elif len(symbol_match) >= _multiple_hits:
                 gene.possible_hits = locus_match
@@ -311,6 +333,7 @@ class GeneMatcher:
             if len(synonym_match) == _single_hit:
                 gene.ncbi_id = synonym_match[0][MAP_GENE_ID]
                 gene.type_of_match = _synonym
+                gene.load_ncbi_info()
                 continue
             elif len(synonym_match) >= _multiple_hits:
                 gene.possible_hits = synonym_match
@@ -320,6 +343,7 @@ class GeneMatcher:
             if len(nomenclature_match) == _single_hit:
                 gene.ncbi_id = nomenclature_match[0][MAP_GENE_ID]
                 gene.type_of_match = _nom_symbol
+                gene.load_ncbi_info()
                 continue
             elif len(nomenclature_match) >= _multiple_hits:
                 gene.possible_hits = nomenclature_match
