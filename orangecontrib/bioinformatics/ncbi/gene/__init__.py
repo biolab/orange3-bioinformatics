@@ -208,9 +208,9 @@ class GeneMatcher:
         else:
             return 'Unmatched'
 
-    def to_data_table(self):
+    def to_data_table(self, selected_genes=None):
+        tax_id = set()
         data_x = []
-
         metas = [
             StringVariable('Input gene ID'),
             DiscreteVariable('Match result', values=['Matched', 'Match Conflict', 'Unmatched']),
@@ -229,11 +229,13 @@ class GeneMatcher:
             StringVariable('Other designations'),
             StringVariable('Taxonomy ID'),
         ]
-
         domain = Domain([], metas=metas)
 
-        tax_id = set()
-        for gene in self.genes:
+        genes = self.genes
+        if selected_genes is not None:
+            genes = [gene for gene in self.genes if str(gene.ncbi_id) in selected_genes]
+
+        for gene in genes:
             gene.load_ncbi_info()
             tax_id.add(gene.tax_id)
             match_status = self.gene_match_status(gene)

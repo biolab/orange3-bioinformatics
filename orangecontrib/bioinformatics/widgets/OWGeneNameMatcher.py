@@ -370,7 +370,6 @@ class OWGeneNameMatcher(OWWidget):
             self.__reset_widget_state()
             return
 
-        self.Outputs.gene_matcher_results.send(self.gene_matcher.to_data_table())
         # set known genes
         self.table_model.initialize(self.gene_matcher.genes)
         self.table_view.setModel(self.table_model)
@@ -507,12 +506,10 @@ class OWGeneNameMatcher(OWWidget):
                         data_table.domain[gene.input_name].attributes[gene_id] = str(gene.ncbi_id)
 
                     if self.replace_id_with_symbol:
-                        # gene.load_ncbi_info()
                         try:
                             data_table.domain[gene.input_name].name = str(gene.symbol)
                         except AttributeError:
                             pass
-
 
         else:
             set_of_variables = set([var.name for var in data_table.domain.variables + data_table.domain.metas
@@ -591,9 +588,13 @@ class OWGeneNameMatcher(OWWidget):
                         selected = self.output_data_table[selected_rows]
                     else:
                         selected = None
-
                     self.Outputs.custom_data_table.send(selected)
+
+                self.Outputs.gene_matcher_results.send(
+                    self.gene_matcher.to_data_table(selected_genes=selected_genes)
+                )
             else:
+                self.Outputs.gene_matcher_results.send(self.gene_matcher.to_data_table())
                 self.Outputs.custom_data_table.send(self.output_data_table)
 
     def toggle_radio_options(self):
