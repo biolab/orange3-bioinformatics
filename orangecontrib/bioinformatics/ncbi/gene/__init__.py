@@ -2,12 +2,16 @@
 import pickle
 
 from collections import defaultdict
-from typing import List
+from functools import lru_cache
+from typing import List, Union
+
+from Orange.data import StringVariable, DiscreteVariable, Domain, Table
+
 
 from orangecontrib.bioinformatics.ncbi.gene.config import *
 from orangecontrib.bioinformatics.ncbi.gene.utils import GeneInfoDB, parse_sources, parse_synonyms
 from orangecontrib.bioinformatics.utils import serverfiles, ensure_type
-
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
 
 _no_hits, _single_hit, _multiple_hits = 0, 1, 2
 _source, _symbol, _synonym, _locus, _gene_id, _nom_symbol = \
@@ -38,6 +42,10 @@ class Gene:
         self.ncbi_id = None
         self._possible_hits = []
 
+    def __getattr__(self, attribute):
+        if attribute not in self.__slots__:
+            return ''
+
     @property
     def possible_hits(self):
         return self._possible_hits
@@ -49,6 +57,7 @@ class Gene:
             possible_match.ncbi_id = gene
             self._possible_hits.append(possible_match)
 
+    @lru_cache(10000)
     def load_ncbi_info(self):
         """ Populate :class:`Gene` with data from NCBI gene database
         """
@@ -63,6 +72,24 @@ class Gene:
                 value = parse_synonyms(value)
 
             setattr(self, attr, value)
+
+    def to_list(self):
+        _, header_tags = GENE_MATCHER_HEADER
+
+        def parse_attribute(tag):
+            gene_attr = getattr(self, '{}'.format(tag))
+
+            if isinstance(gene_attr, dict):
+                # note: db_refs are stored as dicts
+                gene_attr = ', '.join('{}: {}'.format(key, val)
+                                      for (key, val) in gene_attr.items()) if gene_attr else ' '
+            elif isinstance(gene_attr, list):
+                # note: synonyms are stored as lists
+                gene_attr = ', '.join(gene_attr) if gene_attr else ' '
+
+            return gene_attr
+
+        return [parse_attribute(tag) for tag in header_tags]
 
     def to_html(self):
         """ Return a basic HTML representation of :class:`Gene` class.
@@ -159,7 +186,7 @@ class GeneMatcher:
 
         """
         self._organism = ensure_type(tax_id, str)  # type: str
-        self._genes = []                           # type: (List[Gene])
+        self._genes = []                           # type: (List[Union[str, Gene]])
 
         self._case_insensitive = kwargs.get("case_insensitive", False)
         self._matcher = self.load_matcher_file(DOMAIN, MATCHER_FILENAME.format(tax_id))
@@ -220,6 +247,71 @@ class GeneMatcher:
                 if gene.ncbi_id:
                     data_table.domain[gene.input_name].attributes[NCBI_ID] = gene.ncbi_id
 
+    @staticmethod
+    def gene_match_status(gene):
+        # type: (Gene) -> str
+
+        if gene.ncbi_id:
+            return 'Matched'
+        elif gene.possible_hits:
+            return 'Match Conflict'
+        else:
+            return 'Unmatched'
+
+    def to_data_table(self, selected_genes=None):
+        tax_id = set()
+        data_x = []
+        metas = [
+            StringVariable('Input gene ID'),
+            DiscreteVariable('Match result', values=['Matched', 'Match Conflict', 'Unmatched']),
+            StringVariable(NCBI_ID),
+            StringVariable('Symbol'),
+            StringVariable('Synonyms'),
+            StringVariable('Description'),
+            StringVariable('Other IDs'),
+            StringVariable('Type of gene'),
+            StringVariable('Chromosome'),
+            StringVariable('Map location'),
+            StringVariable('Locus tag'),
+            StringVariable('Symbol from nomenclature authority'),
+            StringVariable('Full name from nomenclature authority'),
+            StringVariable('Nomenclature status'),
+            StringVariable('Other designations'),
+            StringVariable('Taxonomy ID'),
+        ]
+        domain = Domain([], metas=metas)
+
+        genes = self.genes
+        if selected_genes is not None:
+            genes = [gene for gene in self.genes if str(gene.ncbi_id) in selected_genes]
+
+        for gene in genes:
+            gene.load_ncbi_info()
+            tax_id.add(gene.tax_id)
+            match_status = self.gene_match_status(gene)
+
+            db_refs = ', '.join('{}: {}'.format(key, val)
+                                for (key, val) in gene.db_refs.items()) if gene.db_refs else ''
+            synonyms = ', '.join(gene.synonyms) if gene.synonyms else ''
+
+            line = [
+                gene.input_name, match_status, gene.ncbi_id, gene.symbol, synonyms, gene.description, db_refs,
+                gene.type_of_gene, gene.chromosome, gene.map_location, gene.locus_tag,
+                gene.symbol_from_nomenclature_authority, gene.full_name_from_nomenclature_authority,
+                gene.nomenclature_status, gene.other_designations, gene.tax_id
+            ]
+
+            data_x.append(line)
+
+        tax_id = filter(None.__ne__, tax_id)
+
+        table = Table(domain, data_x)
+        table.name = 'Gene Matcher Results'
+        table.attributes[TAX_ID] = next(tax_id)
+        table.attributes[GENE_AS_ATTRIBUTE_NAME] = False
+        table.attributes[GENE_ID_COLUMN] = NCBI_ID
+        return table
+
     def run_matcher(self, progress_callback=None):
         """ This will try to match genes, with ncbi ids, based on provided input of genes.
 
@@ -248,6 +340,7 @@ class GeneMatcher:
                 if ncbi_match:
                     gene.ncbi_id = ncbi_match[0][MAP_GENE_ID]
                     gene.type_of_match = _gene_id
+                    gene.load_ncbi_info()
                     continue
             except ValueError:
                 # NCBI ids are stored as Integers. If ValueError is raised, probably not NCBI ID.
@@ -264,12 +357,14 @@ class GeneMatcher:
             if source_match:
                 gene.ncbi_id = source_match[0][MAP_GENE_ID]
                 gene.type_of_match = _source
+                gene.load_ncbi_info()
                 continue
 
             symbol_match = match_input(self._matcher[MAP_SYMBOL], input_name)
             if len(symbol_match) == _single_hit:
                 gene.ncbi_id = symbol_match[0][MAP_GENE_ID]
                 gene.type_of_match = _symbol
+                gene.load_ncbi_info()
                 continue
             elif len(symbol_match) >= _multiple_hits:
                 gene.possible_hits = symbol_match
@@ -279,6 +374,7 @@ class GeneMatcher:
             if len(locus_match) == _single_hit:
                 gene.ncbi_id = locus_match[0][MAP_GENE_ID]
                 gene.type_of_match = _locus
+                gene.load_ncbi_info()
                 continue
             elif len(symbol_match) >= _multiple_hits:
                 gene.possible_hits = locus_match
@@ -288,6 +384,7 @@ class GeneMatcher:
             if len(synonym_match) == _single_hit:
                 gene.ncbi_id = synonym_match[0][MAP_GENE_ID]
                 gene.type_of_match = _synonym
+                gene.load_ncbi_info()
                 continue
             elif len(synonym_match) >= _multiple_hits:
                 gene.possible_hits = synonym_match
@@ -297,6 +394,7 @@ class GeneMatcher:
             if len(nomenclature_match) == _single_hit:
                 gene.ncbi_id = nomenclature_match[0][MAP_GENE_ID]
                 gene.type_of_match = _nom_symbol
+                gene.load_ncbi_info()
                 continue
             elif len(nomenclature_match) >= _multiple_hits:
                 gene.possible_hits = nomenclature_match

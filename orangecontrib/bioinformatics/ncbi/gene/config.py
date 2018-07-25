@@ -25,6 +25,11 @@ GENE_INFO_TAGS = ['tax_id',
 
 GENE_MATCHER_TAGS = ['input_name', 'type_of_match', 'ncbi_id', '_possible_hits']
 
+GENE_MATCHER_HEADER = [
+    ['Input ID', 'Entrez ID', 'Name', 'Description', 'Synonyms', 'Other IDs'],
+    ['input_name', 'ncbi_id', 'symbol', 'description', 'synonyms', 'db_refs']
+]
+
 # PICKLED GENE MAPPER
 MATCHER_FILENAME = 'gene_mapper.{}'
 MATCHER_TITLE = 'Gene mapper'
