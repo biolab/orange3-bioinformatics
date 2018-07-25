@@ -224,9 +224,6 @@ class OWGeneNameMatcher(OWWidget):
         # progress bar
         self.progress_bar = None
 
-        # filter
-        self.filter_labels = ['Unique', 'Partial', 'Unknown']
-
         # GUI SECTION #
 
         # Control area
@@ -318,6 +315,7 @@ class OWGeneNameMatcher(OWWidget):
         self.table_view.setSortingEnabled(False)
         self.table_model.show_table(str(self.search_pattern))
         self.table_view.setModel(self.table_model)
+        self.table_view.selectionModel().selectionChanged.connect(self.invalidate)
         self.table_view.setSortingEnabled(True)
 
     def __reset_widget_state(self):
@@ -557,8 +555,6 @@ class OWGeneNameMatcher(OWWidget):
         return data_table
 
     def commit(self):
-        self.Outputs.custom_data_table.send(None)
-
         if self.output_data_table:
             selection = self.table_view.selectionModel().selectedRows(self.table_model.entrez_column_index)
             selected_genes = [row.data() for row in selection]
@@ -606,6 +602,9 @@ class OWGeneNameMatcher(OWWidget):
             self.exclude_unmatched = len(self.gene_matcher.genes) != len(self.gene_matcher.get_known_genes())
 
     def on_output_option_change(self):
+        self.Outputs.custom_data_table.send(None)
+        self.Outputs.gene_matcher_results.send(None)
+
         if not self.input_data:
             return
 

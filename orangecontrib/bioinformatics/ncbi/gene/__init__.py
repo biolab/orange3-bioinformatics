@@ -71,7 +71,7 @@ class Gene:
 
         def parse_attribute(tag):
             gene_attr = getattr(self, '{}'.format(tag))
-            # print(tag)
+
             if isinstance(gene_attr, dict):
                 # note: db_refs are stored as dicts
                 gene_attr = ', '.join('{}: {}'.format(key, val)
@@ -248,7 +248,7 @@ class GeneMatcher:
                 gene.input_name, match_status, gene.ncbi_id, gene.symbol, synonyms, gene.description, db_refs,
                 gene.type_of_gene, gene.chromosome, gene.map_location, gene.locus_tag,
                 gene.symbol_from_nomenclature_authority, gene.full_name_from_nomenclature_authority,
-                gene.nomenclature_status, gene.other_designations, tax_id
+                gene.nomenclature_status, gene.other_designations, gene.tax_id
             ]
 
             data_x.append(line)
