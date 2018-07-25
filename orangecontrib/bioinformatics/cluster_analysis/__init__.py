@@ -53,6 +53,10 @@ class Cluster:
         self.gene_sets = []
         self.filtered_gene_sets = []
 
+        # misc
+        self.use_gene_count = True
+        self.delta = 0
+
     def set_genes(self, gene_names, gene_ids):
         self.genes = []
 
@@ -73,7 +77,9 @@ class Cluster:
 
     def filter_enriched_genes(self, count, p_val, fdr):
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
-        self.filtered_genes = list(sorted(filter(filter_function, self.genes), key=attrgetter('fdr'))[:count])
+        filtered_list = list(sorted(filter(filter_function, self.genes), key=attrgetter('fdr')))
+        self.delta = len(filtered_list)
+        self.filtered_genes = filtered_list[:count]
 
     def filter_gene_sets(self, count, p_val, fdr):
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
@@ -157,8 +163,10 @@ class Cluster:
         genes = '(all genes are filtered out)'
         if self.filtered_genes:
             genes = ', '.join([gene.input_name for gene in self.filtered_genes])
-            if len(self.filtered_genes) < GENE_COUNT:
-                genes += ', ... ({} more genes)'.format(GENE_COUNT - len(self.filtered_genes))
+            self.delta = GENE_COUNT if self.delta > GENE_COUNT else self.delta
+
+            if (self.delta - len(self.filtered_genes)) > 0 and self.use_gene_count:
+                genes += ', ... ({} more genes)'.format(self.delta - len(self.filtered_genes))
 
         html_string = """
         <html>

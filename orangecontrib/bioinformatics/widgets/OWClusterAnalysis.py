@@ -262,6 +262,9 @@ class OWClusterAnalysis(OWWidget):
 
     def filter_genes(self):
         if self.cluster_info_model:
+            for cluster in self.clusters:
+                cluster.use_gene_count = self.use_gene_count_filter
+
             # filter genes
             # note: after gene filter is applied, we need to recalculate gene set enrichment
             self.cluster_info_model.apply_gene_filters(
