@@ -7,10 +7,15 @@ from typing import Tuple, Union
 
 from scipy.stats import hypergeom
 
+ALT_TWO = "two-sided"
+ALT_LESS = "less"
+ALT_GREATER = "greater"
+ALTERNATIVES = [ALT_GREATER, ALT_TWO, ALT_LESS]
 
 def score_t_test(a, b, **kwargs):
     # type: (np.array, np.array) -> Tuple[Union[float, np.array], Union[float, np.array]]
-    """ Run t-test
+    """ Run t-test. Enable setting different alternative hypothesis.
+    Probabilities are exact due to symmetry of the test.
 
     :returns (statistics, p_values)
 
@@ -19,8 +24,18 @@ def score_t_test(a, b, **kwargs):
     scipy.stats.ttest_ind
 
     """
-    return scipy.stats.ttest_ind(a, b, axis=kwargs.get('axis', 0))
-
+    alt = kwargs.get("alternative", ALT_TWO)
+    assert alt in ALTERNATIVES
+    scores, pvalues = scipy.stats.ttest_ind(a, b, axis=kwargs.get('axis', 0))
+    if alt == ALT_TWO:
+        return scores, pvalues
+    less = scores < 0
+    pvalues = pvalues / 2.0
+    pvalues[np.logical_not(less)] = 1.0 - pvalues[np.logical_not(less)]
+    if alt == ALT_LESS:
+        return scores, pvalues
+    else:
+        return scores, 1.0 - pvalues
 
 def score_mann_whitney(a, b, **kwargs):
     axis = kwargs.get('axis', 0)
@@ -38,40 +53,32 @@ def score_mann_whitney(a, b, **kwargs):
     if axis == 0:
         a, b = a.T, b.T
 
-    res = [scipy.stats.mannwhitneyu(a_, b_) for a_, b_ in zip(a, b)]
-    statistics, p_values = zip(*res)
+    alt = kwargs.get("alternative", ALT_TWO)
+    assert alt in ALTERNATIVES
+    statistics = np.zeros((a.shape[0]),)
+    p_values = np.zeros((a.shape[0]),)
+    for i, (a_, b_) in enumerate(zip(a, b)):
+        try:
+            s, p = scipy.stats.mannwhitneyu(a_, b_, alternative=alt)
+        except ValueError:
+            s, p = (0, 1)
+        statistics[i] = s
+        p_values[i] = p
     return np.array(statistics), np.array(p_values)
 
 
-def hypergeometric_test(X, cluster, treshold):
-    # type: (np.ndarray, np.ndarray, float) -> np.ndarray
-
-    # Binary expression matrix
-    Y = (X >= treshold).astype(int)
-
-    # Test Parameters
-    M, G = X.shape
-    N = len(cluster)
-    n_expr = Y.sum(axis=0)  # Number of cells expressing genes (overall)
-    n_expr_clust = Y[cluster, ].sum(axis=0)
-
-    # Test results --- both directions
-    # Note: cumulatives do not sum to 1 because of overlap at 1 point
-    test = np.array(list(map(lambda t: (hypergeom.cdf(k=t[1], n=t[0], M=M, N=N),
-                                        hypergeom.sf(k=t[1]+1, n=t[0], M=M, N=N)),
-                             zip(n_expr, n_expr_clust))))
-    pvalues = test.min(axis=1)
-    signs = 2 * np.argmin(test, axis=1) - 1
-    scores = -np.log(pvalues) * signs
-    return scores
-
-
-def hypergeometric_test_vector(a, b, threshold=1):
+def score_hypergeometric_test(a, b, threshold=1, **kwargs):
+    """
+    Run a hypergeometric test. The probability in a two-sided test is approximated
+    with the symmetric distribution with more extreme of the tails.
+    """
     # type: (np.ndarray, np.ndarray, float) -> np.ndarray
 
     # Binary expression matrices
     A = (a >= threshold).astype(int)
     B = (b >= threshold).astype(int)
+    alt = kwargs.get("alternative", ALT_TWO)
+    assert alt in ALTERNATIVES
 
     # Test Parameters
     M = len(A) + len(B)
@@ -85,8 +92,13 @@ def hypergeometric_test_vector(a, b, threshold=1):
                             zip(n_expr, n_expr_clust)), dtype=float)
     over = np.fromiter(map(lambda t: hypergeom.sf(k=t[1]-1, n=t[0], M=M, N=N),
                            zip(n_expr, n_expr_clust)), dtype=float)
-    pvalues = np.minimum(under, over)
     signs = np.sign(under - over)
+    if alt == ALT_TWO:
+        pvalues = np.minimum(1.0, 2.0 * np.minimum(under, over))
+    elif alt == ALT_LESS:
+        pvalues = under
+    else:
+        pvalues = over
     scores = -np.log(pvalues) * signs
     return scores, pvalues
 

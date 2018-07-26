@@ -3,6 +3,8 @@ import numpy as np
 from time import time
 
 from orangecontrib.bioinformatics.utils import statistics
+from scipy.stats import multivariate_normal as mvn
+
 
 
 class TestStatistics(unittest.TestCase):
@@ -24,10 +26,74 @@ class TestStatistics(unittest.TestCase):
 
         cluster = np.zeros((X.shape[0], ), dtype=bool)
         cluster[:4] = True
-        scores, pvalues = statistics.hypergeometric_test_vector(a=X[cluster],
-                                                    b=X[np.logical_not(cluster),],
-                                                    threshold=threshold)
+        scores, pvalues = statistics.score_hypergeometric_test(a=X[cluster],
+                                                               b=X[np.logical_not(cluster),],
+                                                               threshold=threshold)
         self.assertIsNotNone(scores)
+
+
+    def test_alternatives(self):
+        """ Test implemented alternative hypotheses. """
+        np.random.seed(42)
+        n = 100
+        a = mvn.rvs(mean=0, cov=1, size=n).reshape((n, 1))
+        b = mvn.rvs(mean=1, cov=1, size=n).reshape((n, 1))
+        c = mvn.rvs(mean=-1, cov=1, size=n).reshape((n, 1))
+
+
+        for method in (statistics.score_t_test,
+                       statistics.score_hypergeometric_test,
+                       statistics.score_mann_whitney):
+
+            _, pval_less = method(a, b, alternative=statistics.ALT_LESS)
+            _, pval_two = method(a, b, alternative=statistics.ALT_TWO)
+            _, pval_greater = method(a, b, alternative=statistics.ALT_GREATER)
+            assert np.all(pval_less < pval_two < pval_greater)
+            assert np.linalg.norm(pval_less + pval_greater - np.array([1.0])) < 1e-8
+
+            _, pval_less = method(b, c, alternative=statistics.ALT_LESS)
+            _, pval_two = method(b, c, alternative=statistics.ALT_TWO)
+            _, pval_greater = method(b, c, alternative=statistics.ALT_GREATER)
+            assert np.all(pval_greater < pval_two < pval_less)
+            assert np.linalg.norm(pval_less + pval_greater - np.array([1.0])) < 1e-8
+
+
+    def test_alternatives_2D(self):
+        """ Test implemented alternative hypotheses. """
+        np.random.seed(42)
+        n = 100
+        a1 = mvn.rvs(mean=0, cov=1, size=n).reshape((n, 1))
+        a2 = mvn.rvs(mean=1, cov=1, size=n).reshape((n, 1))
+        b1 = mvn.rvs(mean=2, cov=1, size=n).reshape((n, 1))
+        b2 = mvn.rvs(mean=3, cov=1, size=n).reshape((n, 1))
+        A = np.hstack((a1, a2))
+        B = np.hstack((b1, b2))
+
+
+        for method in (statistics.score_t_test,
+                       statistics.score_hypergeometric_test,
+                       statistics.score_mann_whitney):
+            _, pval_less = method(A, B, alternative=statistics.ALT_LESS)
+            _, pval_two = method(A, B, alternative=statistics.ALT_TWO)
+            _, pval_greater = method(A, B, alternative=statistics.ALT_GREATER)
+            assert np.all(np.logical_and(pval_less < pval_two, pval_two < pval_greater))
+            assert np.linalg.norm(pval_less + pval_greater - np.array([1.0])) < 1e-8
+
+
+    def test_identical(self):
+        """ Test with identical values. """
+        n = 100
+        a = np.random.rand(n, 1)
+        b = np.random.rand(n, 1)
+        A = np.hstack([a, a])
+        B = np.hstack([a, b])
+        for alt in statistics.ALTERNATIVES:
+            for method in (statistics.score_t_test,
+                           statistics.score_hypergeometric_test,
+                           statistics.score_mann_whitney):
+                p, r = method(A, B, alternative=alt)
+                assert np.isnan(p).sum() == 0
+                assert np.isnan(r).sum() == 0
 
 
 if __name__ == '__main__':

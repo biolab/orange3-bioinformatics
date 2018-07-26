@@ -11,11 +11,12 @@ from Orange.widgets.gui import (
 )
 
 
-from orangecontrib.bioinformatics.utils.statistics import score_t_test, score_mann_whitney, hypergeometric_test_vector
+from orangecontrib.bioinformatics.utils.statistics import score_t_test, score_mann_whitney, score_hypergeometric_test, \
+    ALTERNATIVES, ALT_LESS, ALT_TWO, ALT_GREATER
 
 
 #: Selection types
-LowTail, HighTail, TwoTail = 1, 2, 3
+LowTail, HighTail, TwoTail = ALT_LESS, ALT_TWO, ALT_GREATER
 #: Test type - i.e a two sample (t-test, ...) or multi-sample (ANOVA) test
 TwoSampleTest, VarSampleTest = 1, 2
 
@@ -29,7 +30,7 @@ class GeneScoringWidget(QWidget):
     # default methods, override to add custom scoring methods
     scores = [gene_scoring_method('T-test', score_t_test, TwoTail, TwoSampleTest),
               gene_scoring_method('Mann-Whitney', score_mann_whitney, LowTail, TwoSampleTest),
-              gene_scoring_method('Hypergeometric Test', hypergeometric_test_vector, TwoTail, TwoSampleTest)]
+              gene_scoring_method('Hypergeometric Test', score_hypergeometric_test, TwoTail, TwoSampleTest)]
 
     def __init__(self, box, parent,  **kwargs):
         # type: (Union[QGroupBox, QWidget], QWidget) -> None
@@ -41,6 +42,7 @@ class GeneScoringWidget(QWidget):
         # parent widget settings
         self.scoring_method_selection = None
         self.scoring_method_design = None
+        self.test_type = None
 
     def set_method_selection_area(self, settings_var):
         # type: (str) -> None
@@ -60,6 +62,14 @@ class GeneScoringWidget(QWidget):
                      callback=self.on_design_selection_changed,
                      label='Design')
 
+    def set_test_type(self, settings_var):
+        # type: (str) -> None
+        self.test_type = settings_var
+        radioButtons(self.widget, self.parent, self.test_type,
+                     list(map(lambda s: s.title(), ALTERNATIVES)),
+                     callback=self.on_test_type_changed,
+                     label='Test Type')
+
     def get_selected_method(self):
         # type: () -> gene_scoring_method
         return self.scores[self.parent.__getattribute__(self.scoring_method_selection)]
@@ -68,10 +78,18 @@ class GeneScoringWidget(QWidget):
         # type: () -> int
         return self.parent.__getattribute__(self.scoring_method_design)
 
+    def get_selected_test_type(self):
+        # type: () -> str
+        return ALTERNATIVES[self.parent.__getattribute__(self.test_type)]
+
     def on_method_selection_changed(self):
         """ Override this method if needed """
         self.parent.invalidate()
 
     def on_design_selection_changed(self):
+        """ Override this method if needed """
+        self.parent.invalidate()
+
+    def on_test_type_changed(self):
         """ Override this method if needed """
         self.parent.invalidate()

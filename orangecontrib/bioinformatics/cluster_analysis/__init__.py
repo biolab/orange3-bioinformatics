@@ -16,7 +16,7 @@ from Orange.widgets.gui import ProgressBar
 
 from orangecontrib.bioinformatics.geneset import GeneSet
 from orangecontrib.bioinformatics.widgets.utils.gui import gene_scoring_method
-from orangecontrib.bioinformatics.utils.statistics import FDR
+from orangecontrib.bioinformatics.utils.statistics import FDR, ALT_GREATER
 from orangecontrib.bioinformatics.ncbi.gene import Gene
 
 DISPLAY_GENE_COUNT = 20
@@ -132,37 +132,61 @@ class Cluster:
             gene.p_val = p_val
             gene.fdr = fdr
 
-    def cluster_vs_rest(self, table_x, rows_by_cluster, method):
-        # type: (np.ndarray, np.ndarray, gene_scoring_method) -> None
 
-        cluster = table_x[rows_by_cluster == self.index]
-        rest = table_x[rows_by_cluster != self.index]
-        if cluster.any():
-            scores, p_values = method.score_function(cluster, rest)
-            fdr_values = FDR(p_values)
-            self.__update_gene_objects(p_values, fdr_values)
+    CLUSTER_VS_REST = False
+    CLUSTER_VS_CLUSTER = True
+    def cluster_scores(self, table_x, rows_by_cluster, method, design, **kwargs):
+        # type: (np.ndarray, np.ndarray, gene_scoring_method, str) -> None
+        """
+        General scoring of genes in the cluster.
+        Ways to score genes are determined by design.
+        If a batch variable index is defined, it is accounted for in gene scoring.
 
-    def cluster_vs_cluster(self, table_x, rows_by_cluster, method, **kwargs):
-        # type: (np.ndarray, np.ndarray, gene_scoring_method) -> None
-
+        :param table_x:
+        :param rows_by_cluster:
+        :param method:
+        :param design:
+        :param kwargs:
+        :param aggregation:
+        :param rows_by_batch:
+        :return:
+        """
         aggregation = kwargs.get('aggregation', 'max')
+        alternative = kwargs.get('alternative', ALT_GREATER)
+        rows_by_batch = kwargs.get('rows_by_batch', None)
+        if not isinstance(rows_by_batch, np.ndarray):
+            rows_by_batch = np.zeros((len(table_x),))
+        uniq_batches = set(rows_by_batch)
 
-        calculated_p_values = []
-        for cluster_index in set(rows_by_cluster):
+        # Determine clusters
+        uniq_clusters = set(rows_by_cluster) - {self.index}
+        this_cluster = self.index
+        if design == self.CLUSTER_VS_REST:
+            rows_by_cluster = rows_by_cluster == self.index
+            uniq_clusters = {False}
+            this_cluster = True
 
-            # ignore current cluster index
-            if cluster_index != self.index:
-                cluster = table_x[rows_by_cluster == self.index]
-                rest = table_x[rows_by_cluster == cluster_index]
+        calculated_p_values = np.ones((table_x.shape[1],       # genes
+                                       len(uniq_clusters),     # other clusters
+                                       len(uniq_batches)))     # batches
 
-                _, p_values = method.score_function(cluster, rest)
-                calculated_p_values.append(p_values)
+        for bi, b in enumerate(uniq_batches):
+            for ci, c in enumerate(uniq_clusters):
+                cluster = table_x[np.logical_and(rows_by_cluster == this_cluster, rows_by_batch == b)]
+                rest = table_x[np.logical_and(rows_by_cluster == c, rows_by_batch == b)]
+                if cluster.any() and rest.any():
+                    _, p_values = method.score_function(cluster, rest, alternative=alternative)
+                    p_values[np.isnan(p_values)] = 1
+                    calculated_p_values[:, ci, bi] = p_values
 
         if aggregation == 'max':
-            max_p_values = np.max(np.array(calculated_p_values), axis=0)
+            max_p_values = np.max(calculated_p_values, axis=(1, 2))
             fdr_values = FDR(max_p_values)
-
             self.__update_gene_objects(max_p_values, fdr_values)
+        else:
+            raise NotImplementedError("Aggregation %s is not implemented" % aggregation)
+        return
+
 
     def to_html(self):
         gene_sets = '(no enriched gene sets)'
@@ -265,14 +289,9 @@ class ClusterModel(QAbstractListModel):
         except Exception as ex:
             print(ex)
 
-    def _score_genes(self, design, data_x, rows_by_cluster, method, callback):
-
+    def _score_genes(self, callback, **kwargs):
         for item in self.get_rows():
-            if design:
-                item.cluster_vs_cluster(data_x, rows_by_cluster, method)
-            else:
-                item.cluster_vs_rest(data_x, rows_by_cluster, method)
-
+            item.cluster_scores(**kwargs)
             callback()
 
     @Slot()
@@ -292,7 +311,7 @@ class ClusterModel(QAbstractListModel):
             self._task.watcher.done.disconnect(self._score_genes)
             self._task = None
 
-    def score_genes(self, design, data_x, rows_by_cluster, method):
+    def score_genes(self, **kwargs):
         """ Run gene enrichment.
 
         :param design:
@@ -315,7 +334,7 @@ class ClusterModel(QAbstractListModel):
                 progress_advance()
 
         self.parent.progress_bar = ProgressBar(self.parent, iterations=len(self.get_rows()))
-        f = partial(self._score_genes, design, data_x, rows_by_cluster, method, callback=callback)
+        f = partial(self._score_genes, callback=callback, **kwargs)
         self._task.future = self._executor.submit(f)
 
         self._task.watcher = FutureWatcher(self._task.future)
