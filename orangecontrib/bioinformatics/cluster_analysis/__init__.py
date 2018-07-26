@@ -1,18 +1,23 @@
 """ Cluster analysis module """
 import numpy as np
+import threading
+import concurrent.futures
 
-from typing import Union
+from typing import Union, Optional
 from operator import attrgetter
 from functools import partial
-from orangecontrib.bioinformatics.ncbi.gene import Gene
+
 
 from AnyQt.QtCore import (
-    Qt, QAbstractListModel, QVariant
+    Qt, QAbstractListModel, QVariant, QThreadPool, Slot, QThread
 )
+from Orange.widgets.utils.concurrent import ThreadExecutor, FutureWatcher, methodinvoke
+from Orange.widgets.gui import ProgressBar
 
 from orangecontrib.bioinformatics.geneset import GeneSet
 from orangecontrib.bioinformatics.widgets.utils.gui import gene_scoring_method
 from orangecontrib.bioinformatics.utils.statistics import FDR
+from orangecontrib.bioinformatics.ncbi.gene import Gene
 
 GENE_COUNT = 20
 GENE_SETS_COUNT = 5
@@ -93,6 +98,7 @@ class Cluster:
 
         # calculate gene set enrichment
         for gene_set in gene_sets:
+
             if gene_set.hierarchy not in selected_sets:
                 continue
 
@@ -192,11 +198,26 @@ class Cluster:
         return html_string
 
 
+class Task:
+    future = None
+    watcher = None
+    cancelled = False
+
+    def cancel(self):
+        self.cancelled = True
+        self.future.cancel()
+        concurrent.futures.wait([self.future])
+
+
 class ClusterModel(QAbstractListModel):
 
-    def __init__(self):
+    def __init__(self, parent=None):
         QAbstractListModel.__init__(self)
         self.__items = []
+        self.parent = parent
+
+        self._task = None  # type: Union[Task, None]
+        self._executor = ThreadExecutor()
 
     def add_rows(self, rows):
         self.__items = rows
@@ -221,6 +242,49 @@ class ClusterModel(QAbstractListModel):
         if role == Qt.DisplayRole:
             return row_obj
 
+    @Slot(concurrent.futures.Future)
+    def _end_task(self, f):
+        assert self.thread() is QThread.currentThread()
+        assert threading.current_thread() == threading.main_thread()
+        assert self._task is not None
+        assert self._task.future is f
+        assert f.done()
+
+        self._task = None
+        self.parent.progress_bar.finish()
+
+        try:
+            f.result()
+        except Exception as ex:
+            print(ex)
+
+    def _score_genes(self, design, data_x, rows_by_cluster, method, callback):
+
+        for item in self.get_rows():
+            if design:
+                item.cluster_vs_cluster(data_x, rows_by_cluster, method)
+            else:
+                item.cluster_vs_rest(data_x, rows_by_cluster, method)
+
+            callback()
+
+    @Slot()
+    def progress_advance(self):
+        # GUI should be updated in main thread. That's why we are calling advance method here
+        if self.parent.progress_bar:
+            self.parent.progress_bar.advance()
+
+    def cancel(self):
+        """
+        Cancel the current task (if any).
+        """
+        if self._task is not None:
+            self._task.cancel()
+            assert self._task.future.done()
+            # disconnect the `_task_finished` slot
+            self._task.watcher.done.disconnect(self._score_genes)
+            self._task = None
+
     def score_genes(self, design, data_x, rows_by_cluster, method):
         """ Run gene enrichment.
 
@@ -234,11 +298,21 @@ class ClusterModel(QAbstractListModel):
             We do not apply filter nor notify view that data is changed. This is done after filters
         """
 
-        for item in self.get_rows():
-            if design:
-                item.cluster_vs_cluster(data_x, rows_by_cluster, method)
-            else:
-                item.cluster_vs_rest(data_x, rows_by_cluster, method)
+        self._task = Task()
+        progress_advance = methodinvoke(self, "progress_advance")
+
+        def callback():
+            if self._task.cancelled:
+                raise KeyboardInterrupt()
+            if self.parent.progress_bar:
+                progress_advance()
+
+        self.parent.progress_bar = ProgressBar(self.parent, iterations=len(self.get_rows()))
+        f = partial(self._score_genes, design, data_x, rows_by_cluster, method, callback=callback)
+        self._task.future = self._executor.submit(f)
+
+        self._task.watcher = FutureWatcher(self._task.future)
+        self._task.watcher.done.connect(self._end_task)
 
     def gene_sets_enrichment(self, gs_object, gene_sets, reference_genes):
         """ Run gene sets enrichment.
@@ -254,7 +328,10 @@ class ClusterModel(QAbstractListModel):
 
         for item in self.get_rows():
             genes = [gene.ncbi_id for gene in item.filtered_genes]
-            item.gene_set_enrichment(gs_object, gene_sets, set(genes), reference_genes)
+            item.gene_set_enrichment(gs_object,
+                                     gene_sets,
+                                     set(genes),
+                                     reference_genes)
 
     def apply_gene_filters(self, count=GENE_COUNT, p_val=None, fdr=None):
         [item.filter_enriched_genes(count, p_val, fdr) for item in self.get_rows()]

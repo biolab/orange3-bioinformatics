@@ -32,7 +32,7 @@ class OWClusterAnalysis(OWWidget):
     name = "Cluster Analysis"
     description = "The widget displays differentially expressed genes that characterize the cluster, " \
                   "and corresponding gene terms that describe differentially expressed genes"
-    icon = ""
+    icon = "../widgets/icons/OWClusterAnalysis.svg"
     priority = 100
 
     class Inputs:
@@ -232,7 +232,7 @@ class OWClusterAnalysis(OWWidget):
     def __set_cluster_info_model(self):
         self.cluster_info_view.setModel(None)
 
-        self.cluster_info_model = ClusterModel()
+        self.cluster_info_model = ClusterModel(self)
         self.cluster_info_model.add_rows(self.clusters)
 
         # add model to the view
@@ -302,15 +302,19 @@ class OWClusterAnalysis(OWWidget):
 
     def __gene_sets_enrichment(self):
         # TODO: move this to the worker thread
+
         selected_sets = self.gs_widget.get_hierarchies(only_selected=True)
         # save setting on selected hierarchies
         self.stored_gene_sets_selection = tuple(selected_sets)
-
         ref_genes = set(self.input_genes_ids)
+
         try:
-            self.cluster_info_model.gene_sets_enrichment(self.gs_widget.gs_object, selected_sets, ref_genes)
+            self.cluster_info_model.gene_sets_enrichment(self.gs_widget.gs_object,
+                                                         selected_sets,
+                                                         ref_genes)
         except Exception as e:
             # TODO: possible exceptions?
+
             raise e
 
         self.filter_gene_sets()
