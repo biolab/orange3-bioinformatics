@@ -460,7 +460,8 @@ class OWClusterAnalysis(OWWidget):
 
                 self.num_of_custom_sets = len(set(gene_sets_names))
                 gene_names, _ = self.custom_data.get_column_view(self.custom_gene_id_column)
-                self.gs_widget.add_custom_sets(gene_sets_names, gene_names)
+                hierarchy_title = (self.input_data.name if self.input_data.name else 'Custom sets', )
+                self.gs_widget.add_custom_sets(gene_sets_names, gene_names, hierarchy_title=hierarchy_title)
 
         self.__gene_sets_enrichment()
         self.__update_info_box()

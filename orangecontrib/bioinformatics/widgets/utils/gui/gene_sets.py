@@ -31,15 +31,19 @@ class GeneSetsSelection(QWidget):
         self.hierarchy_tree_widget.setEditTriggers(QTreeView.NoEditTriggers)
         box.layout().addWidget(self.hierarchy_tree_widget)
 
-        self.custom_set_hier = ('Custom sets',)
+        self.custom_set_hier = None
+        self.default_selection = [
+            ('GO', 'molecular_function'), ('GO', 'biological_process'), ('GO', 'cellular_component')
+        ]
 
     def clear_custom_sets(self):
         # delete any custom sets if they exists
         self.gs_object.delete_sets_by_hierarchy(self.custom_set_hier)
 
-    def add_custom_sets(self, gene_sets_names, gene_names):
+    def add_custom_sets(self, gene_sets_names, gene_names, hierarchy_title=None):
         # type: (np.ndarray, np.ndarray) -> None
 
+        self.custom_set_hier = hierarchy_title
         self.clear_custom_sets()
 
         temp_dict = defaultdict(list)
@@ -134,8 +138,10 @@ class GeneSetsSelection(QWidget):
 
     def set_selected_hierarchies(self):
         iterator = QTreeWidgetItemIterator(self.hierarchy_tree_widget, QTreeWidgetItemIterator.All)
+        defaults = []
 
         while iterator.value():
+
             # note: if hierarchy value is not a tuple, then this is just top level qTreeWidgetItem that
             #       holds subcategories. We don't want to display all sets from category
             if type(iterator.value().hierarchy) is not str:
@@ -144,18 +150,14 @@ class GeneSetsSelection(QWidget):
                 else:
                     iterator.value().setCheckState(0, Qt.Unchecked)
 
+            # if no items are checked, set defaults
+            if iterator.value().hierarchy in self.default_selection:
+                defaults.append(iterator.value())
+
             iterator += 1
 
-        # if no items are checked, we check first one at random
         if len(self.get_hierarchies(only_selected=True)) == 0:
-            iterator = QTreeWidgetItemIterator(self.hierarchy_tree_widget, QTreeWidgetItemIterator.NotChecked)
-
-            while iterator.value():
-                if type(iterator.value().hierarchy) is not str:
-                    iterator.value().setCheckState(0, Qt.Checked)
-                    return
-
-                iterator += 1
+            [item.setCheckState(0, Qt.Checked) for item in defaults]
 
     @staticmethod
     def hierarchy_tree(gene_sets):
