@@ -47,6 +47,7 @@ class OWClusterAnalysis(OWWidget):
 
     class Warning(OWWidget.Warning):
         mannwhitneyu = Msg('{}, {}.')
+        no_selected_gene_sets = Msg('No gene set selected, select them from Gene Sets box.')
 
     class Error(OWWidget.Error):
         missing_annotation = Msg(ERROR_ON_MISSING_ANNOTATION)
@@ -302,8 +303,12 @@ class OWClusterAnalysis(OWWidget):
 
     def __gene_sets_enrichment(self):
         # TODO: move this to the worker thread
-
+        self.Warning.no_selected_gene_sets.clear()
         selected_sets = self.gs_widget.get_hierarchies(only_selected=True)
+
+        if len(selected_sets) == 0:
+            self.Warning.no_selected_gene_sets()
+
         # save setting on selected hierarchies
         self.stored_gene_sets_selection = tuple(selected_sets)
         ref_genes = set(self.input_genes_ids)

@@ -191,6 +191,8 @@ class Cluster:
                 <td width=\"20%\" ></td>
                 <td width=\"80%\" align=left valign=top>{}</td>
             </tr>
+            <tr>
+            </tr>
         </table>
         </body>
         </html>
