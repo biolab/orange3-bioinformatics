@@ -353,7 +353,11 @@ class OWClusterAnalysis(OWWidget):
 
         if data:
             self.input_data = data
-            self.cluster_indicator_model.set_domain(self.input_data.domain)
+
+            # For Cluster Indicator do not use categorical variables that contain only one value.
+            domain = self.input_data.domain.copy()
+            domain = Domain([], class_vars=[class_var for class_var in domain.class_vars if len(class_var.values) > 1])
+            self.cluster_indicator_model.set_domain(domain)
 
             self.tax_id = str(self.input_data.attributes.get(TAX_ID, None))
             self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
