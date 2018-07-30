@@ -354,7 +354,10 @@ class OWClusterAnalysis(OWWidget):
 
             # For Cluster Indicator do not use categorical variables that contain only one value.
             domain = self.input_data.domain.copy()
-            domain = Domain([], class_vars=[class_var for class_var in domain.class_vars if len(class_var.values) > 1])
+            class_vars = [class_var for class_var in domain.class_vars if len(class_var.values) > 1]
+            class_vars_metas = [class_var for class_var in domain.metas
+                                if isinstance(class_var, DiscreteVariable) and len(class_var.values) > 1]
+            domain = Domain([], class_vars=class_vars, metas=class_vars_metas)
             self.cluster_indicator_model.set_domain(domain)
 
             self.tax_id = str(self.input_data.attributes.get(TAX_ID, None))
