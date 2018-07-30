@@ -25,7 +25,7 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
     ERROR_ON_MISSING_ANNOTATION, ERROR_ON_MISSING_GENE_ID, ERROR_ON_MISSING_TAX_ID
 )
 from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSetsSelection, GeneScoringWidget
-from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, GENE_SETS_COUNT, GENE_COUNT
+from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, DISPLAY_GENE_SETS_COUNT, DISPLAY_GENE_COUNT
 
 
 class OWClusterAnalysis(OWWidget):
@@ -63,7 +63,7 @@ class OWClusterAnalysis(OWWidget):
     scoring_method_design = ContextSetting(0)
 
     # genes filter
-    min_gene_count = Setting(20)
+    max_gene_count = Setting(20)
     use_gene_count_filter = Setting(True)
 
     max_gene_p_value = Setting(0.1)
@@ -152,7 +152,7 @@ class OWClusterAnalysis(OWWidget):
         self.mainArea.layout().addWidget(splitter)
 
         genes_filter = widgetBox(splitter, 'Filter Genes', orientation=QHBoxLayout())
-        spin(genes_filter, self, 'min_gene_count', 0, GENE_COUNT,
+        spin(genes_filter, self, 'max_gene_count', 0, 10000,
              label='Count',
              tooltip='Minimum genes count',
              checked='use_gene_count_filter',
@@ -179,7 +179,7 @@ class OWClusterAnalysis(OWWidget):
                    )
 
         gene_sets_filter = widgetBox(splitter, 'Filter Gene Sets', orientation=QHBoxLayout())
-        spin(gene_sets_filter, self, 'min_gs_count', 0, GENE_SETS_COUNT,
+        spin(gene_sets_filter, self, 'min_gs_count', 0, DISPLAY_GENE_SETS_COUNT,
              label='Count',
              tooltip='Minimum genes count',
              checked='use_gs_count_filter',
@@ -263,26 +263,26 @@ class OWClusterAnalysis(OWWidget):
 
     def filter_genes(self):
         if self.cluster_info_model:
-            for cluster in self.clusters:
-                cluster.use_gene_count = self.use_gene_count_filter
-
             # filter genes
             # note: after gene filter is applied, we need to recalculate gene set enrichment
             self.cluster_info_model.apply_gene_filters(
-                self.min_gene_count if self.use_gene_count_filter else GENE_COUNT,
                 self.max_gene_p_value if self.use_gene_pval_filter else None,
-                self.max_gene_fdr if self.use_gene_fdr_filter else None)
+                self.max_gene_fdr if self.use_gene_fdr_filter else None,
+                self.max_gene_count if self.use_gene_count_filter else None)
 
             # recalculate gene set enrichment
             self.__gene_sets_enrichment()
             # call sizeHint function
             self.cluster_info_view.resizeRowsToContents()
 
+            # commit changes after filter
+            self.commit()
+
     def filter_gene_sets(self):
         if self.cluster_info_model:
             # filter gene sets
             self.cluster_info_model.apply_gene_sets_filters(
-                self.min_gs_count if self.use_gs_count_filter else GENE_SETS_COUNT,
+                self.min_gs_count if self.use_gs_count_filter else DISPLAY_GENE_SETS_COUNT,
                 self.max_gs_p_value if self.use_gs_pval_filter else None,
                 self.max_gs_fdr if self.use_gs_max_fdr else None)
 
@@ -298,8 +298,6 @@ class OWClusterAnalysis(OWWidget):
             self.cluster_info_model.score_genes(design, self.input_data.X, self.rows_by_cluster, method)
         except ValueError as e:
             self.Warning.mannwhitneyu(str(e), 'p-values are set to 1')
-
-        self.filter_genes()
 
     def __gene_sets_enrichment(self):
         # TODO: move this to the worker thread

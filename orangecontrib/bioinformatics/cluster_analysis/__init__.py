@@ -3,13 +3,13 @@ import numpy as np
 import threading
 import concurrent.futures
 
-from typing import Union, Optional
+from typing import Union
 from operator import attrgetter
 from functools import partial
 
 
 from AnyQt.QtCore import (
-    Qt, QAbstractListModel, QVariant, QThreadPool, Slot, QThread
+    Qt, QAbstractListModel, QVariant, Slot, QThread
 )
 from Orange.widgets.utils.concurrent import ThreadExecutor, FutureWatcher, methodinvoke
 from Orange.widgets.gui import ProgressBar
@@ -19,8 +19,8 @@ from orangecontrib.bioinformatics.widgets.utils.gui import gene_scoring_method
 from orangecontrib.bioinformatics.utils.statistics import FDR
 from orangecontrib.bioinformatics.ncbi.gene import Gene
 
-GENE_COUNT = 20
-GENE_SETS_COUNT = 5
+DISPLAY_GENE_COUNT = 20
+DISPLAY_GENE_SETS_COUNT = 5
 
 
 class ClusterGene(Gene):
@@ -58,10 +58,6 @@ class Cluster:
         self.gene_sets = []
         self.filtered_gene_sets = []
 
-        # misc
-        self.use_gene_count = True
-        self.delta = 0
-
     def set_genes(self, gene_names, gene_ids):
         self.genes = []
 
@@ -80,11 +76,14 @@ class Cluster:
 
         return all(filter_status)
 
-    def filter_enriched_genes(self, count, p_val, fdr):
+    def filter_enriched_genes(self, p_val, fdr, max_gene_count=None):
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
         filtered_list = list(sorted(filter(filter_function, self.genes), key=attrgetter('fdr')))
-        self.delta = len(filtered_list)
-        self.filtered_genes = filtered_list[:count]
+
+        if max_gene_count is not None:
+            self.filtered_genes = filtered_list[:max_gene_count]
+        else:
+            self.filtered_genes = filtered_list
 
     def filter_gene_sets(self, count, p_val, fdr):
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
@@ -168,11 +167,11 @@ class Cluster:
 
         genes = '(all genes are filtered out)'
         if self.filtered_genes:
-            genes = ', '.join([gene.input_name for gene in self.filtered_genes])
-            self.delta = GENE_COUNT if self.delta > GENE_COUNT else self.delta
+            genes_to_display = [gene.input_name for gene in self.filtered_genes[:DISPLAY_GENE_COUNT]]
 
-            if (self.delta - len(self.filtered_genes)) > 0 and self.use_gene_count:
-                genes += ', ... ({} more genes)'.format(self.delta - len(self.filtered_genes))
+            genes = ', '.join(genes_to_display)
+            if len(self.filtered_genes) > len(genes_to_display):
+                genes += ', ... ({} more genes)'.format(len(self.filtered_genes) - DISPLAY_GENE_COUNT)
 
         html_string = """
         <html>
@@ -254,6 +253,7 @@ class ClusterModel(QAbstractListModel):
 
         self._task = None
         self.parent.progress_bar.finish()
+        self.parent.filter_genes()
 
         try:
             f.result()
@@ -335,11 +335,11 @@ class ClusterModel(QAbstractListModel):
                                      set(genes),
                                      reference_genes)
 
-    def apply_gene_filters(self, count=GENE_COUNT, p_val=None, fdr=None):
-        [item.filter_enriched_genes(count, p_val, fdr) for item in self.get_rows()]
+    def apply_gene_filters(self, p_val=None, fdr=None, count=None):
+        [item.filter_enriched_genes(p_val, fdr, max_gene_count=count) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 
-    def apply_gene_sets_filters(self, count=GENE_SETS_COUNT, p_val=None, fdr=None):
+    def apply_gene_sets_filters(self, count=DISPLAY_GENE_SETS_COUNT, p_val=None, fdr=None):
         [item.filter_gene_sets(count, p_val, fdr) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 
