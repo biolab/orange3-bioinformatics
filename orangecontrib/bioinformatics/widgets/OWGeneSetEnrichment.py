@@ -432,7 +432,7 @@ class OWGeneSets(OWWidget):
             info_string += '{} unique gene names on input.\n'.format(len(self.input_genes))
             info_string += '{} genes on output.\n'.format(self.num_of_sel_genes)
         else:
-            info_string += 'No genes on input.\n'
+            info_string += 'No data on input.\n'
 
         self.input_info.setText(info_string)
 
@@ -616,47 +616,47 @@ class OWGeneSets(OWWidget):
         filter_proxy = self.filter_proxy_model  # type: FilterProxyModel
         model = filter_proxy.sourceModel()      # type: QStandardItemModel
 
-        assert isinstance(model, QStandardItemModel)
+        if isinstance(model, QStandardItemModel):
 
-        search_term = self.search_pattern.lower().strip().split()
+            search_term = self.search_pattern.lower().strip().split()
 
-        # apply filtering rules
-        filters = [
-            FilterProxyModel.Filter(
-                self.TERM, Qt.DisplayRole,
-                lambda value: all(fs in value.lower() for fs in search_term))
-        ]
-
-        # if self.use_min_count:
-        #    filters.append(
-        #        FilterProxyModel.Filter(
-        #            self.COUNT, Qt.DisplayRole,
-        #            lambda value: value >= self.min_count,
-        #        )
-        #    )
-
-        if self.use_p_value:
-            filters.append(
+            # apply filtering rules
+            filters = [
                 FilterProxyModel.Filter(
-                    self.P_VAL, Qt.DisplayRole,
-                    lambda value: value < self.max_p_value
+                    self.TERM, Qt.DisplayRole,
+                    lambda value: all(fs in value.lower() for fs in search_term))
+            ]
+
+            # if self.use_min_count:
+            #    filters.append(
+            #        FilterProxyModel.Filter(
+            #            self.COUNT, Qt.DisplayRole,
+            #            lambda value: value >= self.min_count,
+            #        )
+            #    )
+
+            if self.use_p_value:
+                filters.append(
+                    FilterProxyModel.Filter(
+                        self.P_VAL, Qt.DisplayRole,
+                        lambda value: value < self.max_p_value
+                    )
                 )
-            )
 
-        if self.use_max_fdr:
-            filters.append(
-                FilterProxyModel.Filter(
-                    self.FDR, Qt.DisplayRole,
-                    lambda value: value < self.max_fdr
+            if self.use_max_fdr:
+                filters.append(
+                    FilterProxyModel.Filter(
+                        self.FDR, Qt.DisplayRole,
+                        lambda value: value < self.max_fdr
+                    )
                 )
-            )
 
-        filter_proxy.set_filters(filters)
+            filter_proxy.set_filters(filters)
 
-        if model.rowCount() and not filter_proxy.rowCount():
-            self.Warning.all_sets_filtered()
-        else:
-            self.Warning.clear()
+            if model.rowCount() and not filter_proxy.rowCount():
+                self.Warning.all_sets_filtered()
+            else:
+                self.Warning.clear()
 
     def __get_source_data(self, proxy_row_index, column):
         proxy_index = self.filter_proxy_model.index(proxy_row_index, column)
@@ -784,8 +784,10 @@ class OWGeneSets(OWWidget):
         self.line_edit_filter.textChanged.connect(self.filter_data_view)
 
     def setup_control_area(self):
-        info_box = vBox(self.controlArea, 'Info')
-        self.input_info = widgetLabel(info_box)
+        # Control area
+        self.input_info = widgetLabel(
+            widgetBox(self.controlArea, "Info", addSpace=True), 'No data on input.\n'
+        )
 
         box = vBox(self.controlArea, "Custom Gene Sets")
         self.gs_label_combobox = comboBox(box, self, "gene_set_label", sendSelectedValue=True,
