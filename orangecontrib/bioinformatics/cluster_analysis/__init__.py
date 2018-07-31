@@ -77,8 +77,10 @@ class Cluster:
         return all(filter_status)
 
     def filter_enriched_genes(self, p_val, fdr, max_gene_count=None):
+        all_args_none = all(arg is None for arg in [p_val, fdr, max_gene_count])
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
-        filtered_list = list(sorted(filter(filter_function, self.genes), key=attrgetter('fdr')))
+        sorted_list = sorted(self.genes, key=attrgetter('p_val' if all_args_none else 'fdr'))
+        filtered_list = list(filter(filter_function, sorted_list))
 
         if max_gene_count is not None:
             self.filtered_genes = filtered_list[:max_gene_count]
@@ -86,8 +88,11 @@ class Cluster:
             self.filtered_genes = filtered_list
 
     def filter_gene_sets(self, count, p_val, fdr):
+        all_args_none = all(arg is None for arg in [p_val, fdr, count])
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
-        self.filtered_gene_sets = list(sorted(filter(filter_function, self.gene_sets), key=attrgetter('fdr'))[:count])
+        sorted_list = sorted(self.gene_sets, key=attrgetter('p_val' if all_args_none else 'fdr'))
+        count = count if count is not None else DISPLAY_GENE_SETS_COUNT
+        self.filtered_gene_sets = list(filter(filter_function, sorted_list))[:count]
 
     def gene_set_enrichment(self, gene_sets, selected_sets, genes, ref_genes):
         self.gene_sets = []
@@ -339,7 +344,7 @@ class ClusterModel(QAbstractListModel):
         [item.filter_enriched_genes(p_val, fdr, max_gene_count=count) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 
-    def apply_gene_sets_filters(self, count=DISPLAY_GENE_SETS_COUNT, p_val=None, fdr=None):
+    def apply_gene_sets_filters(self, count=None, p_val=None, fdr=None):
         [item.filter_gene_sets(count, p_val, fdr) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 

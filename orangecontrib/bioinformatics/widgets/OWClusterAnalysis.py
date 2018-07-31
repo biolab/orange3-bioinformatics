@@ -282,7 +282,7 @@ class OWClusterAnalysis(OWWidget):
         if self.cluster_info_model:
             # filter gene sets
             self.cluster_info_model.apply_gene_sets_filters(
-                self.min_gs_count if self.use_gs_count_filter else DISPLAY_GENE_SETS_COUNT,
+                self.min_gs_count if self.use_gs_count_filter else None,
                 self.max_gs_p_value if self.use_gs_pval_filter else None,
                 self.max_gs_fdr if self.use_gs_max_fdr else None)
 
