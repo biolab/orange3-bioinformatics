@@ -228,7 +228,7 @@ class OWGeneNameMatcher(OWWidget):
 
         # Control area
         self.info_box = widgetLabel(
-            widgetBox(self.controlArea, "Info", addSpace=True), "Initializing\n"
+            widgetBox(self.controlArea, "Info", addSpace=True), 'No data on input.\n'
         )
 
         organism_box = vBox(self.controlArea, 'Organism')
@@ -310,13 +310,15 @@ class OWGeneNameMatcher(OWWidget):
         self.mainArea.layout().addWidget(self.splitter)
 
     def apply_filter(self):
-        self.table_view.clearSpans()
-        self.table_view.setModel(None)
-        self.table_view.setSortingEnabled(False)
-        self.table_model.show_table(str(self.search_pattern))
-        self.table_view.setModel(self.table_model)
-        self.table_view.selectionModel().selectionChanged.connect(self.invalidate)
-        self.table_view.setSortingEnabled(True)
+        # filter only if input data is present and model is populated
+        if self.input_data is not None and self.table_model.data_table is not None:
+            self.table_view.clearSpans()
+            self.table_view.setModel(None)
+            self.table_view.setSortingEnabled(False)
+            self.table_model.show_table(str(self.search_pattern))
+            self.table_view.setModel(self.table_model)
+            self.table_view.selectionModel().selectionChanged.connect(self.invalidate)
+            self.table_view.setSortingEnabled(True)
 
     def __reset_widget_state(self):
         self.Outputs.custom_data_table.send(None)
@@ -325,6 +327,7 @@ class OWGeneNameMatcher(OWWidget):
         self.table_view.setModel(None)
         self.table_model.clear()
         self.unknown_model.clear()
+        self._update_info_box()
 
     def __selection_changed(self):
         genes = [model_index.data() for model_index in self.extended_view.get_selected_gens()]
@@ -341,7 +344,7 @@ class OWGeneNameMatcher(OWWidget):
                         '{} genes with match conflicts\n'.format(num_genes, known_genes, num_genes - known_genes)
 
         else:
-            info_text = 'No genes on input'
+            info_text = 'No data on input.'
 
         self.info_box.setText(info_text)
 
@@ -365,6 +368,7 @@ class OWGeneNameMatcher(OWWidget):
 
         # if no known genes, clean up and return
         if not len(self.gene_matcher.get_known_genes()):
+            self.table_model.wrap(np.array([[]]))
             self.__reset_widget_state()
             return
 
@@ -448,9 +452,9 @@ class OWGeneNameMatcher(OWWidget):
 
     @Inputs.data_table
     def handle_input(self, data):
-        self.__reset_widget_state()
         self.input_data = None
         self.input_genes = None
+        self.__reset_widget_state()
         self.gene_columns_model.set_domain(None)
 
         if data:
