@@ -65,6 +65,7 @@ class GeneSetsSelection(QWidget):
         # type: (str) -> None
         self.gs_object = GeneSets()
         self.clear()
+        self.clear()
 
         gene_sets = list_all(organism=tax_id)
         self.set_hierarchy_model(self.hierarchy_tree_widget, self.hierarchy_tree(gene_sets))
@@ -74,6 +75,9 @@ class GeneSetsSelection(QWidget):
             self.gs_object.update([g_set for g_set in g_sets])
 
         self.set_selected_hierarchies()
+
+    def clear_gene_sets(self):
+        self.gs_object = GeneSets()
 
     def clear(self):
         # reset hierarchy widget state
