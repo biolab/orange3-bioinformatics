@@ -24,6 +24,7 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE,
     ERROR_ON_MISSING_ANNOTATION, ERROR_ON_MISSING_GENE_ID, ERROR_ON_MISSING_TAX_ID
 )
+from orangecontrib.bioinformatics.utils.statistics import hypergeometric_test_vector
 from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSetsSelection, GeneScoringWidget
 from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, DISPLAY_GENE_SETS_COUNT, DISPLAY_GENE_COUNT
 
@@ -295,6 +296,10 @@ class OWClusterAnalysis(OWWidget):
         method = self.gene_scoring.get_selected_method()
 
         try:
+            if method.score_function == hypergeometric_test_vector:
+                if len(np.unique(self.input_data.X)) != 2:
+                    raise ValueError('Binary data expected')
+
             self.cluster_info_model.score_genes(design, self.input_data.X, self.rows_by_cluster, method)
         except ValueError as e:
             self.Warning.mannwhitneyu(str(e), 'p-values are set to 1')

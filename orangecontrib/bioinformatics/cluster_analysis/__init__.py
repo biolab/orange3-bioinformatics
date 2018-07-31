@@ -77,7 +77,7 @@ class Cluster:
         return all(filter_status)
 
     def filter_enriched_genes(self, p_val, fdr, max_gene_count=None):
-        all_args_none = all(arg is None for arg in [p_val, fdr, max_gene_count])
+        all_args_none = all(arg is None for arg in [p_val, fdr])
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
         sorted_list = sorted(self.genes, key=attrgetter('p_val' if all_args_none else 'fdr'))
         filtered_list = list(filter(filter_function, sorted_list))
@@ -88,7 +88,7 @@ class Cluster:
             self.filtered_genes = filtered_list
 
     def filter_gene_sets(self, count, p_val, fdr):
-        all_args_none = all(arg is None for arg in [p_val, fdr, count])
+        all_args_none = all(arg is None for arg in [p_val, fdr])
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
         sorted_list = sorted(self.gene_sets, key=attrgetter('p_val' if all_args_none else 'fdr'))
         count = count if count is not None else DISPLAY_GENE_SETS_COUNT
