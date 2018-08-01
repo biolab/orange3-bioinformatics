@@ -24,14 +24,19 @@ class NoGeneNamesException(Exception):
 
 class Gene:
     """ Basic representation of a gene. Class holds NCBI and GeneMatcher data created upon class initialization.
-    GeneMatcher tags are used only for matching purposes.
 
-    We deny __dict__ creation by defining __slots__ for memory optimization. We expect a lot of instances
-    of this class to be created.
+    GeneMatcher tags are used only for matching purposes.
     """
+
+    # We deny __dict__ creation by defining __slots__ for memory optimization.
+    # We expect a lot of instances of this class to be created.
     __slots__ = GENE_INFO_TAGS + GENE_MATCHER_TAGS  # Note: slots are ordered.
 
     def __init__(self, input_name=None):
+        """
+        :param input_name: Name of the gene (symbol, synonym, external reference)
+        :type input_name: :class:`str`
+        """
         self.input_name = input_name
         self.type_of_match = None
         self.ncbi_id = None
@@ -54,6 +59,8 @@ class Gene:
 
     @lru_cache(10000)
     def load_ncbi_info(self):
+        """ Populate :class:`Gene` with data from NCBI gene database
+        """
         if not self.ncbi_id:
             return
 
@@ -85,6 +92,10 @@ class Gene:
         return [parse_attribute(tag) for tag in header_tags]
 
     def to_html(self):
+        """ Return a basic HTML representation of :class:`Gene` class.
+
+        :rtype: :class:`str`
+        """
         self.load_ncbi_info()
         db_refs = getattr(self, 'db_refs')
         external_links = []
@@ -123,13 +134,18 @@ class Gene:
 
 
 class GeneInfo(dict):
-
     def __init__(self, organism):
+        """ Load genes for given organism.
+
+        Each instance of :class:`Gene` is mapped to corresponding Entrez ID
+
+        :param organism: Taxonomy if (NCBI taxonomy database)
+        :type organism:  class:`str` or :class:`int`
+        """
         super().__init__()
+        self.__init_gene_info(organism)
 
-        self._init_gene_info(organism)
-
-    def _init_gene_info(self, organism):
+    def __init_gene_info(self, organism):
         for gene in GeneInfoDB().select_genes_by_organism(organism):
             gene_obj = Gene()
 
@@ -144,8 +160,14 @@ class GeneInfo(dict):
             self[gene_obj.gene_id] = gene_obj
 
     def get_gene_by_id(self, gene_id):
-        """ Search and return the Gene object for gene_id
+        """ Return the :class:`Gene` object for given gene_id
+
+        :param gene_id: Entrez ID (NCBI gene database)
+        :type gene_id: str or int
+
+        :rtype: :class:`Gene`
         """
+
         try:
             return self[int(gene_id)]
         except KeyError as e:
@@ -157,6 +179,12 @@ class GeneInfo(dict):
 class GeneMatcher:
 
     def __init__(self,  tax_id, **kwargs):
+        """ Gene name matching interface
+
+        :param tax_id: Taxonomy if (NCBI taxonomy database)
+        :type tax_id: str
+
+        """
         self._organism = ensure_type(tax_id, str)  # type: str
         self._genes = []                           # type: (List[Union[str, Gene]])
 
@@ -181,12 +209,34 @@ class GeneMatcher:
         self._genes = [Gene(input_name=gene) for gene in gene_data]
 
     def get_known_genes(self):
+        """ Return genes with known Entrez Id from NCBI gene database
+
+        Unknown genes are not included.
+
+        :rtype: :class:`list` of :class:`Gene` instances
+        """
         return [gene for gene in self.genes if gene.ncbi_id]
 
     def map_input_to_ncbi(self):
+        """ Return a map where key is a given input (gene name) and value is gene id (Entrez Id)
+
+        Unknown genes are not included.
+
+        :rtype: :class:`dict`
+        """
         return {gene.input_name: gene.ncbi_id for gene in self.genes if gene.ncbi_id}
 
     def match_table_attributes(self, data_table):
+        """ Helper function for gene name matching in data table.
+
+        Match table attributes and if a unique match is found create a new column attribute for Entrez Id.
+        Attribute name is defined here: `orangecontrib.bioinformatics.ncbi.gene.config.NCBI_ID`
+
+
+        :param data_table: data table
+        :type data_table: :class:`Orange.data.Table`
+
+        """
         input_gene_names = [var.name for var in data_table.domain.attributes]
 
         if input_gene_names:
@@ -265,11 +315,10 @@ class GeneMatcher:
     def run_matcher(self, progress_callback=None):
         """ This will try to match genes, with ncbi ids, based on provided input of genes.
 
-
-        Args:
-            progress_callback: Used for progress bar in widgets. It emits the signal back to main thread
+        :param progress_callback: Used for progress bar in widgets. It emits the signal back to main thread
 
         """
+
         if progress_callback:
             self._match(callback=progress_callback.emit)
         else:

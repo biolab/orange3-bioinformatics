@@ -1,11 +1,10 @@
-========
-Resolwe
-========
+=================================
+Resolwe module (:mod:`resolwe`)
+=================================
 .. automodule:: orangecontrib.bioinformatics.resolwe
 .. autofunction:: orangecontrib.bioinformatics.resolwe.connect
 
-.. autoclass:: orangecontrib.bioinformatics.resolwe.GenAPI
+.. autoclass:: GenAPI()
    :members:
-   :special-members: __init__
 
 

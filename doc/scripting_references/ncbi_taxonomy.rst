@@ -8,13 +8,13 @@ Organism Taxonomy (:mod:`taxonomy`)
 This module provides access to the `NCBI's organism taxonomy information
 <http://www.ncbi.nlm.nih.gov/Taxonomy/>`_ and organism name unification across different modules.
 
-.. autofunction:: name(tax_id)
-.. autofunction:: other_names(tax_id)
-.. autofunction:: search(string, onlySpecies=True, exact=False)
-.. autofunction:: lineage(taxid)
-.. autofunction:: common_taxids()
-.. autofunction:: common_taxid_to_name(tax_id)
-.. autofunction:: taxname_to_taxid(name)
+.. autofunction:: name
+.. autofunction:: other_names
+.. autofunction:: search
+.. autofunction:: lineage
+.. autofunction:: common_taxids
+.. autofunction:: common_taxid_to_name
+.. autofunction:: taxname_to_taxid
 
 Examples
 --------

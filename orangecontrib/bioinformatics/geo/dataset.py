@@ -39,6 +39,16 @@ class GDSInfo:
         An instance behaves like a dictionary: the keys are GEO DataSets IDs, and the dictionary values
         for is a dictionary providing various information about the particular data set.
 
+        Example
+        --------
+            >>> info = GDSInfo()
+            >>> list(info.keys())[:5]
+            ['GDS10', 'GDS100', 'GDS1001', 'GDS1002', 'GDS1003']
+            >>> info['GDS10']['title']
+            'Type 1 diabetes gene expression profiling'
+            >>> info['GDS10']['platform_organism']
+            'Mus musculus'
+
         """
 
         path = serverfiles.localpath_download(DOMAIN, GDS_INFO_FILENAME)
@@ -72,13 +82,14 @@ class GDS:
         It first checks a local cache directory if the particular data file is loaded locally,
         else it downloads it from `NCBI's GEO FTP site <ftp://ftp.ncbi.nih.gov/pub/geo/DATA/SOFT/GDS/>`_.
 
-        Args:
-            gds_name: An NCBI's ID for the data set in the form "GDSn" where "n" is a GDS ID number.
-            remove_unknown: Remove spots with sample profiles that include unknown values. They are removed
-                            if the proportion of samples with unknown values is above the threshold set by
-                            ``remove_unknown``. If None, nothing is removed.
+        :param gds_name: An NCBI's ID for the data set in the form "GDSn" where "n" is a GDS ID number.
+
+        :param remove_unknown: Remove spots with sample profiles that include unknown values. They are removed
+                               if the proportion of samples with unknown values is above the threshold set by
+                               ``remove_unknown``. If None, nothing is removed.
 
         """
+
         self.gds_name = gds_name
         self.filename = serverfiles.localpath(DOMAIN, self.gds_name + '.soft.gz')
         gds_ensure_downloaded(self.gds_name)
@@ -251,23 +262,18 @@ class GDS:
 
     def get_data(self, report_genes=True, merge_function=spots_mean, sample_type=None, transpose=False):
         """
-        Args:
-            report_genes: Microarray spots reported in the GEO data set can either be merged according to their
-                          gene ids (if True) or can be left as spots.
 
-            sample_type: the type of annotation, or (if :obj:`transpose` is True) the type of class labels to be
-                         included in the data set. The entire annotation of samples will be included either
-                         in the class value or in the ``.attributes`` field of each data set attribute.
+        :param bool report_genes: Microarray spots reported in the GEO data set can either be merged according to their
+                             gene ids (if True) or can be left as spots.
+        :param sample_type: the type of annotation, or (if :obj:`transpose` is True) the type of class labels to be
+                            included in the data set. The entire annotation of samples will be included either
+                            in the class value or in the ``.attributes`` field of each data set attribute.
+        :param transpose: The output table can have spots/genes in rows and samples in columns
+                         (False, default) or samples in rows and  spots/genes in columns (True).
 
-            transpose: The output table can have spots/genes in rows and samples in columns
-                       (False, default) or samples in rows and  spots/genes in columns (True).
+        :param merge_function:
 
-
-
-            merge_function:
-
-        Returns: the GEO DataSet as an :obj:`Orange.data.Table`.
-
+        :return: the GEO DataSet as an :obj:`Orange.data.Table`.
         """
 
         return self._to_orange_data_table(merge_function=merge_function, sample_type=sample_type,
