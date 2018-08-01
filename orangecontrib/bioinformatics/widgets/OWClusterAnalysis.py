@@ -21,8 +21,7 @@ from Orange.widgets.utils import itemmodels
 from Orange.data import StringVariable, DiscreteVariable, Table, Domain
 
 from orangecontrib.bioinformatics.widgets.utils.data import (
-    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE,
-    ERROR_ON_MISSING_ANNOTATION, ERROR_ON_MISSING_GENE_ID, ERROR_ON_MISSING_TAX_ID
+    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
 )
 from orangecontrib.bioinformatics.utils.statistics import hypergeometric_test_vector
 from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSetsSelection, GeneScoringWidget
@@ -48,13 +47,12 @@ class OWClusterAnalysis(OWWidget):
         pass
 
     class Warning(OWWidget.Warning):
-        mannwhitneyu = Msg('{}, {}.')
+        gene_enrichment = Msg('{}, {}.')
         no_selected_gene_sets = Msg('No gene set selected, select them from Gene Sets box.')
 
     class Error(OWWidget.Error):
-        missing_annotation = Msg(ERROR_ON_MISSING_ANNOTATION)
-        missing_gene_id = Msg(ERROR_ON_MISSING_GENE_ID)
-        missing_tax_id = Msg(ERROR_ON_MISSING_TAX_ID)
+        no_cluster_indicator = Msg('No cluster indicator in the input data')
+        gene_as_attributes = Msg('Genes, in the input data, are expected as column names')
         organism_mismatch = Msg('Organism in input data and custom gene sets does not match')
 
     settingsHandler = DomainContextHandler()
@@ -303,7 +301,7 @@ class OWClusterAnalysis(OWWidget):
 
             self.cluster_info_model.score_genes(design, self.input_data.X, self.rows_by_cluster, method)
         except ValueError as e:
-            self.Warning.mannwhitneyu(str(e), 'p-values are set to 1')
+            self.Warning.gene_enrichment(str(e), 'p-values are set to 1')
 
     def __gene_sets_enrichment(self):
         if self.input_data:
@@ -331,8 +329,7 @@ class OWClusterAnalysis(OWWidget):
 
     def invalidate(self):
         if self.input_data is not None and self.tax_id is not None:
-            self.Warning.clear()
-            self.Error.clear()
+            self.Warning.gene_enrichment.clear()
 
             self.__set_genes()
             self.__set_clusters()
@@ -381,17 +378,11 @@ class OWClusterAnalysis(OWWidget):
             self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
             self.gene_id_attribute = self.input_data.attributes.get(GENE_ID_ATTRIBUTE, None)
 
-            if self.use_attr_names is not None and self.gene_id_attribute is None:
-
-                if self.tax_id is None:
-                    self.Error.missing_annotation()
-                    return
-
-                self.Error.missing_gene_id()
+            if not self.cluster_indicator_model:
+                self.Error.no_cluster_indicator()
                 return
-
-            elif self.tax_id is None:
-                self.Error.missing_tax_id()
+            elif not self.use_attr_names:
+                self.Error.gene_as_attributes()
                 return
 
             self.openContext(self.input_data.domain)
@@ -404,6 +395,7 @@ class OWClusterAnalysis(OWWidget):
 
             if self.custom_data:
                 self.refresh_custom_gene_sets()
+                self._handle_future_model()
                 self.handle_custom_gene_sets()
 
     @Inputs.custom_sets
@@ -427,12 +419,14 @@ class OWClusterAnalysis(OWWidget):
             self.custom_gene_id_attribute = self.custom_data.attributes.get(GENE_ID_ATTRIBUTE, None)
             self.custom_gene_id_column = self.custom_data.attributes.get(GENE_ID_COLUMN, None)
 
-        self.gs_label_combobox.setDisabled(True)
-        self.refresh_custom_gene_sets()
-        self.handle_custom_gene_sets()
+            self._handle_future_model()
 
         if self.input_data:
             self.openContext(self.input_data.domain)
+
+        self.gs_label_combobox.setDisabled(True)
+        self.refresh_custom_gene_sets()
+        self.handle_custom_gene_sets()
 
     def __check_organism_mismatch(self):
         """ Check if organisms from different inputs match.
@@ -454,11 +448,8 @@ class OWClusterAnalysis(OWWidget):
                 self.custom_gene_set_indicator = None
 
     def handle_custom_gene_sets(self):
-        self._handle_future_model()
-
         if self.custom_gene_set_indicator:
             if self.custom_data is not None and self.custom_gene_id_column is not None:
-
                 if self.__check_organism_mismatch():
                     self.gs_label_combobox.setDisabled(True)
                     self.Error.organism_mismatch()
@@ -479,6 +470,8 @@ class OWClusterAnalysis(OWWidget):
                 except GeneSetException:
                     pass
                 self.gs_label_combobox.setDisabled(False)
+            else:
+                self.gs_widget.update_gs_hierarchy()
 
         self.__gene_sets_enrichment()
         self.__update_info_box()
