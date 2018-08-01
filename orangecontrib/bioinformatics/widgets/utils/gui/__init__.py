@@ -4,13 +4,19 @@ from numbers import Integral, Real
 from typing import Sequence
 
 from AnyQt.QtWidgets import (
-    QFrame, QStyledItemDelegate
+    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QApplication, QFrame,
+)
+
+from AnyQt.QtGui import (
+    QAbstractTextDocumentLayout, QTextDocument
 )
 
 from AnyQt.QtCore import (
-    Qt, QSortFilterProxyModel,
+    Qt, QSortFilterProxyModel, QSize
 )
 
+from .gene_sets import GeneSetsSelection
+from .gene_scoring import GeneScoringWidget, gene_scoring_method
 from .list_completer import TokenListCompleter
 from .label_selection import (
     standarditem_from, group_candidates, itemselection, RowGroup, ColumnGroup, group_selection_mask,
@@ -91,3 +97,48 @@ class NumericalColumnDelegate(QStyledItemDelegate):
         if align is None and isinstance(data, Real):
             # Right align if the model does not specify otherwise
             option.displayAlignment = Qt.AlignRight | Qt.AlignVCenter
+
+
+class HTMLDelegate(QStyledItemDelegate):
+    """
+    https://stackoverflow.com/questions/1956542/how-to-make-item-view-render-rich-html-text-in-qt
+    https://stackoverflow.com/questions/2375763/how-to-open-an-url-in-a-qtableview
+    """
+
+    def sizeHint(self, option, index):
+        options = QStyleOptionViewItem(option)
+        gene_obj = index.data(Qt.DisplayRole)
+        self.initStyleOption(options, index)
+
+        doc = QTextDocument()
+        doc.setHtml(gene_obj.to_html())
+        doc.setTextWidth(options.rect.width() - 10)
+
+        return QSize(doc.idealWidth(), doc.size().height())
+
+    def paint(self, painter, option, index):
+        options = QStyleOptionViewItem(option)
+        row_obj = index.data(Qt.DisplayRole)
+        self.initStyleOption(options, index)
+        # print(option.rect.width())
+        style = QApplication.style() if options.widget is None else options.widget.style()
+
+        doc = QTextDocument()
+        doc.setHtml(row_obj.to_html())
+        doc.setTextWidth(option.rect.width() - 10)
+
+        # doc.setPageSize(300)
+        # print(doc.loadResource(3))
+
+        options.text = ""
+        style.drawControl(QStyle.CE_ItemViewItem, options, painter)
+
+        ctx = QAbstractTextDocumentLayout.PaintContext()
+
+        text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, options)
+        painter.save()
+        painter.translate(text_rect.topLeft())
+        painter.setClipRect(text_rect.translated(-text_rect.topLeft()))
+        doc.documentLayout().draw(painter, ctx)
+
+        painter.restore()

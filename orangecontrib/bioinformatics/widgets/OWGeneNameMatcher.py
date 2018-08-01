@@ -11,7 +11,6 @@ from AnyQt.QtWidgets import (
 )
 from AnyQt.QtCore import (
     Qt, QSize, QThreadPool, QAbstractTableModel, QVariant, QModelIndex
-
 )
 from AnyQt.QtGui import (
     QFont, QColor

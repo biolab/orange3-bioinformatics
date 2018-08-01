@@ -1,9 +1,46 @@
 import math
+import scipy
 import threading
 import numpy as np
 
+from typing import Tuple, Union
 
 from scipy.stats import hypergeom
+
+
+def score_t_test(a, b, **kwargs):
+    # type: (np.array, np.array) -> Tuple[Union[float, np.array], Union[float, np.array]]
+    """ Run t-test
+
+    :returns (statistics, p_values)
+
+    See also
+    --------
+    scipy.stats.ttest_ind
+
+    """
+    return scipy.stats.ttest_ind(a, b, axis=kwargs.get('axis', 0))
+
+
+def score_mann_whitney(a, b, **kwargs):
+    axis = kwargs.get('axis', 0)
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+
+    if not 0 <= axis < 2:
+        raise ValueError("Axis")
+
+    if a.ndim != b.ndim:
+        raise ValueError
+
+    if axis >= a.ndim:
+        raise ValueError
+
+    if axis == 0:
+        a, b = a.T, b.T
+
+    res = [scipy.stats.mannwhitneyu(a_, b_) for a_, b_ in zip(a, b)]
+    statistics, p_values = zip(*res)
+    return np.array(statistics), np.array(p_values)
 
 
 def hypergeometric_test(X, cluster, treshold):
@@ -15,14 +52,14 @@ def hypergeometric_test(X, cluster, treshold):
     # Test Parameters
     M, G = X.shape
     N = len(cluster)
-    n_expr = Y.sum(axis=0) # Number of cells expressing genes (overall)
-    n_expr_clust = Y[cluster,].sum(axis=0)
+    n_expr = Y.sum(axis=0)  # Number of cells expressing genes (overall)
+    n_expr_clust = Y[cluster, ].sum(axis=0)
 
     # Test results --- both directions
     # Note: cumulatives do not sum to 1 because of overlap at 1 point
     test = np.array(list(map(lambda t: (hypergeom.cdf(k=t[1], n=t[0], M=M, N=N),
                                         hypergeom.sf(k=t[1]+1, n=t[0], M=M, N=N)),
-                                     zip(n_expr, n_expr_clust))))
+                             zip(n_expr, n_expr_clust))))
     pvalues = test.min(axis=1)
     signs = 2 * np.argmin(test, axis=1) - 1
     scores = -np.log(pvalues) * signs
@@ -39,8 +76,8 @@ def hypergeometric_test_vector(a, b, threshold=1):
     # Test Parameters
     M = len(A) + len(B)
     N = len(A)
-    n_expr = A.sum(axis=0) + B.sum(axis=0) # Number of cells expressing genes (overall)
-    n_expr_clust = A.sum(axis=0)           # Number of cells expressing genes (in cluster)
+    n_expr = A.sum(axis=0) + B.sum(axis=0)  # Number of cells expressing genes (overall)
+    n_expr_clust = A.sum(axis=0)            # Number of cells expressing genes (in cluster)
 
     # Test results --- both tails
     # Note: cumulatives do sum to >1 due to overlap at 1 point
@@ -52,7 +89,6 @@ def hypergeometric_test_vector(a, b, threshold=1):
     signs = np.sign(under - over)
     scores = -np.log(pvalues) * signs
     return scores, pvalues
-
 
 
 def _lngamma(z):
@@ -141,7 +177,7 @@ class Binomial(LogBin):
     def p_value(self, k, N, m, n):
         """ The probability that k or more tests are positive. """
         if n - k + 1 <= k:
-            #starting from k gives the shorter list of values
+            # starting from k gives the shorter list of values
             return sum(self.__call__(i, N, m, n) for i in range(k, n+1))
         else:
             value = 1.0 - sum(self.__call__(i, N, m, n) for i in range(k))
