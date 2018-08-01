@@ -40,7 +40,7 @@ class GeneSetsSelection(QWidget):
         # delete any custom sets if they exists
         self.gs_object.delete_sets_by_hierarchy(self.custom_set_hier)
 
-    def add_custom_sets(self, gene_sets_names, gene_names, hierarchy_title=None):
+    def add_custom_sets(self, gene_sets_names, gene_names, hierarchy_title=None, select_customs_flag=False):
         # type: (np.ndarray, np.ndarray) -> None
 
         self.custom_set_hier = hierarchy_title
@@ -59,7 +59,7 @@ class GeneSetsSelection(QWidget):
                                   genes=set(value)))
 
         self.gs_object.update(g_sets)
-        self.update_gs_hierarchy()
+        self.update_gs_hierarchy(select_customs_flag=select_customs_flag)
 
     def load_gene_sets(self, tax_id):
         # type: (str) -> None
@@ -83,10 +83,13 @@ class GeneSetsSelection(QWidget):
         # reset hierarchy widget state
         self.hierarchy_tree_widget.clear()
 
-    def update_gs_hierarchy(self):
+    def update_gs_hierarchy(self, select_customs_flag=False):
         self.clear()
         self.set_hierarchy_model(self.hierarchy_tree_widget, self.hierarchy_tree(self.gs_object.hierarchies()))
-        self.set_selected_hierarchies()
+        if select_customs_flag:
+            self.set_custom_sets()
+        else:
+            self.set_selected_hierarchies()
 
     def set_hierarchy_model(self, tree_widget, sets):
 
@@ -162,6 +165,21 @@ class GeneSetsSelection(QWidget):
 
         if len(self.get_hierarchies(only_selected=True)) == 0:
             [item.setCheckState(0, Qt.Checked) for item in defaults]
+
+    def set_custom_sets(self):
+        iterator = QTreeWidgetItemIterator(self.hierarchy_tree_widget, QTreeWidgetItemIterator.All)
+
+        while iterator.value():
+
+            # note: if hierarchy value is not a tuple, then this is just top level qTreeWidgetItem that
+            #       holds subcategories. We don't want to display all sets from category
+            if type(iterator.value().hierarchy) is not str:
+                if iterator.value().hierarchy == self.custom_set_hier:
+                    iterator.value().setCheckState(0, Qt.Checked)
+                else:
+                    iterator.value().setCheckState(0, Qt.Unchecked)
+
+            iterator += 1
 
     @staticmethod
     def hierarchy_tree(gene_sets):

@@ -426,7 +426,7 @@ class OWClusterAnalysis(OWWidget):
 
         self.gs_label_combobox.setDisabled(True)
         self.refresh_custom_gene_sets()
-        self.handle_custom_gene_sets()
+        self.handle_custom_gene_sets(select_customs_flag=True)
 
     def __check_organism_mismatch(self):
         """ Check if organisms from different inputs match.
@@ -447,9 +447,10 @@ class OWClusterAnalysis(OWWidget):
             else:
                 self.custom_gene_set_indicator = None
 
-    def handle_custom_gene_sets(self):
+    def handle_custom_gene_sets(self, select_customs_flag=False):
         if self.custom_gene_set_indicator:
             if self.custom_data is not None and self.custom_gene_id_column is not None:
+
                 if self.__check_organism_mismatch():
                     self.gs_label_combobox.setDisabled(True)
                     self.Error.organism_mismatch()
@@ -466,7 +467,9 @@ class OWClusterAnalysis(OWWidget):
                 gene_names, _ = self.custom_data.get_column_view(self.custom_gene_id_column)
                 hierarchy_title = (self.custom_data.name if self.custom_data.name else 'Custom sets', )
                 try:
-                    self.gs_widget.add_custom_sets(gene_sets_names, gene_names, hierarchy_title=hierarchy_title)
+                    self.gs_widget.add_custom_sets(
+                        gene_sets_names, gene_names,
+                        hierarchy_title=hierarchy_title, select_customs_flag=select_customs_flag)
                 except GeneSetException:
                     pass
                 self.gs_label_combobox.setDisabled(False)
