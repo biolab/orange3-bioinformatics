@@ -23,7 +23,7 @@ from Orange.data import StringVariable, DiscreteVariable, Table, Domain
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
 )
-from orangecontrib.bioinformatics.utils.statistics import hypergeometric_test_vector
+from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_test
 from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSetsSelection, GeneScoringWidget
 from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, DISPLAY_GENE_SETS_COUNT
 from orangecontrib.bioinformatics.geneset.utils import GeneSetException
@@ -54,13 +54,16 @@ class OWClusterAnalysis(OWWidget):
         no_cluster_indicator = Msg('No cluster indicator in the input data')
         gene_as_attributes = Msg('Genes, in the input data, are expected as column names')
         organism_mismatch = Msg('Organism in input data and custom gene sets does not match')
+        cluster_batch_conflict = Msg('Cluster and batch must not be the same variable')
 
     settingsHandler = DomainContextHandler()
     cluster_indicator = ContextSetting(None)
+    batch_indicator = ContextSetting(None)
     stored_gene_sets_selection = ContextSetting(tuple())
 
     scoring_method_selection = ContextSetting(0)
     scoring_method_design = ContextSetting(0)
+    scoring_test_type = ContextSetting(0)
 
     # genes filter
     max_gene_count = Setting(20)
@@ -109,6 +112,7 @@ class OWClusterAnalysis(OWWidget):
         self.num_of_custom_sets = None
 
         self.rows_by_cluster = None
+        self.rows_by_batch = None
         self.clusters = []
 
         # data model
@@ -126,11 +130,22 @@ class OWClusterAnalysis(OWWidget):
                                                    sendSelectedValue=True,
                                                    callback=self.invalidate)
 
+        # Batch selection
+        self.batch_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,),
+                                                            placeholder="")
+        box = widgetBox(self.controlArea, 'Batch Indicator')
+        self.batch_indicator_combobox = comboBox(box, self, 'batch_indicator',
+                                                   model=self.batch_indicator_model,
+                                                   sendSelectedValue=True,
+                                                   callback=self.invalidate)
+
+
         # Gene scoring
         box = widgetBox(self.controlArea, 'Gene Scoring')
         self.gene_scoring = GeneScoringWidget(box, self)
         self.gene_scoring.set_method_selection_area('scoring_method_selection')
         self.gene_scoring.set_method_design_area('scoring_method_design')
+        self.gene_scoring.set_test_type('scoring_test_type')
 
         # Gene Sets widget
         gene_sets_box = widgetBox(self.controlArea, "Gene Sets")
@@ -252,6 +267,14 @@ class OWClusterAnalysis(OWWidget):
                 self.clusters.append(cluster)
                 cluster.set_genes(self.input_genes_names, self.input_genes_ids)
 
+    def __set_batch(self):
+        self.rows_by_batch = None
+        if self.batch_indicator == self.cluster_indicator:
+            self.Error.cluster_batch_conflict()
+            return
+        if self.batch_indicator and self.input_data:
+            self.rows_by_batch = np.asarray(self.input_data.get_column_view(self.batch_indicator)[0], dtype=int)
+
     def __set_genes(self):
         self.input_genes_names = []
         self.input_genes_ids = []
@@ -292,14 +315,20 @@ class OWClusterAnalysis(OWWidget):
     def __gene_enrichment(self):
         # TODO: move this to the worker thread
         design = bool(self.gene_scoring.get_selected_desig())  # if true cluster vs. cluster else cluster vs rest
+        test_type = self.gene_scoring.get_selected_test_type()
         method = self.gene_scoring.get_selected_method()
-
         try:
-            if method.score_function == hypergeometric_test_vector:
-                if len(np.unique(self.input_data.X)) != 2:
-                    raise ValueError('Binary data expected')
+            if method.score_function == score_hypergeometric_test:
+                values = set(np.unique(self.input_data.X))
+                if (0 not in values) or (len(values) != 2):
+                    raise ValueError('Binary data expected (use Preprocess)')
 
-            self.cluster_info_model.score_genes(design, self.input_data.X, self.rows_by_cluster, method)
+            self.cluster_info_model.score_genes(design=design,
+                                                table_x=self.input_data.X,
+                                                rows_by_cluster=self.rows_by_cluster,
+                                                rows_by_batch = self.rows_by_batch,
+                                                method=method,
+                                                alternative=test_type)
         except ValueError as e:
             self.Warning.gene_enrichment(str(e), 'p-values are set to 1')
 
@@ -333,6 +362,7 @@ class OWClusterAnalysis(OWWidget):
 
             self.__set_genes()
             self.__set_clusters()
+            self.__set_batch()
             self.__set_cluster_info_model()
 
             # note: when calling self.__gene_enrichment we calculate gse automatically.
@@ -361,6 +391,10 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_indicator_model.set_domain(None)
         self.cluster_info_view.setModel(None)
 
+        self.batch_indicator = None
+        self.cluster_indicator_model.set_domain(None)
+        self.batch_indicator_model.set_domain(None)
+
         self.__update_info_box()
 
         if data:
@@ -373,6 +407,7 @@ class OWClusterAnalysis(OWWidget):
                                 if isinstance(class_var, DiscreteVariable) and len(class_var.values) > 1]
             domain = Domain([], class_vars=class_vars, metas=class_vars_metas)
             self.cluster_indicator_model.set_domain(domain)
+            self.batch_indicator_model.set_domain(domain)
 
             self.tax_id = self.input_data.attributes.get(TAX_ID, None)
             self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
@@ -390,6 +425,8 @@ class OWClusterAnalysis(OWWidget):
             self.gs_widget.load_gene_sets(self.tax_id)
             if self.cluster_indicator_model:
                 self.cluster_indicator = self.cluster_indicator_model[0]
+            if self.batch_indicator_model:
+                self.batch_indicator = self.batch_indicator_model[0]
 
             self.invalidate()
 
@@ -521,7 +558,7 @@ if __name__ == "__main__":
         app = QApplication(list(argv) if argv else [])
 
         w = OWClusterAnalysis()
-        data = Table('https://datasets.orange.biolab.si/sc/aml-1k.pickle')
+        data = Table("https://datasets.orange.biolab.si/sc/aml-1k.pickle")
         w.show()
         w.handle_input(data)
         # w.cluster_indicator.initialize(data)

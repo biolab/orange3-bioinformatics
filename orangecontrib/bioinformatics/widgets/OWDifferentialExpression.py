@@ -23,7 +23,7 @@ from Orange.widgets.utils.datacaching import data_hints
 from orangecontrib.bioinformatics.widgets.utils.settings import SetContextHandler
 from orangecontrib.bioinformatics.widgets.utils import gui as guiutils
 from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME
-from orangecontrib.bioinformatics.utils.statistics import hypergeometric_test_vector
+from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_test
 
 
 def score_fold_change(a, b, **kwargs):
@@ -232,7 +232,7 @@ class InfiniteLine(pg.InfiniteLine):
 def hypergeometric_test_score(*args, **kwargs):
 
     expression_treshold = kwargs.get('treshold', None)
-    scores, _ = hypergeometric_test_vector(*args, expression_treshold)
+    scores, _ = score_hypergeometric_test(*args, expression_treshold)
     return scores
 
 
