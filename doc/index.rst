@@ -10,7 +10,7 @@ Widgets
    widgets/databasesupdate
    widgets/geodatasets
    widgets/dictyExpress
-   widgets/differentialexpression
+   widgets/differential_expression.md
    widgets/geneinfo
    widgets/gobrowser
    widgets/keggpathways
