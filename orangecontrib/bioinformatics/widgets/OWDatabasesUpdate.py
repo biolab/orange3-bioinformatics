@@ -16,9 +16,8 @@ from AnyQt.QtCore import (
 from AnyQt.QtWidgets import (
     QWidget, QTreeWidget, QTreeWidgetItem, QToolButton,
     QCheckBox, QLabel, QLineEdit, QStyledItemDelegate,
-    QApplication, QAbstractItemView, QSizePolicy, QHBoxLayout, QPushButton, QDialog, QVBoxLayout,
-    QDialogButtonBox, QComboBox, QFileDialog
-)
+    QApplication, QAbstractItemView, QHBoxLayout, QPushButton, QDialog, QVBoxLayout,
+    QDialogButtonBox, QComboBox, QFileDialog)
 from Orange.widgets.widget import OWWidget
 from Orange.widgets import gui
 
@@ -177,7 +176,9 @@ class OWDatabasesUpdate(OWWidget):
 
         box.layout().addWidget(self.filesView)
 
-        box = gui.widgetBox(self.controlArea, orientation="horizontal")
+        layout = QHBoxLayout()
+        gui.widgetBox(self.controlArea, margin=0, orientation=layout)
+
         self.updateButton = gui.button(
             box, self, "Update all",
             callback=self.update_all,
@@ -195,31 +196,22 @@ class OWDatabasesUpdate(OWWidget):
             tooltip="Cancel scheduled downloads/updates."
         )
 
-        # add empty label to separate button.
-        # TODO: is there better way of doing this?
-        box.layout().addWidget(QLabel(), Qt.AlignRight)
-
         self.addButton = gui.button(
             box, self, "Add ...", callback=self.__handle_dialog,
             tooltip="Add files for personal use."
         )
 
-        self.retryButton = gui.button(
-            box, self, "Reconnect", callback=self.initialize_files_view
-        )
-        self.retryButton.hide()
+        layout.addWidget(self.updateButton)
+        layout.addWidget(self.downloadButton)
+        layout.addWidget(self.cancelButton)
+        layout.addStretch()
+        layout.addWidget(self.addButton)
 
-        # gui.rubber(box)
-        self.warning(0)
-
-        box = gui.widgetBox(self.controlArea, orientation="horizontal")
-        gui.rubber(box)
-
-        self.infoLabel = QLabel()
-        self.infoLabel.setAlignment(Qt.AlignCenter)
-
-        self.controlArea.layout().addWidget(self.infoLabel)
-        self.infoLabel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        # Enable retryButton once connection is established
+        # self.retryButton = gui.button(
+        #     box, self, "Reconnect", callback=self.initialize_files_view
+        # )
+        # self.retryButton.hide()
 
         self.resize(800, 600)
 
@@ -255,7 +247,7 @@ class OWDatabasesUpdate(OWWidget):
         print(ex)
 
     def initialize_files_view(self):
-        self.retryButton.hide()
+        # self.retryButton.hide()
 
         # clear view
         self.filesView.clear()
