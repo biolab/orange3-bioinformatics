@@ -12,13 +12,13 @@ Signals
 
 -   **Data**
 
-    Data set.
-
 **Outputs**:
 
--   **Selected data**
+-   **Data subset**
 
-    Data subset.
+-   **Remaining data subset**
+
+-   **Selected genes**
 
 Description
 -----------
@@ -29,7 +29,7 @@ sample target. It takes gene expression data as an input (from
 **dictyExpress**, **PIPAx**, etc.) and outputs a selected data subset
 (normally the most interesting genes).
 
-![](images/differential_expression/diff_expression_stamped.png)
+![](images/differential_expression/differential_expression.png)
 
 1.  Information of the data input and output. The first line shows the
     number of samples and genes in the data set. The second line
@@ -45,6 +45,7 @@ sample target. It takes gene expression data as an input (from
     -   **ANOVA (P-value)**: variance distribution with P-value as criterium
     -   [Signal to NoiseRatio](https://en.wikipedia.org/wiki/Signal-to-noise_ratio): biological signal to noise ratio
     -   [Mann-Whitney](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test): non-parametric test of null hypothesis with P-value as criterium
+    -   [Hypergeometric test](https://en.wikipedia.org/wiki/Hypergeometric_distribution#Hypergeometric_test): for binary expression data.
 
 3.  Select *Target Labels*. Labels depend on the attributes in the
     input. In *Values* you can change the sample target (default value
@@ -62,14 +63,11 @@ sample target. It takes gene expression data as an input (from
 Example
 -------
 
-In the example below we chose two experiments from the **PIPAx** widget
-( 8 experiments measuring gene expression levels on *Dictyostelium
-discoideum* at different timepoints) and observed them in the **Data
-Table**. Then we used the **Differential Expression** widget to select
-the most interesting genes. We left upper and lower threshold at default
-(1 and -1) and output the data. Then we observed the selected data in
-another **Data Table**. As we have ticked the *Add gene scores to
-output*, the table shows an additional column with gene scores as
-instances.
+From the GEO Data Sets widget, we selected the data on breast cancer (GDS360) with
+14 treatment resistand and 10 treatment sensitive tumors and observed them in the **Data
+Table**. Then we used the **Differential Expression** widget to select the most interesting
+genes. We left upper and lower threshold at default (1 and -1) and output the data.
+Then we observed the selected data in another **Data Table**. The table shows an additional
+column with gene scores as instances.
 
-![](images/differential_expression/data_profiles_example.png)
+![](images/differential_expression/differential_expression_example.png)
