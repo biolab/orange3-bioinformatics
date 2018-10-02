@@ -1,47 +1,20 @@
 GO Browser
 ==========
 
-![](icons/go-browser.png)
-
 Provides access to Gene Ontology database.
 
-Signals
--------
+**Inputs**
+- Cluster Data: Data on clustered genes.
+- Reference Data: Data with genes for the reference set (optional).
 
-**Inputs**:
+**Outputs**
+- Data on Selected Genes: Data on genes from the selected GO node.
+- Enrichment Report: Data on GO enrichment analysis.
 
--   **Cluster Data**
 
-    Data on clustered genes.
+**GO Browser** widget provides access to [Gene Ontology database](http://geneontology.org/). Gene Ontology (GO) classifies genes and gene products to terms organized in a graph structure called an ontology. The widget takes any data on genes as an input (it is best to input statistically significant genes, for example from the output of the **Differential Expression** widget) and shows a ranked list of GO terms with p-values. This is a great tool for finding biological processes that are over- or under-represented in a particular gene set. The user can filter input data by selecting terms in a list.
 
--   **Reference Data**
-
-    Data with genes for the reference set (optional).
-
-**Outputs**:
-
--   **Data on Selected Genes**
-
-    Data on genes from the selected GO node.
-
--   **Enrichment Report**
-
-    Data on GO enrichment analysis.
-
-Description
------------
-
-**GO Browser** widget provides access to [Gene Ontology
-database](http://geneontology.org/). Gene Ontology (GO) classifies genes
-and gene products to terms organized in a graph structure called an
-ontology. The widget takes any data on genes as an input (it is best to
-input statistically significant genes, for example from the output of
-the **Differential Expression** widget) and shows a ranked list of GO
-terms with p-values. This is a great tool for finding biological
-processes that are over- or under-represented in a particular gene set.
-The user can filter input data by selecting terms in a list.
-
-![](images/go_browser/go_browser.png)
+![](images/go_browser/GO-Browser-stamped.png)
 
 **INPUT tab**
 
@@ -78,7 +51,7 @@ The user can filter input data by selecting terms in a list.
     -   [Enrichment](http://geneontology.org/page/go-enrichment-analysis)
         level
 
-![](images/go_browser/go_browser_side_bar.png)
+![](images/go_browser/Filter-Select.png)
 
 **FILTER tab**
 
@@ -120,14 +93,13 @@ Example
 -------
 
 In the example below we have used **GEO Data Sets** widget, in which we
-have selected *Caffeine effects: time course and dose response* data
-set, and connected it to a **Differential Analysis**. Differential
+have selected *Caffeine effects: time course and dose response* data set, and connected it to a **Differential Expression**. Differential
 analysis allows us to select genes with the highest statistical
-relevance (we used ANOVA scoring) and feed them to **GO Browser**. This
+relevance (we used ANOVA scoring and agent label) and feed them to **GO Browser**. This
 widget lists four biological processes for our selected genes. Say we
-are interested in finding out more about *monosaccharide transport* as
+are interested in finding out more about *monosaccharide transmembrane transport* as
 this term has a high enrichment rate. To learn more about which genes
-are annotated to this GO term we view it in the **Data Table**, where we
-see all the genes participating in this process listed.
+are annotated to this GO term, select it in the view and observe the results in a **Data Table**, where we
+see all the genes participating in this process listed. The other output of **GO Browser** widget is enrichment report, which we observe in the second **Data Table**.
 
-![](images/go_browser/go_browser_example.png)
+![](images/go_browser/GO-Browser-Example.png)

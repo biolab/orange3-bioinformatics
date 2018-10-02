@@ -1,28 +1,17 @@
 GEO Data Sets
 =============
 
-![](icons/geo-data-sets.png)
-
 Provides access to data sets from gene expression omnibus [GEO
 DataSets](http://www.ncbi.nlm.nih.gov/gds).
 
-Signals
--------
+**Inputs**
+- None
 
-**Inputs**:
+**Outputs**
+- Expression data: Data set selected in the widget with genes or samples in rows.
 
--   (None)
 
-**Outputs**:
-
--   **Expression data**
-
-    Data set selected in the widget with genes or samples in rows.
-
-Description
------------
-
-[GEO DataSets](http://www.ncbi.nlm.nih.gov/gds) is a data base of gene
+[GEO DataSets](http://www.ncbi.nlm.nih.gov/gds) is a database of gene
 expression curated profiles maintained by
 [NCBI](http://www.ncbi.nlm.nih.gov/) and included in the [Gene
 Expression Omnibus](http://www.ncbi.nlm.nih.gov/geo/info/datasets.html).
@@ -30,7 +19,7 @@ This Orange widget provides access to all its data sets and outputs a
 data set selected for further processing. For convenience, each
 dowloaded data set is stored locally.
 
-![](images/geo_data_sets/geo_data_sets.png)
+![](images/geo_data_sets/GEO-Data-Sets-stamped.png)
 
 1.  Information on the GEO data set collection. Cached data sets are the
     ones currently stored on the computer.
@@ -54,10 +43,6 @@ dowloaded data set is stored locally.
 Example
 -------
 
-**GEO Data Sets** is similar to the **File** widget. In the example
-below we selected *Caffeine effect: time course and dose response*
-dataset from the GEO data base and used *Genes in rows* option. We
-inspected the data in *Data Table*. Then we selected 3 samples in the
-**Select Columns** widget for a detailed analysis in another data table.
+**GEO Data Sets** is similar to the **File** widget, since it is used to load the data. In the example below we selected *Caffeine effect: time course and dose response* dataset from the GEO data base. Do not forget to press *Commit* to output the data. We can inspect the data in *Data Table*.
 
-![](images/geo_data_sets/geo_data_sets_example.png)
+![](images/geo_data_sets/GEO-Data-Sets-Example.png)

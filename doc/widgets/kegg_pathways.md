@@ -1,35 +1,16 @@
 KEGG Pathways
 =============
 
-![](icons/kegg-pathways.png)
-
 Diagrams of molecular interactions, reactions, and relations.
 
-Signals
--------
+**Inputs**
+- Data: Data set.
+- Reference: Referential data set.
 
-**Inputs**:
+**Outputs**
+- Selected Data: Data subset.
+- Unselected Data: Remaining data.
 
--   **Data**
-
-    Data set.
-
--   **Reference**
-
-    Referential data set.
-
-**Outputs**:
-
--   **Selected Data**
-
-    Data subset.
-
--   **Unselected Data**
-
-    Remaining data.
-
-Description
------------
 
 **KEGG Pathways** widget displays diagrams of molecular interactions,
 reactions and relations from the [KEGG Pathways
@@ -39,7 +20,7 @@ and displays a list of corresponding pathways. To explore the pathway,
 the user can click on any process from the list or arrange them by
 P-value to get the most relevant processes at the top.
 
-![](images/kegg_pathways/kegg_pathway.png)
+![](images/kegg_pathways/KEGG-Pathways-stamped.png)
 
 1.  Information on the input genes.
 2.  If you have a separate reference set in the input, tick *From
@@ -54,3 +35,10 @@ P-value to get the most relevant processes at the top.
 7.  A list of pathways either as processes or in full orthology. Click
     on the process to display the pathway. You can sort the data by
     P-value to get the most relevant results at the top.
+
+Example
+-------
+
+This simple example shows how to visualize interactions with **KEGG Pathways**. We have loaded the *Caffeine effect: time courses and dose response* (GDS2914) data with the **GEO Data Sets** widget. Then we have observed the pathways in **KEGG Pathways**. We have used reference from signal and selected *AGE-RAGE signaling pathway in diabetic complications*.
+
+![](images/kegg_pathways/KEGG-Pathways-Example.png)

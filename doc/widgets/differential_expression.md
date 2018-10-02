@@ -1,40 +1,29 @@
 Differential Expression
 =======================
 
-![](icons/differential-expression.png)
-
 Plots differential gene expression for selected experiments.
 
-Signals
--------
+**Inputs**
+- Data: Data set.
 
-**Inputs**:
+**Outputs**
+- Data Subset: Differentially expressed genes.
+- Remaining Data Subset: Genes that were not differentially expressed.
+- Selected Genes: Genes from the select data with scores appended.
 
--   **Data**
-
-**Outputs**:
-
--   **Data subset**
-
--   **Remaining data subset**
-
--   **Selected genes**
-
-Description
------------
 
 This widget plots a [differential gene
 expression](http://www.ncbi.nlm.nih.gov/books/NBK10061/) graph for a
 sample target. It takes gene expression data as an input (from
-**dictyExpress**, **PIPAx**, etc.) and outputs a selected data subset
+**dictyExpress**, **GEO Data Sets**, etc.) and outputs a selected data subset
 (normally the most interesting genes).
 
-![](images/differential_expression/differential_expression.png)
+![](images/differential_expression/Differential-Expression-stamped.png)
 
 1.  Information of the data input and output. The first line shows the
     number of samples and genes in the data set. The second line
     displays the selected sample target (read around which the graph is
-    plotted). The third line shows the number of undefined gene (missing
+    plotted). The third line shows the number of undefined genes (missing
     data) and the fourth the number of genes in the output.
 2.  Select the plotting method in *Scoring method*:
     -   [Fold change](https://en.wikipedia.org/wiki/Fold_change): final to initial value ratio
@@ -63,11 +52,6 @@ sample target. It takes gene expression data as an input (from
 Example
 -------
 
-From the GEO Data Sets widget, we selected the data on breast cancer (GDS360) with
-14 treatment resistand and 10 treatment sensitive tumors and observed them in the **Data
-Table**. Then we used the **Differential Expression** widget to select the most interesting
-genes. We left upper and lower threshold at default (1 and -1) and output the data.
-Then we observed the selected data in another **Data Table**. The table shows an additional
-column with gene scores as instances.
+From the GEO Data Sets widget, we selected *Breast cancer and docetaxel treatment* (GDS360) with 14 treatment resistant and 10 treatment sensitive tumors. Then we used the **Differential Expression** widget to select the most interesting genes. We left the upper and lower threshold at default (1 and -1) and output the data. Then we observed the selected data subset in a **Data Table**. The table shows selected genes with an additional gene score label.
 
-![](images/differential_expression/differential_expression_example.png)
+![](images/differential_expression/Differential-Expression-Example.png)
