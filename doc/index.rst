@@ -7,13 +7,14 @@ Widgets
 .. toctree::
    :maxdepth: 1
 
-   widgets/databasesupdate
-   widgets/geodatasets
-   widgets/dictyExpress
-   widgets/differentialexpression
-   widgets/geneinfo
-   widgets/gobrowser
-   widgets/keggpathways
+   widgets/databases_update.md
+   widgets/geo_data_sets.md
+   widgets/dicty_express.md
+   widgets/differential_expression.md
+   widgets/gene_name_matcher.md
+   widgets/go_browser.md
+   widgets/kegg_pathways.md
+
 
 
 Scripting Reference

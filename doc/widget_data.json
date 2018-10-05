@@ -1,0 +1,65 @@
+{
+"Databases Update": {
+    "title": "Databases Update",
+    "file": "widgets/databases_update.md",
+    "icon": "widgets/icons/databases-update.png",
+    "keywords": ["database", "data"],
+    "category": "Bioinformatics"
+    },
+"GEO Data Sets": {
+    "title": "GEO Data Sets",
+    "file": "widgets/geo_data_sets.md",
+    "icon": "widgets/geo-data-sets.png",
+    "keywords": ["database", "data"],
+    "category": "Bioinformatics"
+    },
+"dictyExpress": {
+    "title": "dictyExpress",
+    "file": "widgets/dicty_express.md",
+    "icon": "widgets/dicty-express.png",
+    "keywords": ["database", "data"],
+    "category": "Bioinformatics"
+    },
+"Gene Name Matcher": {
+    "title": "Gene Name Matcher",
+    "file": "widgets/gene_name_matcher.md",
+    "icon": "widgets/gene-name-matcher.png",
+    "keywords": ["gene", "ontology"],
+    "category": "Bioinformatics"
+    },
+"Differential Expression": {
+    "title": "Differential Expression",
+    "file": "widgets/differential_expression.md",
+    "icon": "widgets/differential-expression.png",
+    "keywords": ["gene expression", "genomics"],
+    "category": "Bioinformatics"
+    },
+"GO Browser": {
+    "title": "GO Browser",
+    "file": "widgets/go_browser.md",
+    "icon": "widgets/go-browser.png",
+    "keywords": ["data"],
+    "category": "Bioinformatics"
+    },
+"KEGG Pathways": {
+    "title": "KEGG Pathways",
+    "file": "widgets/kegg_pathways.md",
+    "icon": "widgets/kegg-pathways.png",
+    "keywords": ["kegg", "ortology"],
+    "category": "Bioinformatics"
+    },
+"Gene Set Enrichment": {
+    "title": "Gene Set Enrichment",
+    "file": "widgets/gene_set_enrichment.md",
+    "icon": "widgets/gene-set-enrichment.png",
+    "keywords": ["enrichment", "gene"],
+    "category": "Bioinformatics"
+    },
+"Cluster Analysis": {
+    "title": "Cluster Analysis",
+    "file": "widgets/cluster_analysis.md",
+    "icon": "widgets/cluster-analysis.png",
+    "keywords": ["clustering"],
+    "category": "Bioinformatics"
+    }
+}
