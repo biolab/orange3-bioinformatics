@@ -10,10 +10,12 @@ Widgets
    widgets/databases_update.md
    widgets/geo_data_sets.md
    widgets/dicty_express.md
-   widgets/differential_expression.md
    widgets/gene_name_matcher.md
+   widgets/differential_expression.md
    widgets/go_browser.md
    widgets/kegg_pathways.md
+   widgets/gene_set_enrichment.md
+   widgets/cluster_analysis.md
 
 
 
