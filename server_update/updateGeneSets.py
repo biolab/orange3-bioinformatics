@@ -19,7 +19,8 @@ from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
 from orangecontrib.bioinformatics.geneset import (
     DOMAIN, GeneSet, GeneSets, GeneSetException,
     filename, GO_TERM_LINK, CYTOBAND_DOWNLOAD_LINK,
-    REACTOME_DOWNLOAD_LINK, REACTOME_FILE_NAME, OMIM_LINK
+    REACTOME_DOWNLOAD_LINK, REACTOME_FILE_NAME, OMIM_LINK,
+    REACTOME_DETAIL_LINK
 )
 
 DOMAIN_PATH = sf_local.localpath(DOMAIN)
@@ -166,12 +167,16 @@ def reactome_gene_sets(org):
                     for gene in gene_matcher.genes:
                         if gene.ncbi_id is not None:
                             genes.append(int(gene.ncbi_id))
+
                     pathway = path.split('\t')[0].replace(',', ' ')
-                    gs = GeneSet(gs_id=pathway,
+                    pathway_id = path.split('\t')[1].replace(',', ' ')
+
+                    gs = GeneSet(gs_id=pathway_id,
                                  name=pathway,
                                  genes=genes,
                                  hierarchy=('Reactome', 'pathways'),
-                                 organism='9606', link='')
+                                 organism='9606',
+                                 link=REACTOME_DETAIL_LINK.format(pathway_id))
 
                     genesets.append(gs)
 
