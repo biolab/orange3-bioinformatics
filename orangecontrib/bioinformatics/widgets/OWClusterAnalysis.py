@@ -131,7 +131,8 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_indicator_list = listView(self.cluster_indicator_box, self, 'cluster_indicators',
                                                model=self.cluster_indicator_model,
                                                selectionMode=QListWidget.MultiSelection,
-                                               callback=self.invalidate)
+                                               callback=self.invalidate,
+                                               sizeHint=QSize(256, 70))
 
         # Batch selection
         self.batch_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,),
