@@ -15,7 +15,7 @@ from functools import reduce
 from concurrent.futures import Future
 from types import SimpleNamespace
 from typing import Dict, List, Tuple
-from requests.exceptions import ConnectTimeout, RequestException
+from requests.exceptions import ConnectTimeout, RequestException, ConnectionError
 
 from AnyQt.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QTreeView, QMenu, QCheckBox, QSplitter,
@@ -148,6 +148,8 @@ class OWGOBrowser(widget.OWWidget):
     selectionDisjoint = settings.Setting(0)
 
     class Error(widget.OWWidget.Error):
+        serverfiles_unavailable = widget.Msg('Can not locate annotation files, '
+                                             'please check your connection and try again.')
         missing_annotation = widget.Msg(ERROR_ON_MISSING_ANNOTATION)
         missing_gene_id = widget.Msg(ERROR_ON_MISSING_GENE_ID)
         missing_tax_id = widget.Msg(ERROR_ON_MISSING_TAX_ID)
@@ -317,13 +319,19 @@ class OWGOBrowser(widget.OWWidget):
             def parse_tax_id(f_name):
                 return f_name.split('.')[1]
 
+        try:
+            remote_files = serverfiles.ServerFiles().listfiles(DOMAIN)
+        except (ConnectTimeout, RequestException, ConnectionError):
+            # TODO: Warn user about failed connection to the remote server
+            remote_files = []
+
         self.available_annotations = [
             AnnotationSlot(
                 taxid=AnnotationSlot.parse_tax_id(annotation_file),
                 name=taxonomy.common_taxid_to_name(AnnotationSlot.parse_tax_id(annotation_file)),
                 filename=FILENAME_ANNOTATION.format(AnnotationSlot.parse_tax_id(annotation_file))
             )
-            for _, annotation_file in set(serverfiles.ServerFiles().listfiles(DOMAIN) + serverfiles.listfiles(DOMAIN))
+            for _, annotation_file in set(remote_files + serverfiles.listfiles(DOMAIN))
             if annotation_file != FILENAME_ONTOLOGY
 
         ]
@@ -376,7 +384,9 @@ class OWGOBrowser(widget.OWWidget):
             try:
                 self.annotation_index = _c2i[self.tax_id]
             except KeyError:
-                raise ValueError('Taxonomy {} not supported.'.format(self.tax_id))
+                self.Error.serverfiles_unavailable()
+                # raise ValueError('Taxonomy {} not supported.'.format(self.tax_id))
+                return
 
             self.__invalidate()
 

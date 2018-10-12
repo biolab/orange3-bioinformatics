@@ -4,6 +4,7 @@ import pickle
 from collections import defaultdict
 from functools import lru_cache
 from typing import List, Union
+from requests.exceptions import ConnectTimeout, RequestException, ConnectionError
 
 from Orange.data import StringVariable, DiscreteVariable, Domain, Table
 
@@ -401,10 +402,15 @@ class GeneMatcher:
                 continue
 
     def load_matcher_file(self, domain, filename):
-        # this starts download if files are not on local machine
-        file_path = serverfiles.localpath_download(domain, filename)
-        # download new version before using this file for gene name matching
-        serverfiles.update(domain, filename)
+        try:
+            # this starts download if files are not on local machine
+            file_path = serverfiles.localpath_download(domain, filename)
+            # download new version before using this file for gene name matching
+            # serverfiles.update(domain, filename)
+        except (ConnectTimeout, RequestException, ConnectionError) as e:
+            # Do not raise exception.
+            print(e)
+            return
 
         def case_insensitive_keys(matcher_dict):
             updated_dict = {MAP_SOURCES:  matcher_dict[MAP_SOURCES],
