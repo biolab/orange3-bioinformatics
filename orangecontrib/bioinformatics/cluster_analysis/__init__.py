@@ -45,6 +45,9 @@ class ClusterGeneSet(GeneSet):
 
 class Cluster:
 
+    CLUSTER_VS_REST = False
+    CLUSTER_VS_CLUSTER = True
+
     def __init__(self, name, index):
         # type: (str, int) -> None
         self.name = name
@@ -132,9 +135,6 @@ class Cluster:
             gene.p_val = p_val
             gene.fdr = fdr
 
-
-    CLUSTER_VS_REST = False
-    CLUSTER_VS_CLUSTER = True
     def cluster_scores(self, table_x, rows_by_cluster, method, design, **kwargs):
         # type: (np.ndarray, np.ndarray, gene_scoring_method, str) -> None
         """
@@ -181,12 +181,11 @@ class Cluster:
 
         if aggregation == 'max':
             max_p_values = np.max(calculated_p_values, axis=(1, 2))
-            fdr_values = FDR(max_p_values)
+            fdr_values = FDR(max_p_values.tolist())
             self.__update_gene_objects(max_p_values, fdr_values)
         else:
             raise NotImplementedError("Aggregation %s is not implemented" % aggregation)
         return
-
 
     def to_html(self):
         gene_sets = '(no enriched gene sets)'
@@ -287,7 +286,7 @@ class ClusterModel(QAbstractListModel):
         try:
             f.result()
         except Exception as ex:
-            print(ex)
+            raise ex
 
     def _score_genes(self, callback, **kwargs):
         for item in self.get_rows():

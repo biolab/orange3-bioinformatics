@@ -1,17 +1,18 @@
 """ OWClusterAnalysis """
 import sys
+import itertools
 import numpy as np
 
 from AnyQt.QtWidgets import (
     QTableView, QHeaderView, QHBoxLayout,
-    QSplitter
+    QSplitter, QListWidget
 )
 from AnyQt.QtCore import (
     Qt, QSize
 )
 
 from Orange.widgets.gui import (
-    vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox
+    vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox, listView
 )
 from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandler
@@ -57,7 +58,7 @@ class OWClusterAnalysis(OWWidget):
         cluster_batch_conflict = Msg('Cluster and batch must not be the same variable')
 
     settingsHandler = DomainContextHandler()
-    cluster_indicator = ContextSetting(None)
+    cluster_indicators = ContextSetting([])
     batch_indicator = ContextSetting(None)
     stored_gene_sets_selection = ContextSetting(tuple())
 
@@ -95,6 +96,7 @@ class OWClusterAnalysis(OWWidget):
 
         # widget attributes
         self.input_data = None
+        self.store_input_domain = None
         self.input_genes_names = []
         self.input_genes_ids = []
 
@@ -123,22 +125,23 @@ class OWClusterAnalysis(OWWidget):
         self.input_info = widgetLabel(info_box)
 
         # Cluster selection
-        self.cluster_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,))
-        box = widgetBox(self.controlArea, 'Cluster Indicator')
-        self.cluster_indicator_combobox = comboBox(box, self, 'cluster_indicator',
-                                                   model=self.cluster_indicator_model,
-                                                   sendSelectedValue=True,
-                                                   callback=self.invalidate)
+        self.cluster_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,), separators=False)
+        self.cluster_indicator_box = widgetBox(self.controlArea, 'Cluster Indicator')
+
+        self.cluster_indicator_list = listView(self.cluster_indicator_box, self, 'cluster_indicators',
+                                               model=self.cluster_indicator_model,
+                                               selectionMode=QListWidget.MultiSelection,
+                                               callback=self.invalidate,
+                                               sizeHint=QSize(256, 70))
 
         # Batch selection
         self.batch_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,),
                                                             placeholder="")
         box = widgetBox(self.controlArea, 'Batch Indicator')
         self.batch_indicator_combobox = comboBox(box, self, 'batch_indicator',
-                                                   model=self.batch_indicator_model,
-                                                   sendSelectedValue=True,
-                                                   callback=self.invalidate)
-
+                                                 model=self.batch_indicator_model,
+                                                 sendSelectedValue=True,
+                                                 callback=self.batch_indicator_changed)
 
         # Gene scoring
         box = widgetBox(self.controlArea, 'Gene Scoring')
@@ -257,19 +260,72 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_info_view.resizeRowsToContents()
         self.cluster_info_view.selectionModel().selectionChanged.connect(self.commit)
 
+    def __create_temp_class_var(self):
+        """ See no evil !"""
+        cluster_indicator_name = 'Cluster indicators'
+
+        var_index_lookup = dict([(val, idx)
+                                for var in self.cluster_indicators
+                                for idx, val in enumerate(var.values)])
+
+        row_profile = None
+        new_cluster_profile = []
+        new_cluster_values = []
+
+        cart_prod = itertools.product(*[cluster.values for cluster in self.cluster_indicators])
+
+        for comb in cart_prod:
+            new_cluster_values.append(', '.join([val for val in comb]))
+            new_cluster_profile.append([var_index_lookup[val] for val in comb])
+
+        row_profile_lookup = dict([(tuple(profile), indx)
+                                   for indx, (profile, _) in enumerate(zip(new_cluster_profile, new_cluster_values))])
+
+        for var in self.cluster_indicators:
+            if row_profile is None:
+                row_profile = np.asarray(self.input_data.get_column_view(var)[0], dtype=int)
+            else:
+                row_profile = np.vstack((row_profile, np.asarray(self.input_data.get_column_view(var)[0], dtype=int)))
+
+        ca_ind = DiscreteVariable.make(cluster_indicator_name, values=[val for val in new_cluster_values])
+
+        domain = Domain(self.store_input_domain.attributes,
+                        self.store_input_domain.class_vars,
+                        self.store_input_domain.metas + (ca_ind, ))
+
+        table = self.input_data.transform(domain)
+        table[:, ca_ind] = np.array([[row_profile_lookup[tuple(row_profile[:, i])]]
+                                     for i in range(row_profile.shape[1])])
+        self.input_data = table
+        return ca_ind
+
     def __set_clusters(self):
         self.clusters = []
-        if self.cluster_indicator and self.input_data:
-            self.rows_by_cluster = np.asarray(self.input_data.get_column_view(self.cluster_indicator)[0], dtype=int)
+        self.cluster_var = None
+        self.batch_indicator_model.set_domain(None)
 
-            for index, name in enumerate(self.cluster_indicator.values):
+        if self.cluster_indicators and self.input_data:
+
+            if isinstance(self.cluster_indicators, list) and len(self.cluster_indicators) > 1:
+                self.cluster_var = self.__create_temp_class_var()
+            else:
+                self.cluster_var = self.cluster_indicators[0]
+
+            self.batch_indicator_model.set_domain(self.input_data.domain)
+            # todo: this resets the previous selection for batch indicator. Fixme?
+            self.batch_indicator = self.batch_indicator_model[0]
+
+            self.rows_by_cluster = np.asarray(self.input_data.get_column_view(self.cluster_var)[0], dtype=int)
+            for index, name in enumerate(self.cluster_var.values):
                 cluster = Cluster(name, index)
                 self.clusters.append(cluster)
                 cluster.set_genes(self.input_genes_names, self.input_genes_ids)
 
     def __set_batch(self):
+        self.Error.cluster_batch_conflict.clear()
         self.rows_by_batch = None
-        if self.batch_indicator == self.cluster_indicator:
+
+        if self.batch_indicator == self.cluster_var:
             self.Error.cluster_batch_conflict()
             return
         if self.batch_indicator and self.input_data:
@@ -326,7 +382,7 @@ class OWClusterAnalysis(OWWidget):
             self.cluster_info_model.score_genes(design=design,
                                                 table_x=self.input_data.X,
                                                 rows_by_cluster=self.rows_by_cluster,
-                                                rows_by_batch = self.rows_by_batch,
+                                                rows_by_batch=self.rows_by_batch,
                                                 method=method,
                                                 alternative=test_type)
         except ValueError as e:
@@ -356,12 +412,13 @@ class OWClusterAnalysis(OWWidget):
 
             self.filter_gene_sets()
 
-    def invalidate(self):
+    def invalidate(self, cluster_init=True):
         if self.input_data is not None and self.tax_id is not None:
             self.Warning.gene_enrichment.clear()
 
             self.__set_genes()
-            self.__set_clusters()
+            if cluster_init:
+                self.__set_clusters()
             self.__set_batch()
             self.__set_cluster_info_model()
 
@@ -370,6 +427,9 @@ class OWClusterAnalysis(OWWidget):
             self.__gene_enrichment()
             self.__update_info_box()
 
+    def batch_indicator_changed(self):
+        self.invalidate(cluster_init=False)
+
     @Inputs.data_table
     def handle_input(self, data):
         self.Warning.clear()
@@ -377,6 +437,7 @@ class OWClusterAnalysis(OWWidget):
 
         self.closeContext()
         self.input_data = None
+        self.store_input_domain = None
         self.stored_gene_sets_selection = tuple()
         self.input_genes_names = []
         self.input_genes_ids = []
@@ -384,7 +445,7 @@ class OWClusterAnalysis(OWWidget):
         self.use_attr_names = None
         self.gene_id_attribute = None
         self.clusters = None
-        self.cluster_indicator = None
+        self.cluster_indicators = []
 
         self.gs_widget.clear()
         self.gs_widget.clear_gene_sets()
@@ -399,13 +460,13 @@ class OWClusterAnalysis(OWWidget):
 
         if data:
             self.input_data = data
-
             # For Cluster Indicator do not use categorical variables that contain only one value.
-            domain = self.input_data.domain.copy()
+            self.store_input_domain = domain = self.input_data.domain.copy()
             class_vars = [class_var for class_var in domain.class_vars if len(class_var.values) > 1]
             class_vars_metas = [class_var for class_var in domain.metas
                                 if isinstance(class_var, DiscreteVariable) and len(class_var.values) > 1]
             domain = Domain([], class_vars=class_vars, metas=class_vars_metas)
+
             self.cluster_indicator_model.set_domain(domain)
             self.batch_indicator_model.set_domain(domain)
 
@@ -424,7 +485,7 @@ class OWClusterAnalysis(OWWidget):
 
             self.gs_widget.load_gene_sets(self.tax_id)
             if self.cluster_indicator_model:
-                self.cluster_indicator = self.cluster_indicator_model[0]
+                self.cluster_indicators = [self.cluster_indicator_model[0]]
             if self.batch_indicator_model:
                 self.batch_indicator = self.batch_indicator_model[0]
 

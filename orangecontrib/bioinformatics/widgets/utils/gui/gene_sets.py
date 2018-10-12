@@ -29,6 +29,7 @@ class GeneSetsSelection(QWidget):
         self.hierarchy_tree_widget = QTreeWidget(self)
         self.hierarchy_tree_widget.setHeaderHidden(True)
         self.hierarchy_tree_widget.setEditTriggers(QTreeView.NoEditTriggers)
+        self.hierarchy_tree_widget.setMaximumHeight(120)
         box.layout().addWidget(self.hierarchy_tree_widget)
 
         self.custom_set_hier = None
