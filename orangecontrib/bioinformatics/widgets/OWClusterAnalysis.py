@@ -273,21 +273,19 @@ class OWClusterAnalysis(OWWidget):
         new_cluster_values = []
 
         cart_prod = itertools.product(*[cluster.values for cluster in self.cluster_indicators])
-
         for comb in cart_prod:
             new_cluster_values.append(', '.join([val for val in comb]))
             new_cluster_profile.append([var_index_lookup[val] for val in comb])
 
         row_profile_lookup = dict([(tuple(profile), indx)
                                    for indx, (profile, _) in enumerate(zip(new_cluster_profile, new_cluster_values))])
-
         for var in self.cluster_indicators:
             if row_profile is None:
                 row_profile = np.asarray(self.input_data.get_column_view(var)[0], dtype=int)
             else:
                 row_profile = np.vstack((row_profile, np.asarray(self.input_data.get_column_view(var)[0], dtype=int)))
 
-        ca_ind = DiscreteVariable.make(cluster_indicator_name, values=[val for val in new_cluster_values])
+        ca_ind = DiscreteVariable.make(cluster_indicator_name, values=[val for val in new_cluster_values], ordered=True)
 
         domain = Domain(self.store_input_domain.attributes,
                         self.store_input_domain.class_vars,
@@ -608,6 +606,7 @@ class OWClusterAnalysis(OWWidget):
         selected_rows = [row_index for row_index, col_index in enumerate(self.rows_by_cluster)
                          if col_index in selected_cluster_indexes]
 
+        # print(selected_rows)
         # send to output signal
         self.Outputs.selected_data.send(output_data[selected_rows])
 
