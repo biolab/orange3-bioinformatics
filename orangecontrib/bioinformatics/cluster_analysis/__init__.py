@@ -34,6 +34,7 @@ class ClusterGene(Gene):
         # default values
         self.fdr = 1
         self.p_val = 1
+        self.score = 0
 
 
 class ClusterGeneSet(GeneSet):
@@ -60,6 +61,9 @@ class Cluster:
         # set enrichment
         self.gene_sets = []
         self.filtered_gene_sets = []
+
+        # Statistical method used when performing analysis
+        self.method_used = None
 
     def set_genes(self, gene_names, gene_ids):
         self.genes = []
@@ -123,15 +127,16 @@ class Cluster:
         for gs, fdr in zip(self.gene_sets, fdr_values):
             gs.fdr = fdr
 
-    def __update_gene_objects(self, p_vals, fdr_vals):
-        # type: (Union[np.ndarray, list], Union[np.ndarray, list]) ->  None
+    def __update_gene_objects(self, scores, p_vals, fdr_vals):
+        # type: (Union[np.ndarray, list], Union[np.ndarray, list], Union[np.ndarray, list]) ->  None
         """ update gene objects with computed results
 
         :param p_vals:   Computed p-values
         :param fdr_vals: Computed fdr-values
 
         """
-        for p_val, fdr, gene in zip(p_vals, fdr_vals, self.genes):
+        for score, p_val, fdr, gene in zip(scores, p_vals, fdr_vals, self.genes):
+            gene.score = score
             gene.p_val = p_val
             gene.fdr = fdr
 
@@ -159,6 +164,7 @@ class Cluster:
         uniq_batches = set(rows_by_batch)
 
         # Determine clusters
+        self.method_used = method.name
         uniq_clusters = set(rows_by_cluster) - {self.index}
         this_cluster = self.index
         if design == self.CLUSTER_VS_REST:
@@ -166,23 +172,32 @@ class Cluster:
             uniq_clusters = {False}
             this_cluster = True
 
-        calculated_p_values = np.ones((table_x.shape[1],       # genes
-                                       len(uniq_clusters),     # other clusters
-                                       len(uniq_batches)))     # batches
+        calculated_p_values = np.ones((table_x.shape[1],      # genes
+                                      len(uniq_clusters),     # other clusters
+                                      len(uniq_batches)))     # batches
+
+        calculated_scores = np.ones((table_x.shape[1],       # genes
+                                     len(uniq_clusters),     # other clusters
+                                     len(uniq_batches)))     # batches
 
         for bi, b in enumerate(uniq_batches):
             for ci, c in enumerate(uniq_clusters):
                 cluster = table_x[np.logical_and(rows_by_cluster == this_cluster, rows_by_batch == b)]
                 rest = table_x[np.logical_and(rows_by_cluster == c, rows_by_batch == b)]
                 if cluster.any() and rest.any():
-                    _, p_values = method.score_function(cluster, rest, alternative=alternative)
+                    scores, p_values = method.score_function(cluster, rest, alternative=alternative)
+                    scores[np.isnan(p_values)] = 0
+                    calculated_scores[:, ci, bi] = scores
                     p_values[np.isnan(p_values)] = 1
                     calculated_p_values[:, ci, bi] = p_values
 
         if aggregation == 'max':
             max_p_values = np.max(calculated_p_values, axis=(1, 2))
+            max_p_indexes = np.argwhere(calculated_p_values == calculated_p_values.max())
+            # this holds true only if max_p_indexes.ndim == 3
+            max_scores = calculated_scores[max_p_indexes[:, 0], max_p_indexes[:, 1], max_p_indexes[:, 2]]
             fdr_values = FDR(max_p_values.tolist())
-            self.__update_gene_objects(max_p_values, fdr_values)
+            self.__update_gene_objects(max_scores, max_p_values, fdr_values)
         else:
             raise NotImplementedError("Aggregation %s is not implemented" % aggregation)
         return

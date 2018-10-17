@@ -11,6 +11,8 @@ from AnyQt.QtCore import (
     Qt, QSize
 )
 
+from scipy.stats import rankdata
+
 from Orange.widgets.gui import (
     vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox, listView
 )
@@ -19,7 +21,7 @@ from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandle
 from Orange.widgets.utils.signals import Output, Input
 from Orange.widgets import settings
 from Orange.widgets.utils import itemmodels
-from Orange.data import StringVariable, DiscreteVariable, Table, Domain
+from Orange.data import StringVariable, DiscreteVariable, ContinuousVariable, Table, Domain
 
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
@@ -28,6 +30,7 @@ from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_t
 from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSetsSelection, GeneScoringWidget
 from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, DISPLAY_GENE_SETS_COUNT
 from orangecontrib.bioinformatics.geneset.utils import GeneSetException
+from orangecontrib.bioinformatics.ncbi.gene.config import NCBI_ID
 
 
 class OWClusterAnalysis(OWWidget):
@@ -43,6 +46,7 @@ class OWClusterAnalysis(OWWidget):
 
     class Outputs:
         selected_data = Output('Selected Data', Table)
+        gene_scores = Output('Gene Scores', Table)
 
     class Information(OWWidget.Information):
         pass
@@ -116,6 +120,7 @@ class OWClusterAnalysis(OWWidget):
         self.rows_by_cluster = None
         self.rows_by_batch = None
         self.clusters = []
+        self.new_cluster_profile = []
 
         # data model
         self.cluster_info_model = None
@@ -128,7 +133,7 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,), separators=False)
         self.cluster_indicator_box = widgetBox(self.controlArea, 'Cluster Indicator')
 
-        self.cluster_indicator_list = listView(self.cluster_indicator_box, self, 'cluster_indicators',
+        self.cluster_indicator_view = listView(self.cluster_indicator_box, self, 'cluster_indicators',
                                                model=self.cluster_indicator_model,
                                                selectionMode=QListWidget.MultiSelection,
                                                callback=self.invalidate,
@@ -269,16 +274,15 @@ class OWClusterAnalysis(OWWidget):
                                 for idx, val in enumerate(var.values)])
 
         row_profile = None
-        new_cluster_profile = []
         new_cluster_values = []
 
         cart_prod = itertools.product(*[cluster.values for cluster in self.cluster_indicators])
         for comb in cart_prod:
             new_cluster_values.append(', '.join([val for val in comb]))
-            new_cluster_profile.append([var_index_lookup[val] for val in comb])
+            self.new_cluster_profile.append([var_index_lookup[val] for val in comb])
 
         row_profile_lookup = dict([(tuple(profile), indx)
-                                   for indx, (profile, _) in enumerate(zip(new_cluster_profile, new_cluster_values))])
+                                   for indx, (profile, _) in enumerate(zip(self.new_cluster_profile, new_cluster_values))])
         for var in self.cluster_indicators:
             if row_profile is None:
                 row_profile = np.asarray(self.input_data.get_column_view(var)[0], dtype=int)
@@ -299,6 +303,7 @@ class OWClusterAnalysis(OWWidget):
 
     def __set_clusters(self):
         self.clusters = []
+        self.new_cluster_profile = []
         self.cluster_var = None
         self.batch_indicator_model.set_domain(None)
 
@@ -579,9 +584,44 @@ class OWClusterAnalysis(OWWidget):
         self.gs_widget.clear_custom_sets()
         # self.gs_widget.update_gs_hierarchy()
 
+    def gene_scores_output(self, selected_clusters):
+
+        metas = [StringVariable('Gene'), StringVariable(NCBI_ID),
+                 StringVariable('Rank'), StringVariable('Statistic score'),
+                 ContinuousVariable('P-value'), ContinuousVariable('FDR')]
+
+        if len(self.new_cluster_profile):
+            # note: order is important
+            metas = self.cluster_indicators + metas
+
+        domain = Domain([], metas=metas, class_vars=self.cluster_var)
+
+        data = []
+        for cluster in selected_clusters:
+            num_of_genes = len(cluster.filtered_genes)
+
+            scores = [gene.score for gene in cluster.filtered_genes]
+            p_vals = [gene.p_val for gene in cluster.filtered_genes]
+            fdr_vals = [gene.fdr for gene in cluster.filtered_genes]
+            gene_names = [gene.input_name for gene in cluster.filtered_genes]
+            gene_ids = [gene.ncbi_id for gene in cluster.filtered_genes]
+            rank = rankdata(p_vals, method='min')
+
+            if len(self.new_cluster_profile):
+                profiles = [[cluster.index] * num_of_genes]
+                [profiles.append([p] * num_of_genes) for p in self.new_cluster_profile[cluster.index]]
+            else:
+                profiles = [[cluster.index] * num_of_genes]
+
+            for row in zip(*profiles, gene_names, gene_ids, rank, scores, p_vals, fdr_vals):
+                data.append(list(row))
+
+        self.Outputs.gene_scores.send(Table(domain, data))
+
     def commit(self):
         selection_model = self.cluster_info_view.selectionModel()
         selected_rows = selection_model.selectedRows()
+        selected_clusters = []
         selected_cluster_indexes = set()
         selected_cluster_genes = set()
 
@@ -591,6 +631,7 @@ class OWClusterAnalysis(OWWidget):
 
         for sel_row in selected_rows:
             cluster = sel_row.data()
+            selected_clusters.append(cluster)
             selected_cluster_indexes.add(cluster.index)
             [selected_cluster_genes.add(gene.ncbi_id) for gene in cluster.filtered_genes]
 
@@ -606,9 +647,9 @@ class OWClusterAnalysis(OWWidget):
         selected_rows = [row_index for row_index, col_index in enumerate(self.rows_by_cluster)
                          if col_index in selected_cluster_indexes]
 
-        # print(selected_rows)
         # send to output signal
         self.Outputs.selected_data.send(output_data[selected_rows])
+        self.gene_scores_output(selected_clusters)
 
 
 if __name__ == "__main__":
