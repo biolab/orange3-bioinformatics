@@ -47,6 +47,7 @@ class OWClusterAnalysis(OWWidget):
     class Outputs:
         selected_data = Output('Selected Data', Table)
         gene_scores = Output('Gene Scores', Table)
+        gene_set_scores = Output('Gene Set Scores', Table)
 
     class Information(OWWidget.Information):
         pass
@@ -587,7 +588,7 @@ class OWClusterAnalysis(OWWidget):
     def gene_scores_output(self, selected_clusters):
 
         metas = [StringVariable('Gene'), StringVariable(NCBI_ID),
-                 StringVariable('Rank'), StringVariable('Statistic score'),
+                 StringVariable('Rank'), ContinuousVariable('Statistic score'),
                  ContinuousVariable('P-value'), ContinuousVariable('FDR')]
 
         if len(self.new_cluster_profile):
@@ -617,6 +618,38 @@ class OWClusterAnalysis(OWWidget):
                 data.append(list(row))
 
         self.Outputs.gene_scores.send(Table(domain, data))
+
+    def gene_set_scores_output(self, selected_clusters):
+
+        metas = [StringVariable('Term'), StringVariable('Term ID'), StringVariable('Rank'),
+                 ContinuousVariable('P-value'), ContinuousVariable('FDR')]
+
+        if len(self.new_cluster_profile):
+            # note: order is important
+            metas = self.cluster_indicators + metas
+
+        domain = Domain([], metas=metas, class_vars=self.cluster_var)
+
+        data = []
+        for cluster in selected_clusters:
+            num_of_sets = len(cluster.filtered_gene_sets)
+
+            p_vals = [gs.p_val for gs in cluster.filtered_gene_sets]
+            fdr_vals = [gs.fdr for gs in cluster.filtered_gene_sets]
+            gs_names = [gs.name for gs in cluster.filtered_gene_sets]
+            gs_ids = [gs.gs_id for gs in cluster.filtered_gene_sets]
+            rank = rankdata(p_vals, method='min')
+
+            if len(self.new_cluster_profile):
+                profiles = [[cluster.index] * num_of_sets]
+                [profiles.append([p] * num_of_sets) for p in self.new_cluster_profile[cluster.index]]
+            else:
+                profiles = [[cluster.index] * num_of_sets]
+
+            for row in zip(*profiles, gs_names, gs_ids, rank, p_vals, fdr_vals):
+                data.append(list(row))
+
+        self.Outputs.gene_set_scores.send(Table(domain, data))
 
     def commit(self):
         selection_model = self.cluster_info_view.selectionModel()
@@ -650,6 +683,7 @@ class OWClusterAnalysis(OWWidget):
         # send to output signal
         self.Outputs.selected_data.send(output_data[selected_rows])
         self.gene_scores_output(selected_clusters)
+        self.gene_set_scores_output(selected_clusters)
 
 
 if __name__ == "__main__":

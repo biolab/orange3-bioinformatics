@@ -118,6 +118,7 @@ class Cluster:
             gs.count = len(enrichment_result.query)
             gs.p_val = enrichment_result.p_value
             gs.name = gene_set.name
+            gs.gs_id = gene_set.gs_id
             self.gene_sets.append(gs)
 
         # calculate FDR
