@@ -194,11 +194,11 @@ class Cluster:
 
         if aggregation == 'max':
             max_p_values = np.max(calculated_p_values, axis=(1, 2))
-            max_p_indexes = np.argwhere(calculated_p_values == calculated_p_values.max())
+            max_p_indexes = np.where(np.max(calculated_p_values, axis=(1, 2), keepdims=True) == calculated_p_values)
             # this holds true only if max_p_indexes.ndim == 3
-            max_scores = calculated_scores[max_p_indexes[:, 0], max_p_indexes[:, 1], max_p_indexes[:, 2]]
+            scores = calculated_scores[max_p_indexes[0], max_p_indexes[1], max_p_indexes[2]]
             fdr_values = FDR(max_p_values.tolist())
-            self.__update_gene_objects(max_scores, max_p_values, fdr_values)
+            self.__update_gene_objects(scores, max_p_values, fdr_values)
         else:
             raise NotImplementedError("Aggregation %s is not implemented" % aggregation)
         return
