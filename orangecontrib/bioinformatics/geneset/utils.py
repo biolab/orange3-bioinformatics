@@ -236,7 +236,7 @@ class GeneSets(set):
         """
         index = {label: index for index, label in enumerate(GENE_SET_ATTRIBUTES)}
 
-        with open(file_path, 'r') as gmt_file:
+        with open(file_path, 'r', encoding='utf-8') as gmt_file:
             gene_sets = []
 
             for line in gmt_file:
