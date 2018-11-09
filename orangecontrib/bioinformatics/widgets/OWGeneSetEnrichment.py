@@ -3,7 +3,6 @@ import threading
 import concurrent.futures
 
 from functools import partial
-from collections import defaultdict
 
 from AnyQt.QtWidgets import (
     QTreeView, QHeaderView, QHBoxLayout
@@ -175,6 +174,7 @@ class OWGeneSets(OWWidget):
         self._executor = ThreadExecutor()
 
         # gui
+        self._handle_future_model()
         self.setup_gui()
 
     def __reset_widget_state(self):
@@ -222,7 +222,9 @@ class OWGeneSets(OWWidget):
                     return
 
                 if isinstance(self.custom_gene_set_indicator, DiscreteVariable):
-                    gene_sets_names = self.custom_gene_set_indicator.values
+                    labels = self.custom_gene_set_indicator.values
+                    gene_sets_names = [labels[int(idx)] for idx
+                                       in self.custom_data.get_column_view(self.custom_gene_set_indicator)[0]]
                 else:
                     gene_sets_names, _ = self.custom_data.get_column_view(self.custom_gene_set_indicator)
 
@@ -414,7 +416,6 @@ class OWGeneSets(OWWidget):
 
         if self.custom_data:
             info_string += '{} marker genes in {} sets\n'.format(self.custom_data.X.shape[0], self.num_of_custom_sets)
-
 
         self.input_info.setText(info_string)
 
