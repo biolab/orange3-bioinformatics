@@ -22,7 +22,7 @@ from Orange.widgets.gui import (
 )
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.utils import itemmodels
-from Orange.widgets.settings import Setting
+from Orange.widgets.settings import Setting, DomainContextHandler, ContextSetting
 from Orange.widgets.utils.signals import Output, Input
 from Orange.data import StringVariable, DiscreteVariable, Domain, Table, filter as table_filter
 
@@ -170,7 +170,6 @@ class OWGeneNameMatcher(OWWidget):
     priority = 5
     want_main_area = True
 
-    use_attr_names = Setting(True)
     selected_organism = Setting(11)
 
     search_pattern = Setting('')
@@ -180,6 +179,10 @@ class OWGeneNameMatcher(OWWidget):
     replace_id_with_symbol = Setting(True)
 
     auto_commit = Setting(True)
+
+    settingsHandler = DomainContextHandler()
+    selected_gene_col = ContextSetting(None)
+    use_attr_names = ContextSetting(True)
 
     class Inputs:
         data_table = Input("Data", Table)
@@ -203,7 +206,6 @@ class OWGeneNameMatcher(OWWidget):
         self.input_genes = None
         self.tax_id = None
         self.column_candidates = []
-        self.selected_gene_col = None
 
         # input options
         self.organisms = []
@@ -451,6 +453,7 @@ class OWGeneNameMatcher(OWWidget):
 
     @Inputs.data_table
     def handle_input(self, data):
+        self.closeContext()
         self.input_data = None
         self.input_genes = None
         self.__reset_widget_state()
@@ -458,11 +461,7 @@ class OWGeneNameMatcher(OWWidget):
 
         if data:
             self.input_data = data
-
             self.gene_columns_model.set_domain(self.input_data.domain)
-
-            if self.gene_columns_model:
-                self.selected_gene_col = self.gene_columns_model[0]
 
             self.tax_id = str(self.input_data.attributes.get(TAX_ID, ''))
             self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.use_attr_names)
@@ -470,6 +469,7 @@ class OWGeneNameMatcher(OWWidget):
             if self.tax_id in self.organisms:
                 self.selected_organism = self.organisms.index(self.tax_id)
 
+            self.openContext(self.input_data.domain)
             self.on_input_option_change()
 
     @staticmethod
