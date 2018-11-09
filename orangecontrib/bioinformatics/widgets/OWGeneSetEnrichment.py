@@ -3,7 +3,6 @@ import threading
 import concurrent.futures
 
 from functools import partial
-from collections import defaultdict
 
 from AnyQt.QtWidgets import (
     QTreeView, QHeaderView, QHBoxLayout
@@ -175,6 +174,7 @@ class OWGeneSets(OWWidget):
         self._executor = ThreadExecutor()
 
         # gui
+        self._handle_future_model()
         self.setup_gui()
 
     def __reset_widget_state(self):
