@@ -65,7 +65,6 @@ class GeneSetsSelection(QWidget):
         # type: (str) -> None
         self.gs_object = GeneSets()
         self.clear()
-        self.clear()
 
         gene_sets = list_all(organism=tax_id)
         self.set_hierarchy_model(self.hierarchy_tree_widget, self.hierarchy_tree(gene_sets))

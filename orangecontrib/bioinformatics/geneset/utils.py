@@ -90,6 +90,9 @@ class GeneSet:
 
         return False
 
+    def __lt__(self, other):
+        return (self.name + self.gs_id) < (other.name + other.gs_id)
+
     def set_enrichment(self, reference, query):  # type: (List, List) -> enrichment_result
         """
         Args:
@@ -161,9 +164,6 @@ class GeneSets(set):
 
     def hierarchies(self):
         """ Return all hierarchies. """
-        if len(self) == 0:
-            raise GeneSetException("Empty gene sets.")
-
         return set(g_set.hierarchy for g_set in self)
 
     def common_hierarchy(self):
