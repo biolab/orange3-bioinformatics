@@ -31,7 +31,7 @@ Labels = [
     ("static.cite", "Citation"),
     ("var.growth", "Growth"),
     ("var.treatment", "Treatment"),
-    ("var.strain", "Parental strain")]
+    ("var.strain", "Strain")]
 
 
 # Creates line separator
@@ -61,9 +61,12 @@ class OWdictyExpress(OWWidget):
         invalid_credentials = Msg('Invalid credentials')
 
     username = settings.Setting('')
-    password = settings.Setting('')
+    # password = settings.Setting('')
     setTimeVariable = settings.Setting(False)
     gene_as_attr_name = settings.Setting(0)
+
+    selected_item = settings.Setting(None, schema_only=True)
+    auto_commit = settings.Setting(False, schema_only=True)
 
     def __init__(self):
         super().__init__()
@@ -80,12 +83,12 @@ class OWdictyExpress(OWWidget):
         self.threadpool = QThreadPool()
 
         # Login Section
-
         box = gui.widgetBox(self.controlArea, 'Login')
 
         self.namefield = gui.lineEdit(box, self, "username", "Username:", labelWidth=100, orientation='horizontal',
                                       callback=self.auth_changed)
 
+        self.password = ''
         self.passfield = gui.lineEdit(box, self, "password", "Password:", labelWidth=100, orientation='horizontal',
                                       callback=self.auth_changed)
 
@@ -95,17 +98,16 @@ class OWdictyExpress(OWWidget):
 
         box = gui.widgetBox(self.controlArea, "Output", addSpace=True)
         gui.radioButtonsInBox(box, self, "gene_as_attr_name", ["Genes in rows", "Genes in columns"],
-                              callback=self.commit)
+                              callback=self.invalidate)
 
         self.controlArea.layout().addWidget(h_line())
-
-        self.commit_button = gui.button(self.controlArea, self, "Commit", callback=self.commit)
-        self.handle_commit_button(False)
 
         self.refresh_button = gui.button(self.controlArea, self, "Refresh", callback=self.refresh)
         self.handle_cache_button(True)
 
         gui.rubber(self.controlArea)
+
+        self.commit_button = gui.auto_commit(self.controlArea, self, "auto_commit", "&Commit", box=False)
 
         # Experiment Section
 
@@ -157,7 +159,6 @@ class OWdictyExpress(OWWidget):
         self.items = []
         # self.lastSelected = None
         self.searchString = ""
-        self.handle_commit_button(False)
 
     def search_update(self):
         parts = self.searchString.split()
@@ -187,7 +188,6 @@ class OWdictyExpress(OWWidget):
         self.res = None
         self.Error.clear()
         self.reset()
-        self.handle_commit_button(False)
         self.handle_cache_button(False)
 
         user, password = resolwe.DEFAULT_EMAIL, resolwe.DEFAULT_PASSWD
@@ -224,12 +224,19 @@ class OWdictyExpress(OWWidget):
             self.experimentsWidget.resizeColumnToContents(i)
 
         self.set_cached_indicator()
+        self.set_selected()
+
+    def set_selected(self):
+        for item in self.items:
+            if self.selected_item and item.gen_data_id == self.selected_item:
+                self.experimentsWidget.setCurrentItem(item)
+                self.commit()
 
     def onSelectionChanged(self):
-        self.handle_commit_button(True)
+        self.invalidate()
 
-    def handle_commit_button(self, handle):
-        self.commit_button.setEnabled(handle)
+    def invalidate(self):
+        self.commit()
 
     def handle_cache_button(self, handle):
         self.refresh_button.setEnabled(handle)
@@ -278,6 +285,7 @@ class OWdictyExpress(OWWidget):
         self.Error.clear()
 
         selected_item = self.experimentsWidget.currentItem()  # get selected TreeItem
+        self.selected_item = selected_item.gen_data_id
 
         if selected_item:
             # init progress bar
