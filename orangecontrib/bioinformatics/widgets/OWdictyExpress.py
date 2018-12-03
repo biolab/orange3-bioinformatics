@@ -230,7 +230,6 @@ class OWdictyExpress(OWWidget):
         for item in self.items:
             if self.selected_item and item.gen_data_id == self.selected_item:
                 self.experimentsWidget.setCurrentItem(item)
-                self.commit()
 
     def onSelectionChanged(self):
         self.invalidate()
@@ -283,7 +282,6 @@ class OWdictyExpress(OWWidget):
 
     def commit(self):
         self.Error.clear()
-
         selected_item = self.experimentsWidget.currentItem()  # get selected TreeItem
         self.selected_item = selected_item.gen_data_id
 
