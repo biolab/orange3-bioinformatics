@@ -107,19 +107,18 @@ def group_candidates(data):
 
     targets = defaultdict(set)
     for label, value in items:
-        targets[label].add(str(value))
+        targets[label].add(value)
 
     # Need at least 2 distinct values or key
     targets = [(key, sorted(vals)) for key, vals in targets.items() if len(vals) >= 2]
 
-    column_groups = [ColumnGroup(key, key, values)
-                     for key, values in sorted(targets)]
+    column_groups = [ColumnGroup(key, key, values)for key, values in sorted(targets)]
+
     disc_vars = [var for var in data.domain.class_vars + data.domain.metas
                  if isinstance(var, DiscreteVariable)
                  and len(var.values) >= 2]
 
-    row_groups = [RowGroup(var.name, var, var.values)
-                  for var in disc_vars]
+    row_groups = [RowGroup(var.name, var, var.values) for var in disc_vars]
     return column_groups, row_groups
 
 
@@ -181,18 +180,22 @@ class LabelSelectionWidget(QWidget):
 
     .. note:: This is not a QAbstractItemView subclass.
     """
-    #: Current group/root index has changed.
+    # Current group/root index has changed.
     groupChanged = Signal(int)
-    #: Selection for the current group/root has changed.
-    groupSelectionChanged = Signal()
+    # Selection for the current group/root has changed.
+    groupSelectionChanged = Signal(int)
 
-    def __init__(self, parent=None, **kwargs):
-        super().__init__(parent, **kwargs)
+    def __init__(self):
+        super().__init__()
         self.__model = None
         self.__selectionMode = QListView.ExtendedSelection
 
         self.__currentIndex = -1
         self.__selections = {}
+
+        self.__parent = None
+
+        self.targets = []
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -210,8 +213,7 @@ class LabelSelectionWidget(QWidget):
             selectionMode=self.__selectionMode
         )
 
-        self.labels_combo.currentIndexChanged.connect(
-            self.__onCurrentIndexChanged)
+        self.labels_combo.currentIndexChanged.connect(self.__onCurrentIndexChanged)
 
         l_box = group_box(self.tr("Label"))
         v_box = group_box(self.tr("Values"))
@@ -224,8 +226,47 @@ class LabelSelectionWidget(QWidget):
 
         self.setLayout(layout)
 
-        self.setSizePolicy(QSizePolicy.Expanding,
-                           QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def set_selection(self):
+        model = self.model()
+
+        # FIX: This assumes fixed target key/values order.
+        indices = [model.index(i, 0, model.index(keyind, 0, ))
+                   for keyind, selected in enumerate(self.__parent.stored_selections)
+                   for i in selected]
+
+        selection = itemselection(indices)
+        self.setCurrentGroupIndex(self.__parent.current_group_index)
+        self.setSelection(selection)
+
+    def selected_split(self):
+        group_index = self.currentGroupIndex()
+        if not (0 <= group_index < len(self.targets)):
+            return None, []
+
+        group = self.targets[group_index]
+        selection = [ind.row() for ind in self.currentGroupSelection().indexes()]
+        return group, selection
+
+    def set_data(self, parent, data):
+        """ Initialize widget state after receiving new data.
+        """
+        self.__parent = parent
+        # self.__currentIndex = parent.current_group_index
+        if data is not None:
+            column_groups, row_groups = group_candidates(data)
+
+            self.targets = column_groups + row_groups
+
+            model = QStandardItemModel()
+            for item in [standarditem_from(desc) for desc in self.targets]:
+                model.appendRow(item)
+
+            self.setModel(model)
+        else:
+            self.targets = []
+            self.setModel(None)
 
     def clear(self):
         """ Clear the widget/model (same as ``setModel(None)``).
@@ -262,6 +303,7 @@ class LabelSelectionWidget(QWidget):
         self.__model = model
         self.values_view.setModel(model)
         self.values_view.setRootIndex(model.index(0, 0))
+
         self.values_view.selectionModel().selectionChanged.connect(
             self.__onSelectionChanged)
         # will emit the currentIndexChanged (if the model is not empty)
@@ -370,7 +412,7 @@ class LabelSelectionWidget(QWidget):
         self.__storeSelection(self.__currentIndex,
                               self.values_view.selectedIndexes())
 
-        self.groupSelectionChanged.emit()
+        self.groupSelectionChanged.emit(self.__currentIndex)
 
     def __storeSelection(self, groupind, indices):
         # Store current values selection for the current group
