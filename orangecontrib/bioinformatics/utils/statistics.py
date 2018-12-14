@@ -12,30 +12,35 @@ ALT_LESS = "less"
 ALT_GREATER = "greater"
 ALTERNATIVES = [ALT_GREATER, ALT_TWO, ALT_LESS]
 
-def score_t_test(a, b, **kwargs):
-    # type: (np.array, np.array) -> Tuple[Union[float, np.array], Union[float, np.array]]
+
+def score_t_test(a, b, axis=0, alternative=ALT_TWO):
+    # type: (np.array, np.array, int, str) -> Tuple[Union[float, np.array], Union[float, np.array]]
     """ Run t-test. Enable setting different alternative hypothesis.
     Probabilities are exact due to symmetry of the test.
 
-    :returns (statistics, p_values)
+    :return: (statistics, p_values)
 
     See also
     --------
     scipy.stats.ttest_ind
 
     """
-    alt = kwargs.get("alternative", ALT_TWO)
-    assert alt in ALTERNATIVES
-    scores, pvalues = scipy.stats.ttest_ind(a, b, axis=kwargs.get('axis', 0))
-    if alt == ALT_TWO:
+    # alt = kwargs.get("alternative", ALT_TWO)
+    assert alternative in ALTERNATIVES
+    scores, pvalues = scipy.stats.ttest_ind(a, b, axis=axis)
+
+    if alternative == ALT_TWO:
         return scores, pvalues
+
     less = scores < 0
     pvalues = pvalues / 2.0
     pvalues[np.logical_not(less)] = 1.0 - pvalues[np.logical_not(less)]
-    if alt == ALT_LESS:
+
+    if alternative == ALT_LESS:
         return scores, pvalues
     else:
         return scores, 1.0 - pvalues
+
 
 def score_mann_whitney(a, b, **kwargs):
     axis = kwargs.get('axis', 0)
@@ -103,6 +108,28 @@ def score_hypergeometric_test(a, b, threshold=1, **kwargs):
     return scores, pvalues
 
 
+def score_fold_change(a, b, axis=0, log=False):
+    # type: (np.array, np.array, int, bool) -> np.array
+    """ Calculate the fold change between `a` and `b` samples.
+
+    :param a: Array containing the samples
+    :param b: Array containing the samples
+    :param axis: Axis over which to compute the scores
+    :param log: Return the log2(scores).
+
+    :return: The fold change scores
+    """
+
+    scores = np.nanmean(a, axis=axis) / np.nanmean(b, axis=axis)
+
+    # TODO: Properly handle this warrning in widgets
+    # "Negative fold change scores were ignored. You should use another scoring method."
+    if np.any(scores < 0):
+        scores[scores < 0] = np.nan
+
+    return np.log2(scores) if log else scores
+
+
 def _lngamma(z):
     x = 0
     x += 0.1659470187408462e-06 / (z + 7)
@@ -143,7 +170,7 @@ class LogBin(object):
     def _logbin(self, n, k):
         if n >= self._max:
             self._extend(n + 100)
-        if k < n and k >= 0:
+        if n > k >= 0:
             return self._lookup[n] - self._lookup[n - k] - self._lookup[k]
         else:
             return 0.0
