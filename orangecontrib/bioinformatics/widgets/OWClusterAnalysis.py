@@ -14,7 +14,7 @@ from AnyQt.QtCore import (
 from scipy.stats import rankdata
 
 from Orange.widgets.gui import (
-    vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox, listView
+    vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox, listView, auto_commit
 )
 from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandler
@@ -234,6 +234,8 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_info_view.setItemDelegate(HTMLDelegate())
         self.cluster_info_view.horizontalHeader().hide()
         self.cluster_info_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        auto_commit(self.controlArea, self, "auto_commit", "&Commit", box=False)
 
         self.mainArea.layout().addWidget(self.cluster_info_view)
 
