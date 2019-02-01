@@ -296,7 +296,7 @@ class ClusterModel(QAbstractListModel):
         assert f.done()
 
         self._task = None
-        self.parent.progress_bar.finish()
+        self.parent.progressBarFinished()
         self.parent.filter_genes()
 
         try:
@@ -309,11 +309,14 @@ class ClusterModel(QAbstractListModel):
             item.cluster_scores(**kwargs)
             callback()
 
-    @Slot()
-    def progress_advance(self):
-        # GUI should be updated in main thread. That's why we are calling advance method here
+    @Slot(bool)
+    def progress_advance(self, finish):
+        # GUI should be updated in main thread. That's why wex are calling advance method here
         if self.parent.progress_bar:
-            self.parent.progress_bar.advance()
+            if finish:
+                self.parent.progressBarFinished()
+            else:
+                self.parent.progress_bar.advance()
 
     def cancel(self):
         """
@@ -323,7 +326,7 @@ class ClusterModel(QAbstractListModel):
             self._task.cancel()
             assert self._task.future.done()
             # disconnect the `_task_finished` slot
-            self._task.watcher.done.disconnect(self._score_genes)
+            self._task.watcher.done.disconnect(self._end_task)
             self._task = None
 
     def score_genes(self, **kwargs):
@@ -338,18 +341,21 @@ class ClusterModel(QAbstractListModel):
         Note:
             We do not apply filter nor notify view that data is changed. This is done after filters
         """
+        if self._task is not None:
+            # First make sure any pending tasks are cancelled.
+            self.cancel()
+        assert self._task is None
 
-        self._task = Task()
-        progress_advance = methodinvoke(self, "progress_advance")
+        progress_advance = methodinvoke(self, "progress_advance", (bool,))
 
         def callback():
             if self._task.cancelled:
                 raise KeyboardInterrupt()
-            if self.parent.progress_bar:
-                progress_advance()
+            progress_advance(self._task.cancelled)
 
         self.parent.progress_bar = ProgressBar(self.parent, iterations=len(self.get_rows()))
         f = partial(self._score_genes, callback=callback, **kwargs)
+        self._task = Task()
         self._task.future = self._executor.submit(f)
 
         self._task.watcher = FutureWatcher(self._task.future)

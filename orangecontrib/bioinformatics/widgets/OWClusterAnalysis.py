@@ -375,7 +375,6 @@ class OWClusterAnalysis(OWWidget):
             self.cluster_info_view.resizeRowsToContents()
 
     def __gene_enrichment(self):
-        # TODO: move this to the worker thread
         design = bool(self.gene_scoring.get_selected_desig())  # if true cluster vs. cluster else cluster vs rest
         test_type = self.gene_scoring.get_selected_test_type()
         method = self.gene_scoring.get_selected_method()
@@ -421,6 +420,9 @@ class OWClusterAnalysis(OWWidget):
     def invalidate(self, cluster_init=True):
         if self.input_data is not None and self.tax_id is not None:
             self.Warning.gene_enrichment.clear()
+
+            if self.cluster_info_model is not None:
+                self.cluster_info_model.cancel()
 
             self.__set_genes()
             if cluster_init:
