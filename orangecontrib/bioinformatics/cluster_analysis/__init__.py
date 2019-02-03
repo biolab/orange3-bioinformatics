@@ -94,12 +94,16 @@ class Cluster:
         else:
             self.filtered_genes = filtered_list
 
-    def filter_gene_sets(self, count, p_val, fdr):
+    def filter_gene_sets(self, p_val, fdr, max_set_count=None):
         all_args_none = all(arg is None for arg in [p_val, fdr])
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
         sorted_list = sorted(self.gene_sets, key=attrgetter('p_val' if all_args_none else 'fdr'))
-        count = count if count is not None else DISPLAY_GENE_SETS_COUNT
-        self.filtered_gene_sets = list(filter(filter_function, sorted_list))[:count]
+        filtered_list = list(filter(filter_function, sorted_list))
+
+        if max_set_count is not None:
+            self.filtered_gene_sets = filtered_list[:max_set_count]
+        else:
+            self.filtered_gene_sets = filtered_list
 
     def gene_set_enrichment(self, gene_sets, selected_sets, genes, ref_genes):
         self.gene_sets = []
@@ -206,8 +210,13 @@ class Cluster:
     def to_html(self):
         gene_sets = '(no enriched gene sets)'
         if self.filtered_gene_sets:
+            sets_to_display = self.filtered_gene_sets[:DISPLAY_GENE_SETS_COUNT]
             gene_sets = '<br>'.join(['<b>{}</b> (FDR={:0.2e}, n={})'.format(g_set.name, g_set.fdr, g_set.count)
-                                    for g_set in self.filtered_gene_sets])
+                                    for g_set in sets_to_display])
+
+            if len(self.filtered_gene_sets) > len(sets_to_display):
+                gene_sets += \
+                    '<br> ... ({} more gene sets)'.format(len(self.filtered_gene_sets) - DISPLAY_GENE_SETS_COUNT)
 
         genes = '(all genes are filtered out)'
         if self.filtered_genes:
@@ -384,8 +393,8 @@ class ClusterModel(QAbstractListModel):
         [item.filter_enriched_genes(p_val, fdr, max_gene_count=count) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 
-    def apply_gene_sets_filters(self, count=None, p_val=None, fdr=None):
-        [item.filter_gene_sets(count, p_val, fdr) for item in self.get_rows()]
+    def apply_gene_sets_filters(self, p_val=None, fdr=None, count=None):
+        [item.filter_gene_sets(p_val, fdr, max_set_count=count) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 
 

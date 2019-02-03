@@ -362,9 +362,9 @@ class OWClusterAnalysis(OWWidget):
         if self.cluster_info_model:
             # filter gene sets
             self.cluster_info_model.apply_gene_sets_filters(
-                self.min_gs_count if self.use_gs_count_filter else None,
                 self.max_gs_p_value if self.use_gs_pval_filter else None,
-                self.max_gs_fdr if self.use_gs_max_fdr else None)
+                self.max_gs_fdr if self.use_gs_max_fdr else None,
+                self.min_gs_count if self.use_gs_count_filter else None)
 
             # call sizeHint function
             self.cluster_info_view.resizeRowsToContents()
@@ -618,7 +618,11 @@ class OWClusterAnalysis(OWWidget):
             for row in zip(*profiles, gene_names, gene_ids, rank, scores, p_vals, fdr_vals):
                 data.append(list(row))
 
-        self.Outputs.gene_scores.send(Table(domain, data))
+        out_data = Table(domain, data)
+        out_data.attributes[TAX_ID] = self.tax_id
+        out_data.attributes[GENE_AS_ATTRIBUTE_NAME] = False
+        out_data.attributes[GENE_ID_COLUMN] = NCBI_ID
+        self.Outputs.gene_scores.send(out_data)
 
     def gene_set_scores_output(self, selected_clusters):
 
