@@ -17,7 +17,7 @@ from Orange.widgets.gui import (
     vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox, listView, auto_commit
 )
 from Orange.widgets.widget import OWWidget, Msg
-from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandler, PerfectDomainContextHandler
+from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandler, PerfectDomainContextHandler, vartype
 from Orange.widgets.utils.signals import Output, Input
 from Orange.widgets import settings
 from Orange.widgets.utils import itemmodels
@@ -31,6 +31,19 @@ from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSet
 from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, DISPLAY_GENE_SETS_COUNT
 from orangecontrib.bioinformatics.geneset.utils import GeneSetException
 from orangecontrib.bioinformatics.ncbi.gene.config import NCBI_ID
+
+
+class ClusterAnalysisContextHandler(PerfectDomainContextHandler):
+
+    def encode_setting(self, context, setting, value):
+        if setting.name == 'cluster_indicators':
+            value = [(var.name, 100 + vartype(var)) for var in value]
+        return super().encode_setting(context, setting, value)
+
+    def decode_setting(self, setting, value, domain=None):
+        return [domain[var[0]] for var in value] \
+                if setting.name == 'cluster_indicators' \
+                else super().decode_setting(setting, value, domain)
 
 
 class OWClusterAnalysis(OWWidget):
@@ -62,7 +75,7 @@ class OWClusterAnalysis(OWWidget):
         organism_mismatch = Msg('Organism in input data and custom gene sets does not match')
         cluster_batch_conflict = Msg('Cluster and batch must not be the same variable')
 
-    settingsHandler = PerfectDomainContextHandler()
+    settingsHandler = ClusterAnalysisContextHandler()
     cluster_indicators = ContextSetting([])
     batch_indicator = ContextSetting(None)
     stored_gene_sets_selection = ContextSetting(tuple())
@@ -141,7 +154,7 @@ class OWClusterAnalysis(OWWidget):
                                                sizeHint=QSize(256, 70))
 
         # Batch selection
-        self.batch_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,),
+        self.batch_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,), separators=False,
                                                             placeholder="")
         box = widgetBox(self.controlArea, 'Batch Indicator')
         self.batch_indicator_combobox = comboBox(box, self, 'batch_indicator',
@@ -294,9 +307,9 @@ class OWClusterAnalysis(OWWidget):
 
         ca_ind = DiscreteVariable.make(cluster_indicator_name, values=[val for val in new_cluster_values], ordered=True)
 
-        domain = Domain(self.store_input_domain.attributes,
-                        self.store_input_domain.class_vars,
-                        self.store_input_domain.metas + (ca_ind, ))
+        domain = Domain(self.input_data.domain.attributes,
+                        self.input_data.domain.class_vars,
+                        self.input_data.domain.metas + (ca_ind, ))
 
         table = self.input_data.transform(domain)
         table[:, ca_ind] = np.array([[row_profile_lookup[tuple(row_profile[:, i])]]
@@ -463,15 +476,16 @@ class OWClusterAnalysis(OWWidget):
 
         if data:
             self.input_data = data
-            # For Cluster Indicator do not use categorical variables that contain only one value.
-            self.store_input_domain = domain = self.input_data.domain.copy()
-            class_vars = [class_var for class_var in domain.class_vars if len(class_var.values) > 1]
-            class_vars_metas = [class_var for class_var in domain.metas
-                                if isinstance(class_var, DiscreteVariable) and len(class_var.values) > 1]
-            domain = Domain([], class_vars=class_vars, metas=class_vars_metas)
 
-            self.cluster_indicator_model.set_domain(domain)
-            self.batch_indicator_model.set_domain(domain)
+            self.cluster_indicator_model.set_domain(self.input_data.domain)
+            self.batch_indicator_model.set_domain(self.input_data.domain)
+
+            # For Cluster Indicator do not use categorical variables that contain only one value.
+            self.cluster_indicator_model.wrap([item for item in self.cluster_indicator_model if len(item.values) > 1])
+            # First value in batch indicator model is a NoneType,
+            # we can skip it when we validate categorical variables
+            self.batch_indicator_model.wrap(self.batch_indicator_model[:1] +
+                                            [item for item in self.batch_indicator_model[1:] if len(item.values) > 1])
 
             self.tax_id = self.input_data.attributes.get(TAX_ID, None)
             self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
@@ -484,7 +498,7 @@ class OWClusterAnalysis(OWWidget):
                 self.Error.gene_as_attributes()
                 return
 
-            self.openContext(data.domain)
+            self.openContext(self.input_data.domain)
 
             self.gs_widget.load_gene_sets(self.tax_id)
             if self.cluster_indicator_model and len(self.cluster_indicators) < 1:
