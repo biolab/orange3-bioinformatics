@@ -1,0 +1,25 @@
+parameters:
+  # defaults for any parameters that aren't specified
+  platform: ''
+
+
+steps:
+  - ${{ if in(parameters.platform, 'Linux') }}:
+    - script: |
+        pip install pytest pytest-cov
+        catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" \
+          pytest orangecontrib/single_cell/tests --doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
+      displayName: 'Run pytest'
+
+  - ${{ if in(parameters.platform, 'macOS', 'Windows) }}:
+      - script: |
+          pip install pytest pytest-cov
+          pytest orangecontrib/single_cell/tests --doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
+        displayName: 'Run pytest'
+
+  - task: PublishTestResults@2
+    condition: succeededOrFailed()
+    inputs:
+    testResultsFiles: '**/test-results.xml'
+    testRunTitle: 'Python $(python.version)'
+

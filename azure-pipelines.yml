@@ -1,0 +1,46 @@
+trigger:
+  - master
+
+jobs:
+
+  - job: 'Linux'
+    pool:
+      vmImage: 'ubuntu-16.04'
+    strategy:
+      matrix:
+         Python37:
+           python.version: '3.7'
+
+    steps:
+      - template: templates/install_add_on.yml
+      - template: templates/run_tests.yml
+        parameters:
+          platform: 'Linux'
+
+  - job: 'macOS'
+    pool:
+      vmImage: 'macOS-10.13'
+    strategy:
+      matrix:
+         Python37:
+           python.version: '3.7'
+
+    steps:
+      - template: templates/install_add_on.yml
+      - template: templates/run_tests.yml
+        parameters:
+          platform: 'macOS'
+
+  - job: 'Windows'
+    pool:
+      vmImage: 'vs2017-win2016'
+    strategy:
+      matrix:
+         Python37:
+           python.version: '3.7'
+
+    steps:
+      - template: templates/install_add_on.yml
+      - template: templates/run_tests.yml
+        parameters:
+          platform: 'Windows'
