@@ -1,0 +1,12 @@
+name: orange3-bioinformatics
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - serverfiles
+  - requests
+  - requests-cache
+  - genesis-pyapi
+  - scipy

@@ -657,7 +657,7 @@ class OWDifferentialExpression(widget.OWWidget):
             callbackOnReturn=True)
 
         box = gui.widgetBox(self.controlArea, "Target Labels")
-        self.label_selection_widget = guiutils.LabelSelectionWidget(self)
+        self.label_selection_widget = guiutils.LabelSelectionWidget()
         self.label_selection_widget.setMaximumHeight(150)
         box.layout().addWidget(self.label_selection_widget)
 
@@ -1069,8 +1069,8 @@ class OWDifferentialExpression(widget.OWWidget):
             values = grp.values
             selected_values = [values[i] for i in selected_indices]
 
-            left = ", ".join(v for v in values if v not in selected_values)
-            right = ", ".join(v for v in selected_values)
+            left = ", ".join(str(v) for v in values if v not in selected_values)
+            right = ", ".join(str(v) for v in selected_values)
 
             labelitem = pg.TextItem(left, color=(40, 40, 40))
             labelitem.setPos(x1, y1)
@@ -1098,7 +1098,7 @@ class OWDifferentialExpression(widget.OWWidget):
             if isinstance(grp, guiutils.ColumnGroup):
                 samples, genes = genes, samples
 
-            target_labels = [grp.values[i] for i in indices]
+            target_labels = [str(grp.values[i]) for i in indices]
             text = "%i samples, %i genes\n" % (samples, genes)
             text += "Sample target: '%s'" % (",".join(target_labels))
         else:
