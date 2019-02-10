@@ -14,10 +14,10 @@ from AnyQt.QtCore import (
 from scipy.stats import rankdata
 
 from Orange.widgets.gui import (
-    vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox, listView
+    vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox, listView, auto_commit
 )
 from Orange.widgets.widget import OWWidget, Msg
-from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandler
+from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandler, PerfectDomainContextHandler, vartype
 from Orange.widgets.utils.signals import Output, Input
 from Orange.widgets import settings
 from Orange.widgets.utils import itemmodels
@@ -31,6 +31,19 @@ from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSet
 from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, DISPLAY_GENE_SETS_COUNT
 from orangecontrib.bioinformatics.geneset.utils import GeneSetException
 from orangecontrib.bioinformatics.ncbi.gene.config import NCBI_ID
+
+
+class ClusterAnalysisContextHandler(PerfectDomainContextHandler):
+
+    def encode_setting(self, context, setting, value):
+        if setting.name == 'cluster_indicators':
+            value = [(var.name, 100 + vartype(var)) for var in value]
+        return super().encode_setting(context, setting, value)
+
+    def decode_setting(self, setting, value, domain=None):
+        return [domain[var[0]] for var in value] \
+                if setting.name == 'cluster_indicators' \
+                else super().decode_setting(setting, value, domain)
 
 
 class OWClusterAnalysis(OWWidget):
@@ -62,7 +75,7 @@ class OWClusterAnalysis(OWWidget):
         organism_mismatch = Msg('Organism in input data and custom gene sets does not match')
         cluster_batch_conflict = Msg('Cluster and batch must not be the same variable')
 
-    settingsHandler = DomainContextHandler()
+    settingsHandler = ClusterAnalysisContextHandler()
     cluster_indicators = ContextSetting([])
     batch_indicator = ContextSetting(None)
     stored_gene_sets_selection = ContextSetting(tuple())
@@ -141,7 +154,7 @@ class OWClusterAnalysis(OWWidget):
                                                sizeHint=QSize(256, 70))
 
         # Batch selection
-        self.batch_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,),
+        self.batch_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,), separators=False,
                                                             placeholder="")
         box = widgetBox(self.controlArea, 'Batch Indicator')
         self.batch_indicator_combobox = comboBox(box, self, 'batch_indicator',
@@ -235,6 +248,8 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_info_view.horizontalHeader().hide()
         self.cluster_info_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
+        auto_commit(self.controlArea, self, "auto_commit", "&Commit", box=False)
+
         self.mainArea.layout().addWidget(self.cluster_info_view)
 
     def sizeHint(self):
@@ -292,9 +307,9 @@ class OWClusterAnalysis(OWWidget):
 
         ca_ind = DiscreteVariable.make(cluster_indicator_name, values=[val for val in new_cluster_values], ordered=True)
 
-        domain = Domain(self.store_input_domain.attributes,
-                        self.store_input_domain.class_vars,
-                        self.store_input_domain.metas + (ca_ind, ))
+        domain = Domain(self.input_data.domain.attributes,
+                        self.input_data.domain.class_vars,
+                        self.input_data.domain.metas + (ca_ind, ))
 
         table = self.input_data.transform(domain)
         table[:, ca_ind] = np.array([[row_profile_lookup[tuple(row_profile[:, i])]]
@@ -306,7 +321,6 @@ class OWClusterAnalysis(OWWidget):
         self.clusters = []
         self.new_cluster_profile = []
         self.cluster_var = None
-        self.batch_indicator_model.set_domain(None)
 
         if self.cluster_indicators and self.input_data:
 
@@ -314,10 +328,6 @@ class OWClusterAnalysis(OWWidget):
                 self.cluster_var = self.__create_temp_class_var()
             else:
                 self.cluster_var = self.cluster_indicators[0]
-
-            self.batch_indicator_model.set_domain(self.input_data.domain)
-            # todo: this resets the previous selection for batch indicator. Fixme?
-            self.batch_indicator = self.batch_indicator_model[0]
 
             self.rows_by_cluster = np.asarray(self.input_data.get_column_view(self.cluster_var)[0], dtype=int)
             for index, name in enumerate(self.cluster_var.values):
@@ -365,15 +375,14 @@ class OWClusterAnalysis(OWWidget):
         if self.cluster_info_model:
             # filter gene sets
             self.cluster_info_model.apply_gene_sets_filters(
-                self.min_gs_count if self.use_gs_count_filter else None,
                 self.max_gs_p_value if self.use_gs_pval_filter else None,
-                self.max_gs_fdr if self.use_gs_max_fdr else None)
+                self.max_gs_fdr if self.use_gs_max_fdr else None,
+                self.min_gs_count if self.use_gs_count_filter else None)
 
             # call sizeHint function
             self.cluster_info_view.resizeRowsToContents()
 
     def __gene_enrichment(self):
-        # TODO: move this to the worker thread
         design = bool(self.gene_scoring.get_selected_desig())  # if true cluster vs. cluster else cluster vs rest
         test_type = self.gene_scoring.get_selected_test_type()
         method = self.gene_scoring.get_selected_method()
@@ -420,6 +429,9 @@ class OWClusterAnalysis(OWWidget):
         if self.input_data is not None and self.tax_id is not None:
             self.Warning.gene_enrichment.clear()
 
+            if self.cluster_info_model is not None:
+                self.cluster_info_model.cancel()
+
             self.__set_genes()
             if cluster_init:
                 self.__set_clusters()
@@ -436,10 +448,10 @@ class OWClusterAnalysis(OWWidget):
 
     @Inputs.data_table
     def handle_input(self, data):
+        self.closeContext()
         self.Warning.clear()
         self.Error.clear()
 
-        self.closeContext()
         self.input_data = None
         self.store_input_domain = None
         self.stored_gene_sets_selection = tuple()
@@ -449,13 +461,13 @@ class OWClusterAnalysis(OWWidget):
         self.use_attr_names = None
         self.gene_id_attribute = None
         self.clusters = None
-        self.cluster_indicators = []
 
         self.gs_widget.clear()
         self.gs_widget.clear_gene_sets()
-        self.cluster_indicator_model.set_domain(None)
         self.cluster_info_view.setModel(None)
 
+        self.cluster_indicators = []
+        self.cluster_var = None
         self.batch_indicator = None
         self.cluster_indicator_model.set_domain(None)
         self.batch_indicator_model.set_domain(None)
@@ -464,15 +476,16 @@ class OWClusterAnalysis(OWWidget):
 
         if data:
             self.input_data = data
-            # For Cluster Indicator do not use categorical variables that contain only one value.
-            self.store_input_domain = domain = self.input_data.domain.copy()
-            class_vars = [class_var for class_var in domain.class_vars if len(class_var.values) > 1]
-            class_vars_metas = [class_var for class_var in domain.metas
-                                if isinstance(class_var, DiscreteVariable) and len(class_var.values) > 1]
-            domain = Domain([], class_vars=class_vars, metas=class_vars_metas)
 
-            self.cluster_indicator_model.set_domain(domain)
-            self.batch_indicator_model.set_domain(domain)
+            self.cluster_indicator_model.set_domain(self.input_data.domain)
+            self.batch_indicator_model.set_domain(self.input_data.domain)
+
+            # For Cluster Indicator do not use categorical variables that contain only one value.
+            self.cluster_indicator_model.wrap([item for item in self.cluster_indicator_model if len(item.values) > 1])
+            # First value in batch indicator model is a NoneType,
+            # we can skip it when we validate categorical variables
+            self.batch_indicator_model.wrap(self.batch_indicator_model[:1] +
+                                            [item for item in self.batch_indicator_model[1:] if len(item.values) > 1])
 
             self.tax_id = self.input_data.attributes.get(TAX_ID, None)
             self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
@@ -488,9 +501,9 @@ class OWClusterAnalysis(OWWidget):
             self.openContext(self.input_data.domain)
 
             self.gs_widget.load_gene_sets(self.tax_id)
-            if self.cluster_indicator_model:
+            if self.cluster_indicator_model and len(self.cluster_indicators) < 1:
                 self.cluster_indicators = [self.cluster_indicator_model[0]]
-            if self.batch_indicator_model:
+            if self.batch_indicator_model and self.batch_indicator is None:
                 self.batch_indicator = self.batch_indicator_model[0]
 
             self.invalidate()
@@ -619,7 +632,11 @@ class OWClusterAnalysis(OWWidget):
             for row in zip(*profiles, gene_names, gene_ids, rank, scores, p_vals, fdr_vals):
                 data.append(list(row))
 
-        self.Outputs.gene_scores.send(Table(domain, data))
+        out_data = Table(domain, data)
+        out_data.attributes[TAX_ID] = self.tax_id
+        out_data.attributes[GENE_AS_ATTRIBUTE_NAME] = False
+        out_data.attributes[GENE_ID_COLUMN] = NCBI_ID
+        self.Outputs.gene_scores.send(out_data)
 
     def gene_set_scores_output(self, selected_clusters):
 

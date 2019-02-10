@@ -94,12 +94,16 @@ class Cluster:
         else:
             self.filtered_genes = filtered_list
 
-    def filter_gene_sets(self, count, p_val, fdr):
+    def filter_gene_sets(self, p_val, fdr, max_set_count=None):
         all_args_none = all(arg is None for arg in [p_val, fdr])
         filter_function = partial(self.apply_filter, p_val=p_val, fdr=fdr)
         sorted_list = sorted(self.gene_sets, key=attrgetter('p_val' if all_args_none else 'fdr'))
-        count = count if count is not None else DISPLAY_GENE_SETS_COUNT
-        self.filtered_gene_sets = list(filter(filter_function, sorted_list))[:count]
+        filtered_list = list(filter(filter_function, sorted_list))
+
+        if max_set_count is not None:
+            self.filtered_gene_sets = filtered_list[:max_set_count]
+        else:
+            self.filtered_gene_sets = filtered_list
 
     def gene_set_enrichment(self, gene_sets, selected_sets, genes, ref_genes):
         self.gene_sets = []
@@ -206,8 +210,13 @@ class Cluster:
     def to_html(self):
         gene_sets = '(no enriched gene sets)'
         if self.filtered_gene_sets:
+            sets_to_display = self.filtered_gene_sets[:DISPLAY_GENE_SETS_COUNT]
             gene_sets = '<br>'.join(['<b>{}</b> (FDR={:0.2e}, n={})'.format(g_set.name, g_set.fdr, g_set.count)
-                                    for g_set in self.filtered_gene_sets])
+                                    for g_set in sets_to_display])
+
+            if len(self.filtered_gene_sets) > len(sets_to_display):
+                gene_sets += \
+                    '<br> ... ({} more gene sets)'.format(len(self.filtered_gene_sets) - DISPLAY_GENE_SETS_COUNT)
 
         genes = '(all genes are filtered out)'
         if self.filtered_genes:
@@ -296,7 +305,7 @@ class ClusterModel(QAbstractListModel):
         assert f.done()
 
         self._task = None
-        self.parent.progress_bar.finish()
+        self.parent.progressBarFinished()
         self.parent.filter_genes()
 
         try:
@@ -309,11 +318,14 @@ class ClusterModel(QAbstractListModel):
             item.cluster_scores(**kwargs)
             callback()
 
-    @Slot()
-    def progress_advance(self):
-        # GUI should be updated in main thread. That's why we are calling advance method here
+    @Slot(bool)
+    def progress_advance(self, finish):
+        # GUI should be updated in main thread. That's why wex are calling advance method here
         if self.parent.progress_bar:
-            self.parent.progress_bar.advance()
+            if finish:
+                self.parent.progressBarFinished()
+            else:
+                self.parent.progress_bar.advance()
 
     def cancel(self):
         """
@@ -323,7 +335,7 @@ class ClusterModel(QAbstractListModel):
             self._task.cancel()
             assert self._task.future.done()
             # disconnect the `_task_finished` slot
-            self._task.watcher.done.disconnect(self._score_genes)
+            self._task.watcher.done.disconnect(self._end_task)
             self._task = None
 
     def score_genes(self, **kwargs):
@@ -338,18 +350,21 @@ class ClusterModel(QAbstractListModel):
         Note:
             We do not apply filter nor notify view that data is changed. This is done after filters
         """
+        if self._task is not None:
+            # First make sure any pending tasks are cancelled.
+            self.cancel()
+        assert self._task is None
 
-        self._task = Task()
-        progress_advance = methodinvoke(self, "progress_advance")
+        progress_advance = methodinvoke(self, "progress_advance", (bool,))
 
         def callback():
             if self._task.cancelled:
                 raise KeyboardInterrupt()
-            if self.parent.progress_bar:
-                progress_advance()
+            progress_advance(self._task.cancelled)
 
         self.parent.progress_bar = ProgressBar(self.parent, iterations=len(self.get_rows()))
         f = partial(self._score_genes, callback=callback, **kwargs)
+        self._task = Task()
         self._task.future = self._executor.submit(f)
 
         self._task.watcher = FutureWatcher(self._task.future)
@@ -378,8 +393,8 @@ class ClusterModel(QAbstractListModel):
         [item.filter_enriched_genes(p_val, fdr, max_gene_count=count) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 
-    def apply_gene_sets_filters(self, count=None, p_val=None, fdr=None):
-        [item.filter_gene_sets(count, p_val, fdr) for item in self.get_rows()]
+    def apply_gene_sets_filters(self, p_val=None, fdr=None, count=None):
+        [item.filter_gene_sets(p_val, fdr, max_set_count=count) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
 
 
