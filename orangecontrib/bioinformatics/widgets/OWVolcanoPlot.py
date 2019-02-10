@@ -26,14 +26,14 @@ class OWVolcanoPlot(OWDataProjectionWidget):
     icon = "icons/OWVolcanoPlot.svg"
     priority = 100
 
-    class Warning(OWWidget.Warning):
+    class Warning(OWDataProjectionWidget.Warning):
         insufficient_data = Msg('Insufficient data to compute statistics.'
                                 'More than one measurement per class should be provided ')
 
         gene_enrichment = Msg('{}, {}.')
         no_selected_gene_sets = Msg('No gene set selected, select them from Gene Sets box.')
 
-    class Error(OWWidget.Error):
+    class Error(OWDataProjectionWidget.Error):
         exclude_error = Msg('Target labels most exclude/include at least one value.')
         negative_values = Msg('Negative values in the input. The inputs cannot be in ratio scale.')
         data_not_annotated = Msg('The input date is not annotated as expexted. Please refer to documentation.')
