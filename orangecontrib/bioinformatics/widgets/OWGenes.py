@@ -180,6 +180,10 @@ class OWGenes(OWWidget):
     selected_gene_col = ContextSetting(None)
     use_attr_names = ContextSetting(True)
 
+    replaces = [
+        'orangecontrib.bioinformatics.widgets.OWGeneNameMatcher.OWGeneNameMatcher'
+    ]
+
     class Inputs:
         data_table = Input("Data", Table)
 
