@@ -119,7 +119,7 @@ class GeneInfoModel(itemmodels.PyTableModel):
 
         filtered_rows = []
         for row in self.data_table:
-            match_result = np.core.defchararray.rfind(row.astype(str), filter_pattern)
+            match_result = np.core.defchararray.rfind(np.char.lower(row), filter_pattern.lower())
             filtered_rows.append(not np.array_equal(match_result, invalid_result))
         return filtered_rows
 
@@ -564,6 +564,3 @@ class OWGeneNameMatcher(OWWidget):
 
     def get_target_ids(self):
         return [str(gene.ncbi_id) if gene.ncbi_id else '?' for gene in self.gene_matcher.genes]
-
-
-
