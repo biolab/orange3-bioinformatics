@@ -1,4 +1,4 @@
-Gene Name Matcher
+Genes
 =================
 
 Match input gene ID's with corresponding Entrez ID's.
@@ -24,7 +24,7 @@ You can also select a subset and feed it  to other widgets.
 By clicking on the gene Entrez ID in the list, you will be taken to the
 NCBI site with the information on the gene.
 
-![](images/gene_matcher/Gene-Name-Matcher-stamped.png)
+![](images/genes/genes-stamped.png)
 
 
 Example
@@ -32,4 +32,4 @@ Example
 
 First we load *brown-selected.tab* (from *Browse documentation data sets*) with the **File** widget and feed our data to the Gene Name Matcher. Orange recognized the organism correctly, but we have to tell it where our gene labels are. To do this, we tick off *Stored as feature (column) name* and select *gene* attribute from the list. Then we can observe gene info provided from the NCBI Gene database. In the **Data Table** we can see the Entrez ID column included as a meta attribute. The data is also properly annotated (see *Data Attributes* section in **Data Info** widget).
 
-![](images/gene_matcher/Gene-Name-Matcher-Example.png)
+![](images/genes/genes-Example.png)

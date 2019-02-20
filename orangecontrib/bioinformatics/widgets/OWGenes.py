@@ -1,4 +1,4 @@
-""" GeneNameMatching """
+""" Genes """
 import threading
 import numpy as np
 
@@ -159,8 +159,8 @@ class UnknownGeneInfoModel(itemmodels.PyListModel):
         return QAbstractTableModel.headerData(self, section, orientation, role)
 
 
-class OWGeneNameMatcher(OWWidget):
-    name = "Gene Name Matcher"
+class OWGenes(OWWidget):
+    name = "Genes"
     description = "Tool for working with genes"
     icon = "../widgets/icons/OWGeneInfo.svg"
     priority = 5

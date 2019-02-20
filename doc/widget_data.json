@@ -20,10 +20,10 @@
     "keywords": ["database", "data"],
     "category": "Bioinformatics"
     },
-"Gene Name Matcher": {
-    "title": "Gene Name Matcher",
-    "file": "widgets/gene_name_matcher.md",
-    "icon": "widgets/icons/gene-name-matcher.png",
+"Genes": {
+    "title": "Genes",
+    "file": "widgets/genes.md",
+    "icon": "widgets/icons/genes.png",
     "keywords": ["gene", "ontology"],
     "category": "Bioinformatics"
     },
