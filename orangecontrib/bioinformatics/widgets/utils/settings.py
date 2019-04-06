@@ -23,8 +23,8 @@ class SetContextHandler(settings.ContextHandler):
         ctx.items = frozenset(items)
         return ctx
 
-    def settings_to_widget(self, widget):
-        super().settings_to_widget(widget)
+    def settings_to_widget(self, widget, *args):
+        super().settings_to_widget(widget, *args)
 
         context = widget.current_context
         if context is None:
