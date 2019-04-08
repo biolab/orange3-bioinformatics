@@ -89,14 +89,14 @@ def dataset_download(gds_id, samples=None, transpose=False, progress_callback=No
         col, _ = table.get_column_view(class_var)
         col[:] = [map_class_values[class_val] for class_val in class_values]
 
-        if transpose:
-            table = Table.transpose(table, feature_names_column='sample_id', meta_attr_name='genes')
-            table.name = title  # table name is lost after transpose
-            table_annotations[GENE_AS_ATTRIBUTE_NAME] = not gds_info[GENE_AS_ATTRIBUTE_NAME]
-            table_annotations[GENE_ID_COLUMN] = gds_info[GENE_ID_ATTRIBUTE]
-        else:
-            table_annotations[GENE_AS_ATTRIBUTE_NAME] = gds_info[GENE_AS_ATTRIBUTE_NAME]
-            table_annotations[GENE_ID_ATTRIBUTE] = gds_info[GENE_ID_ATTRIBUTE]
+    if transpose:
+        table = Table.transpose(table, feature_names_column='sample_id', meta_attr_name='genes')
+        table.name = title  # table name is lost after transpose
+        table_annotations[GENE_AS_ATTRIBUTE_NAME] = not gds_info[GENE_AS_ATTRIBUTE_NAME]
+        table_annotations[GENE_ID_COLUMN] = gds_info[GENE_ID_ATTRIBUTE]
+    else:
+        table_annotations[GENE_AS_ATTRIBUTE_NAME] = gds_info[GENE_AS_ATTRIBUTE_NAME]
+        table_annotations[GENE_ID_ATTRIBUTE] = gds_info[GENE_ID_ATTRIBUTE]
 
     if progress_callback:
         progress_callback.emit()
