@@ -85,9 +85,6 @@ class GeneInfoDB:
                                   'symbol_from_nomenclature_authority FROM gene_info '
                                   'WHERE species = ? or tax_id = ?', (organism, organism)).fetchall()
 
-    def __del__(self):
-        self._db_con.close()
-
 
 if __name__ == "__main__":
 
