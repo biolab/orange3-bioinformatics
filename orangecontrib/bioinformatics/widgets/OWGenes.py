@@ -1,4 +1,4 @@
-""" GeneNameMatching """
+""" Genes """
 import threading
 import numpy as np
 
@@ -119,7 +119,7 @@ class GeneInfoModel(itemmodels.PyTableModel):
 
         filtered_rows = []
         for row in self.data_table:
-            match_result = np.core.defchararray.rfind(row.astype(str), filter_pattern)
+            match_result = np.core.defchararray.rfind(np.char.lower(row), filter_pattern.lower())
             filtered_rows.append(not np.array_equal(match_result, invalid_result))
         return filtered_rows
 
@@ -159,8 +159,8 @@ class UnknownGeneInfoModel(itemmodels.PyListModel):
         return QAbstractTableModel.headerData(self, section, orientation, role)
 
 
-class OWGeneNameMatcher(OWWidget):
-    name = "Gene Name Matcher"
+class OWGenes(OWWidget):
+    name = "Genes"
     description = "Tool for working with genes"
     icon = "../widgets/icons/OWGeneInfo.svg"
     priority = 5
@@ -179,6 +179,10 @@ class OWGeneNameMatcher(OWWidget):
     settingsHandler = DomainContextHandler()
     selected_gene_col = ContextSetting(None)
     use_attr_names = ContextSetting(True)
+
+    replaces = [
+        'orangecontrib.bioinformatics.widgets.OWGeneNameMatcher.OWGeneNameMatcher'
+    ]
 
     class Inputs:
         data_table = Input("Data", Table)
@@ -564,6 +568,3 @@ class OWGeneNameMatcher(OWWidget):
 
     def get_target_ids(self):
         return [str(gene.ncbi_id) if gene.ncbi_id else '?' for gene in self.gene_matcher.genes]
-
-
-
