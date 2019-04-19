@@ -170,26 +170,17 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         if rows is not None and len(rows) > 0:
             return self.mapFromSourceRows(rows[0])
 
-    def filter_table(self, filter_pattern):
-        _, col_size = self.table.shape
-        invalid_result = np.array([-1 for _ in range(col_size)])
+    def filter_table(self, filter_pattern: str):
+        selection = np.full(self.table.shape, True)
+        for search_word in filter_pattern.split():
+            match_result = np.core.defchararray.find(np.char.lower(self.table), search_word.lower()) >= 0
+            selection = selection & match_result
+        return selection
 
-        filtered_rows = []
-        for row in self.table:
-            match_result = np.core.defchararray.rfind(
-                np.char.lower(row), filter_pattern.lower()
-            )
-            filtered_rows.append(not np.array_equal(match_result, invalid_result))
-        return filtered_rows
-
-    def show_table(self, filter_pattern=None):
+    def show_table(self, filter_pattern=''):
         # clear cache if model changes
         self._row_instance.cache_clear()
-        self.wrap(
-            self.table[self.filter_table(filter_pattern)]
-            if filter_pattern
-            else self.table
-        )
+        self.wrap(self.table[self.filter_table(filter_pattern).any(axis=1), :])
 
 
 class OWGEODatasets(OWWidget):
@@ -347,10 +338,8 @@ class OWGEODatasets(OWWidget):
     def apply_filter(self):
         # filter only if data model is set
         if self.table_model.table is not None:
-            self.table_view.clearSpans()
-            self.table_view.setSortingEnabled(False)
+            # self.table_view.clearSpans()
             self.table_model.show_table(filter_pattern=str(self.search_pattern))
-            self.table_view.setSortingEnabled(True)
             self._set_selection()
             self.update_info()
 
