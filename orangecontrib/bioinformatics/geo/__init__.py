@@ -56,17 +56,17 @@ def dataset_all_info():
         return json.load(fp)
 
 
-def dataset_download(gds_id, samples=None, transpose=False, progress_callback=None):
+def dataset_download(gds_id, samples=None, transpose=False, callback=None):
     file_name = '{}.tab'.format(gds_id)
-    local_files.update(file_name, extract=True, callback=progress_callback.emit if progress_callback else None)
+    local_files.update(file_name, extract=True, callback=callback)
 
     table = Table(local_files.localpath_download(file_name))
     title = table.name
     gds_info = local_files.info(file_name)
     table_annotations = {TAX_ID: gds_info['taxid']}
 
-    if progress_callback:
-        progress_callback.emit()
+    if callback:
+        callback()
 
     if samples is not None:
         filters = [table_filter.FilterStringList(sample, sample_types) for sample, sample_types in samples.items()]
@@ -98,8 +98,8 @@ def dataset_download(gds_id, samples=None, transpose=False, progress_callback=No
         table_annotations[GENE_AS_ATTRIBUTE_NAME] = gds_info[GENE_AS_ATTRIBUTE_NAME]
         table_annotations[GENE_ID_ATTRIBUTE] = gds_info[GENE_ID_ATTRIBUTE]
 
-    if progress_callback:
-        progress_callback.emit()
+    if callback:
+        callback()
 
     table.attributes = table_annotations
     return table

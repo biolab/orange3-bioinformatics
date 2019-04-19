@@ -1,8 +1,10 @@
 """ Gene Expression Omnibus datasets widget """
 import sys
-import threading
 import numpy as np
 
+
+from typing import  Optional, DefaultDict, Any
+from types import SimpleNamespace as namespace
 from collections import defaultdict, OrderedDict
 from functools import lru_cache
 
@@ -18,9 +20,8 @@ from AnyQt.QtWidgets import (
 from AnyQt.QtCore import (
     Qt,
     QSize,
-    QThreadPool,
     QVariant,
-    QModelIndex,
+    QModelIndex
 )
 from AnyQt.QtGui import QFont, QColor
 
@@ -34,8 +35,7 @@ from Orange.widgets.gui import (
     lineEdit,
     LinkRole,
     LinkStyledItemDelegate,
-    IndicatorItemDelegate,
-    ProgressBar,
+    IndicatorItemDelegate
 )
 
 from Orange.widgets.widget import OWWidget
@@ -43,12 +43,31 @@ from Orange.widgets.utils import itemmodels
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output
 from Orange.data import Table
+from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 
 from orangecontrib.bioinformatics.geo import local_files
 from orangecontrib.bioinformatics.geo.dataset import GDSInfo
-from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 from orangecontrib.bioinformatics.geo import pubmed_url, is_cached
 from orangecontrib.bioinformatics.geo.dataset import get_samples, dataset_download
+
+
+class Result(namespace):
+    gds_dataset: Optional[Table] = None
+
+
+def run_download_task(gds_id: str, samples: DefaultDict[str, list], transpose: bool, state: TaskState):
+    res = Result()
+    current_iter = 0
+    max_iter = 102
+
+    def callback():
+        nonlocal current_iter
+        current_iter += 1
+        state.set_progress_value(100 * (current_iter / max_iter))
+
+    state.set_status("Downloading...")
+    res.gds_dataset = dataset_download(gds_id, samples, transpose=transpose, callback=callback)
+    return res
 
 
 class GEODatasetsModel(itemmodels.PyTableModel):
@@ -76,6 +95,7 @@ class GEODatasetsModel(itemmodels.PyTableModel):
 
         self.info = None
         self.table = None
+        self.filter_mask = None
 
         self.font = QFont()
         self.font.setUnderline(True)
@@ -183,19 +203,21 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         self.wrap(self.table[self.filter_table(filter_pattern).any(axis=1), :])
 
 
-class OWGEODatasets(OWWidget):
+class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     name = "GEO Data Sets"
     description = "Access to Gene Expression Omnibus data sets."
     icon = "icons/OWGEODatasets.svg"
     priority = 2
 
     class Outputs:
-        table = Output("Expression Data", Table)
+        gds_data = Output("Expression Data", Table)
 
+    search_pattern = Setting('')
+    auto_commit = Setting(True)
     genes_as_rows = Setting(False)
     mergeSpots = Setting(True)
-    gdsSelectionStates = Setting({})
     selected_gds = Setting(None)
+    gdsSelectionStates = Setting({})
     splitter_settings = Setting(
         (
             b'\x00\x00\x00\xff\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x01\xea\x00\x00\x00\xd7\x01\x00\x00\x00\x07\x01\x00\x00\x00\x02',
@@ -203,33 +225,19 @@ class OWGEODatasets(OWWidget):
         )
     )
 
-    search_pattern = Setting('')
-    auto_commit = Setting(True)
-
     def __init__(self):
-        super().__init__()
-        self.gds_info_object = GDSInfo()
+        OWWidget.__init__(self)
+        ConcurrentWidgetMixin.__init__(self)
 
-        self.selectionChanged = False
-        self.output_table_title = ''
-
-        # threads
-        self.threadpool = QThreadPool(self)
-        self.workers = None
-        self.progress_bar = None
+        self.gds_info: Optional[GDSInfo] = GDSInfo()  # TODO: handle possible exceptions
+        self.gds_data: Optional[Table] = None
 
         # Control area
         box = widgetBox(self.controlArea, 'Info', addSpace=True)
         self.infoBox = widgetLabel(box, 'Initializing\n\n')
 
         box = widgetBox(self.controlArea, 'Output', addSpace=True)
-        radioButtonsInBox(
-            box,
-            self,
-            'genes_as_rows',
-            ['Samples in rows', 'Genes in rows'],
-            callback=self.commit,
-        )
+        radioButtonsInBox(box, self, 'genes_as_rows', ['Samples in rows', 'Genes in rows'], callback=self._run)
         separator(box)
 
         rubber(self.controlArea)
@@ -238,14 +246,11 @@ class OWGEODatasets(OWWidget):
         # Main Area
 
         # Filter widget
-        self.filter = lineEdit(
-            self.mainArea,
-            self,
-            'search_pattern',
-            'Filter:',
-            callbackOnType=True,
-            callback=self.apply_filter,
-        )
+        self.filter = lineEdit(self.mainArea, self,
+                               'search_pattern',
+                               'Filter:',
+                               callbackOnType=True,
+                               callback=self._apply_filter)
         self.mainArea.layout().addWidget(self.filter)
 
         splitter_vertical = QSplitter(Qt.Vertical, self.mainArea)
@@ -265,7 +270,7 @@ class OWGEODatasets(OWWidget):
         self.table_view.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
 
         self.table_model = GEODatasetsModel()
-        self.table_model.initialize(self.gds_info_object)
+        self.table_model.initialize(self.gds_info)
         self.table_view.setModel(self.table_model)
         self.table_model.show_table()
 
@@ -310,74 +315,27 @@ class OWGEODatasets(OWWidget):
         self.annotations_widget.setRootIsDecorated(True)
         box.layout().addWidget(self.annotations_widget)
         self._annotations_updating = False
-        self.annotations_widget.itemChanged.connect(self.annotation_selection_changed)
+        self.annotations_widget.itemChanged.connect(self.on_annotation_selection_changed)
         self.splitters = splitter_vertical, splitter_horizontal
 
         for sp, setting in zip(self.splitters, self.splitter_settings):
-            sp.splitterMoved.connect(self.splitter_moved)
+            sp.splitterMoved.connect(self._splitter_moved)
             sp.restoreState(setting)
 
-        self.table_view.selectionModel().selectionChanged.connect(
-            self.selection_changed
-        )
-        self.apply_filter()
-        self.commit()
+        self.table_view.selectionModel().selectionChanged.connect(self.on_gds_selection_changed)
+        self._apply_filter()
 
-    def _set_selection(self):
-        if self.selected_gds is not None:
-            index = self.table_model.get_row_index(self.selected_gds.get('name'))
-            if index is not None:
-                # todo: is this needed?
-                if self.auto_commit:
-                    self.auto_commit = False
-                    self.table_view.selectRow(index)
-                    self.auto_commit = True
-                else:
-                    self.table_view.selectRow(index)
+        self._run()
 
-    def apply_filter(self):
-        # filter only if data model is set
-        if self.table_model.table is not None:
-            # self.table_view.clearSpans()
-            self.table_model.show_table(filter_pattern=str(self.search_pattern))
-            self._set_selection()
-            self.update_info()
+    def _splitter_moved(self, *args):
+        self.splitter_settings = [bytes(sp.saveState()) for sp in self.splitters]
 
-    def selection_changed(self):
-        # todo: catch possible exceptions
-        if self.table_model.table is not None:
-            selection = self.table_view.selectionModel().selectedRows(
-                self.table_model.gds_id_col
-            )
-            selected_gds_name = selection[0].data() if len(selection) > 0 else None
-
-            if selected_gds_name:
-                self.selected_gds = self.table_model.info.get(selected_gds_name)
-                self.__set_annotations_widget(self.selected_gds)
-                self.__set_description_widget()
-            else:
-                self.annotations_widget.clear()
-                self.description_widget.clear()
-
-            self.update_info()
-            self.commit()
-
-    def update_info(self):
-        all_gds = len(self.table_model.info)
-        text = "{} datasets\n{} datasets cached\n".format(
-            all_gds, len(local_files.listfiles())
-        )
-        filtered = self.table_view.model().rowCount()
-        if all_gds != filtered:
-            text += "{} after filtering".format(filtered)
-        self.infoBox.setText(text)
-
-    def __set_description_widget(self):
+    def _set_description_widget(self):
         self.description_widget.setText(
             self.selected_gds.get('description', 'Description not available.')
         )
 
-    def __set_annotations_widget(self, gds):
+    def _set_annotations_widget(self, gds):
         self._annotations_updating = True
         self.annotations_widget.clear()
 
@@ -404,7 +362,51 @@ class OWGEODatasets(OWWidget):
         for i in range(self.annotations_widget.columnCount()):
             self.annotations_widget.resizeColumnToContents(i)
 
-    def annotation_selection_changed(self):
+    def _set_selection(self):
+        if self.selected_gds is not None:
+            index = self.table_model.get_row_index(self.selected_gds.get('name'))
+            if index is not None:
+                self.table_view.selectionModel().blockSignals(True)
+                self.table_view.selectRow(index)
+                self._handle_selection_changed()
+                self.table_view.selectionModel().blockSignals(False)
+
+    def _handle_selection_changed(self):
+        if self.table_model.table is not None:
+            selection = self.table_view.selectionModel().selectedRows(
+                self.table_model.gds_id_col
+            )
+            selected_gds_name = selection[0].data() if len(selection) > 0 else None
+
+            if selected_gds_name:
+                self.selected_gds = self.table_model.info.get(selected_gds_name)
+                self._set_annotations_widget(self.selected_gds)
+                self._set_description_widget()
+            else:
+                self.annotations_widget.clear()
+                self.description_widget.clear()
+
+            self.update_info()
+
+    def _apply_filter(self):
+        if self.table_model.table is not None:
+            self.table_model.show_table(filter_pattern=str(self.search_pattern))
+            self._set_selection()
+            self.update_info()
+
+    def _run(self):
+        if self.selected_gds is not None:
+            self.gds_data = None
+            self.start(run_download_task,
+                       self.selected_gds.get('name'),
+                       self.get_selected_samples(),
+                       self.genes_as_rows)
+
+    def on_gds_selection_changed(self):
+        self._handle_selection_changed()
+        self._run()
+
+    def on_annotation_selection_changed(self):
         if self._annotations_updating:
             return
         for i in range(self.annotations_widget.topLevelItemCount()):
@@ -416,9 +418,19 @@ class OWGEODatasets(OWWidget):
                 if 'key' in child.__dict__:
                     self.gdsSelectionStates[child.key] = child.checkState(0)
 
-        self.commit()
+        self._run()
 
-    def selected_samples(self):
+    def update_info(self):
+        all_gds = len(self.table_model.info)
+        text = "{} datasets\n{} datasets cached\n".format(
+            all_gds, len(local_files.listfiles())
+        )
+        filtered = self.table_view.model().rowCount()
+        if all_gds != filtered:
+            text += "{} after filtering".format(filtered)
+        self.infoBox.setText(text)
+
+    def get_selected_samples(self):
         """
         Return the currently selected sample annotations.
 
@@ -454,8 +466,7 @@ class OWGEODatasets(OWWidget):
                 samples.extend(selected_values)
                 used_types.append(str(stype.text(0)))
             else:
-                # If no sample of sample type is selected we don't filter
-                # on it.
+                # If no sample of sample type is selected we don't filter on it.
                 samples.extend(all_values)
                 unused_types.append(str(stype.text(0)))
 
@@ -464,45 +475,24 @@ class OWGEODatasets(OWWidget):
             _samples[sample].append(sample_type)
         return _samples
 
-    def _progress_advance(self):
-        assert threading.current_thread() == threading.main_thread()
-        # GUI should be updated in main thread. That's why we are calling advance method here
-        if self.progress_bar:
-            self.progress_bar.advance()
-
-    def _handle_worker_error(self, error):
-        assert threading.current_thread() == threading.main_thread()
-        raise ValueError(error)
-
-    def _handle_worker_finished(self, output):
-        assert threading.current_thread() == threading.main_thread()
-        if self.progress_bar:
-            self.progress_bar.finish()
-        self.Outputs.table.send(output)
-        self.table_model.initialize(self.gds_info_object)
-        self.apply_filter()
-
     def commit(self):
-        self.progress_bar = None
-        if self.selected_gds:
-            worker = Worker(
-                dataset_download,
-                self.selected_gds.get('name'),
-                self.selected_samples(),
-                transpose=self.genes_as_rows,
-                progress_callback=True,
-            )
+        self.Outputs.gds_data.send(self.gds_data)
 
-            worker.signals.progress.connect(self._progress_advance)
-            worker.signals.result.connect(self._handle_worker_finished)
-            worker.signals.error.connect(self._handle_worker_error)
+    def on_done(self, result: Result):
+        assert isinstance(result.gds_dataset, Table)
+        self.gds_data = result.gds_dataset
+        self.commit()
 
-            # move download process to worker thread
-            self.progress_bar = ProgressBar(self, iterations=102)
-            self.threadpool.start(worker)
+        if self.gds_info:
+            self.table_model.initialize(self.gds_info)
+            self._apply_filter()
 
-    def splitter_moved(self, *args):
-        self.splitter_settings = [bytes(sp.saveState()) for sp in self.splitters]
+    def on_partial_result(self, result: Any) -> None:
+        pass
+
+    def onDeleteWidget(self):
+        self.shutdown()
+        super().onDeleteWidget()
 
     def send_report(self):
         self.report_items(
@@ -538,7 +528,6 @@ class OWGEODatasets(OWWidget):
 
 
 if __name__ == "__main__":
-
     def main_test():
         from AnyQt.QtWidgets import QApplication
 
@@ -549,5 +538,6 @@ if __name__ == "__main__":
         r = app.exec_()
         w.saveSettings()
         return r
+
 
     sys.exit(main_test())
