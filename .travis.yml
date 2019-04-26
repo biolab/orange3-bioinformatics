@@ -1,12 +1,12 @@
 language: python
-dist: trusty
+dist: xenial
 sudo: false
 
 matrix:
     include:
-        - python: '3.6'
+        - python: '3.7'
           env: ORANGE_INSTALL=conda
-        - python: '3.6'
+        - python: '3.7'
           env: ORANGE_INSTALL=source
 
 cache:
@@ -18,8 +18,9 @@ before_install:
     - source $TRAVIS_BUILD_DIR/.travis/install_miniconda.sh
     - echo $TRAVIS_PYTHON_VERSION
     - conda env create -f conda_environment.yml python=$TRAVIS_PYTHON_VERSION
-    - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - source activate orange3-bioinformatics
+    - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
+
 
 install:
     - pip install -U pip wheel coverage codecov
