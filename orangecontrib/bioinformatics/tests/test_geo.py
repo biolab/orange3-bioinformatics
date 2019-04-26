@@ -4,9 +4,7 @@ import unittest
 from Orange.data import Table
 
 from orangecontrib.bioinformatics.geo.dataset import GDSInfo, GDS
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    GENE_ID_ATTRIBUTE, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME, TAX_ID
-)
+from orangecontrib.bioinformatics.ncbi.gene import OrangeTableAnnotations
 
 
 class TestGEO(unittest.TestCase):
@@ -39,11 +37,11 @@ class TestGEO(unittest.TestCase):
         self.assertEqual(int(gds_info[self.test_sample]['genes']), columns)
 
         # test data table annotations
-        self.assertTrue(GENE_AS_ATTRIBUTE_NAME in gds_table.attributes)
-        self.assertTrue(GENE_ID_ATTRIBUTE in gds_table.attributes)
-        self.assertTrue(TAX_ID in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.gene_as_attribute_name in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.gene_id_attribute in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.tax_id in gds_table.attributes)
 
-        self.assertTrue(gds_table.attributes[GENE_AS_ATTRIBUTE_NAME])
+        self.assertTrue(gds_table.attributes[OrangeTableAnnotations.gene_as_attribute_name])
 
     def test_gds_data_transposed(self):
         gds_info = GDSInfo()
@@ -59,11 +57,11 @@ class TestGEO(unittest.TestCase):
         self.assertEqual(int(gds_info[self.test_sample]['genes']), rows)
 
         # test data table annotations
-        self.assertTrue(GENE_AS_ATTRIBUTE_NAME in gds_table.attributes)
-        self.assertTrue(GENE_ID_COLUMN in gds_table.attributes)
-        self.assertTrue(TAX_ID in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.gene_as_attribute_name in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.gene_id_column in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.tax_id in gds_table.attributes)
 
-        self.assertFalse(gds_table.attributes[GENE_AS_ATTRIBUTE_NAME])
+        self.assertFalse(gds_table.attributes[OrangeTableAnnotations.gene_as_attribute_name])
 
 
 if __name__ == '__main__':
