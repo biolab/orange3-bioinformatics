@@ -13,10 +13,7 @@ from serverfiles import ServerFiles, LocalFiles
 from Orange.misc.environ import data_dir
 from Orange.data import Table, DiscreteVariable, Domain, filter as table_filter
 
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    GENE_AS_ATTRIBUTE_NAME, GENE_ID_ATTRIBUTE, GENE_ID_COLUMN, TAX_ID
-)
-
+from orangecontrib.bioinformatics.ncbi.gene import OrangeTableAnnotations as Annotations
 
 domain = 'geo'
 _local_cache_path = os.path.join(data_dir(), domain)
@@ -63,7 +60,7 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
     table = Table(local_files.localpath_download(file_name))
     title = table.name
     gds_info = local_files.info(file_name)
-    table_annotations = {TAX_ID: gds_info['taxid']}
+    table_annotations = {Annotations.tax_id: gds_info['taxid']}
 
     if callback:
         callback()
@@ -92,11 +89,11 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
     if transpose:
         table = Table.transpose(table, feature_names_column='sample_id', meta_attr_name='genes')
         table.name = title  # table name is lost after transpose
-        table_annotations[GENE_AS_ATTRIBUTE_NAME] = not gds_info[GENE_AS_ATTRIBUTE_NAME]
-        table_annotations[GENE_ID_COLUMN] = gds_info[GENE_ID_ATTRIBUTE]
+        table_annotations[Annotations.gene_as_attribute_name] = not gds_info[Annotations.gene_as_attribute_name]
+        table_annotations[Annotations.gene_id_column] = gds_info[Annotations.gene_id_attribute]
     else:
-        table_annotations[GENE_AS_ATTRIBUTE_NAME] = gds_info[GENE_AS_ATTRIBUTE_NAME]
-        table_annotations[GENE_ID_ATTRIBUTE] = gds_info[GENE_ID_ATTRIBUTE]
+        table_annotations[Annotations.gene_as_attribute_name] = gds_info[Annotations.gene_as_attribute_name]
+        table_annotations[Annotations.gene_id_attribute] = gds_info[Annotations.gene_id_attribute]
 
     if callback:
         callback()
