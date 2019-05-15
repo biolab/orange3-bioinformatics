@@ -4,3 +4,4 @@ requests
 requests-cache
 genesis-pyapi
 scipy
+numpy
