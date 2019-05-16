@@ -1,9 +1,13 @@
-.. py:currentmodule:: orangecontrib.bioinformatics.annotation.annotate_samples
-
 ****************
 Sample Annotator
 ****************
 
-.. autoclass:: AnnotateSamples()
+.. autoclass:: orangecontrib.bioinformatics.annotation.annotate_samples.AnnotateSamples()
    :members:
 
+********************
+Projection Annotator
+********************
+
+.. automodule:: orangecontrib.bioinformatics.annotation.annotate_projection
+   :members:
