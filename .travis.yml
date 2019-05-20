@@ -23,7 +23,7 @@ before_install:
 
 install:
     - pip install -U pip wheel coverage codecov
-    - pip install PyQt5
+    - pip install PyQt5==5.11.3
     - pip install -e .
     - pip freeze
 
