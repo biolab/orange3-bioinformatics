@@ -3,7 +3,7 @@ import pickle
 
 from collections import defaultdict
 from functools import lru_cache
-from typing import List, Union
+from typing import List, Union, Optional
 from types import SimpleNamespace
 
 from requests.exceptions import ConnectTimeout, RequestException, ConnectionError
