@@ -11,6 +11,7 @@ from functools import partial
 from AnyQt.QtCore import (
     Qt,
     QSize,
+    QTimer,
     QModelIndex,
     QItemSelection,
     QItemSelectionModel,
@@ -167,16 +168,15 @@ class OWMarkerGenes(widget.OWWidget):
     settingsHandler = MarkerGroupContextHandler()
     selected_genes: List[tuple] = settings.ContextSetting([])
 
-    # class Error(widget.OWWidget.Error):
-    #     file_not_found = widget.Msg("File not found.")
-
-    # class Warning(widget.OWWidget.Warning):
-    #     local_data = widget.Msg("File not found, local cached data is shown.")
 
     def __init__(self):
         super().__init__()
         self._data = None
         self._available_db_sources = None
+
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._filter_table)
+        self._timer.setSingleShot(True)
 
         box = gui.widgetBox(self.controlArea, 'Database', margin=0)
         self.db_source_index = -1
@@ -196,7 +196,7 @@ class OWMarkerGenes(widget.OWWidget):
             self.mainArea, self, "filter_text"
         )  # type: QLineEdit
         filter_line_edit.setPlaceholderText("Filter...")
-        filter_line_edit.textEdited.connect(self.set_filter_str)
+        filter_line_edit.textEdited.connect(self.call_filter_timer)
 
         self.view = view = QTreeView(
             rootIsDecorated=False,
@@ -346,12 +346,16 @@ class OWMarkerGenes(widget.OWWidget):
         self.selected_group = self.group_cb.itemText(group_index)
         self._setup()
 
-    def set_filter_str(self, search_string):
+    def call_filter_timer(self, search_string):
+        self._timer.stop()
         if search_string != self.filter_text:
             self.filter_text = search_string
+        self._timer.start(500)
+
+    def _filter_table(self):
         model = self.view.model()
         assert isinstance(model, SearchableTableModel)
-        model.update_model(str(search_string))
+        model.update_model(str(self.filter_text))
 
     def _setup(self):
         self.closeContext()
@@ -378,7 +382,7 @@ class OWMarkerGenes(widget.OWWidget):
         self.view.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
         self.openContext(self.selected_group)
-        self.set_filter_str(self.filter_text)
+        self.call_filter_timer(self.filter_text)
         self.set_selection()
 
         self.commit()
