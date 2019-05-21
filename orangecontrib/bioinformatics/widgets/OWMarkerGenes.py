@@ -38,7 +38,9 @@ def get_available_db_sources():
     found_sources = dict()
 
     try:
-        found_sources.update(serverfiles.ServerFiles().allinfo(serverfiles_domain))
+        found_sources.update(
+            serverfiles.ServerFiles().allinfo(serverfiles_domain)
+        )
     except ConnectionError as e:
         raise ConnectionError(
             'Can not connect to {}. Using only local files.'.format(
@@ -78,13 +80,16 @@ class SearchableTableModel(TableModel):
         self._data = data
         self._roleData = {Qt.DisplayRole: self.source}
         self._roleData = partial(
-            defaultdict, partial(defaultdict, partial(defaultdict, lambda: None))
+            defaultdict,
+            partial(defaultdict, partial(defaultdict, lambda: None)),
         )(self._roleData)
         self.set_column_links()
 
     def set_column_links(self):
         domain = self._data.domain
-        ref_col = domain.metas.index(domain[HeaderLabels[HeaderIndex.REFERENCE]])
+        ref_col = domain.metas.index(
+            domain[HeaderLabels[HeaderIndex.REFERENCE]]
+        )
         font = QFont()
         font.setUnderline(True)
         color = QColor(Qt.blue)
@@ -118,8 +123,10 @@ class SearchableTableModel(TableModel):
         for search_word in filter_pattern.split():
             match_result = (
                 np.core.defchararray.find(
-                    np.char.lower(self._data.metas.astype(str)), search_word.lower()
-                ) >= 0
+                    np.char.lower(self._data.metas.astype(str)),
+                    search_word.lower(),
+                )
+                >= 0
             )
             selection = selection & match_result
         return selection
@@ -151,9 +158,7 @@ class OWMarkerGenes(widget.OWWidget):
     icon = 'icons/OWMarkerGenes.svg'
     priority = 170
 
-    replaces = [
-        'orangecontrib.single_cell.widgets.owmarkergenes.OWMarkerGenes'
-    ]
+    replaces = ['orangecontrib.single_cell.widgets.owmarkergenes.OWMarkerGenes']
 
     class Outputs:
         genes = widget.Output("Genes", Table)
@@ -167,7 +172,6 @@ class OWMarkerGenes(widget.OWWidget):
 
     settingsHandler = MarkerGroupContextHandler()
     selected_genes: List[tuple] = settings.ContextSetting([])
-
 
     def __init__(self):
         super().__init__()
@@ -233,7 +237,9 @@ class OWMarkerGenes(widget.OWWidget):
             self.db_source_index = idx
             self.selected_db_source = items[idx]
         elif items:
-            self.db_source_index = min(max(self.db_source_index, 0), len(items) - 1)
+            self.db_source_index = min(
+                max(self.db_source_index, 0), len(items) - 1
+            )
 
         self.set_db_source_index(self.db_source_index)
 
@@ -272,13 +278,17 @@ class OWMarkerGenes(widget.OWWidget):
                 self.group_index = idx
                 self.selected_group = group_values[idx]
             elif group_values:
-                self.group_index = min(max(self.group_index, 0), len(group_values) - 1)
+                self.group_index = min(
+                    max(self.group_index, 0), len(group_values) - 1
+                )
 
             self.set_group_index(self.group_index)
 
     def _load_data(self):
         self.available_db_sources = get_available_db_sources()
-        file_name = self.available_db_sources[self.selected_db_source]['filename']
+        file_name = self.available_db_sources[self.selected_db_source][
+            'filename'
+        ]
 
         try:
             serverfiles.update(serverfiles_domain, file_name)
@@ -288,7 +298,9 @@ class OWMarkerGenes(widget.OWWidget):
                 'Using only local files.'.format(serverfiles.server_url)
             )
         finally:
-            file_path = serverfiles.localpath_download(serverfiles_domain, file_name)
+            file_path = serverfiles.localpath_download(
+                serverfiles_domain, file_name
+            )
             data = Table(file_path)
 
             # enforce order
@@ -364,7 +376,9 @@ class OWMarkerGenes(widget.OWWidget):
         gvec = data.get_column_view(group)[0]
 
         if group.is_string:
-            mask = gvec == self.group_cb.itemData(self.group_index, Qt.DisplayRole)
+            mask = gvec == self.group_cb.itemData(
+                self.group_index, Qt.DisplayRole
+            )
         else:
             mask = gvec == self.group_index
 
@@ -379,7 +393,9 @@ class OWMarkerGenes(widget.OWWidget):
         )
 
         self.view.setModel(model)
-        self.view.selectionModel().selectionChanged.connect(self._on_selection_changed)
+        self.view.selectionModel().selectionChanged.connect(
+            self._on_selection_changed
+        )
 
         self.openContext(self.selected_group)
         self.call_filter_timer(self.filter_text)
@@ -420,7 +436,9 @@ class OWMarkerGenes(widget.OWWidget):
             output = model.source
 
         gene_id = self.view.selectionModel().selectedRows(HeaderIndex.GENE)
-        cell_type = self.view.selectionModel().selectedRows(HeaderIndex.CELL_TYPE)
+        cell_type = self.view.selectionModel().selectedRows(
+            HeaderIndex.CELL_TYPE
+        )
         ref = self.view.selectionModel().selectedRows(HeaderIndex.REFERENCE)
 
         self.selected_genes = [
@@ -431,7 +449,9 @@ class OWMarkerGenes(widget.OWWidget):
         # always false for marker genes data tables in single cell
         output.attributes[GENE_AS_ATTRIBUTE_NAME] = False
         # set taxonomy id in data.attributes
-        output.attributes[TAX_ID] = self.map_group_to_taxid.get(self.selected_group, '')
+        output.attributes[TAX_ID] = self.map_group_to_taxid.get(
+            self.selected_group, ''
+        )
         # set column id flag
         output.attributes[GENE_ID_COLUMN] = HeaderLabels[HeaderIndex.GENE]
         output.name = 'Marker Genes'
