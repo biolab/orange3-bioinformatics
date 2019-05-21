@@ -14,6 +14,7 @@ from Orange.data import StringVariable, DiscreteVariable, Domain, Table
 from orangecontrib.bioinformatics.ncbi.gene.config import *
 from orangecontrib.bioinformatics.ncbi.gene.utils import GeneInfoDB, parse_sources, parse_synonyms
 from orangecontrib.bioinformatics.utils import serverfiles, ensure_type
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
 
 _no_hits, _single_hit, _multiple_hits = 0, 1, 2
 _source, _symbol, _synonym, _locus, _gene_id, _nom_symbol = \
