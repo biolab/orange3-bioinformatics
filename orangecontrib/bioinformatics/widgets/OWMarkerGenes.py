@@ -49,7 +49,7 @@ def get_available_db_sources():
         )
     finally:
         found_sources.update(serverfiles.allinfo(serverfiles_domain))
-        return {item.get('title'): item for item in found_sources.values()}
+        return {item.get('title').split(': ')[-1]: item for item in found_sources.values()}
 
 
 # todo: this is ugly, refactor this in the future.
