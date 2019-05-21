@@ -18,7 +18,7 @@ from orangecontrib.bioinformatics.ncbi.gene import OrangeTableAnnotations as Ann
 domain = 'geo'
 _local_cache_path = os.path.join(data_dir(), domain)
 _all_info_file = os.path.join(_local_cache_path, '__INFO__')
-_server_url = 'http://file.biolab.si/geo/'
+_server_url = 'http://download.biolab.si/datasets/geo/'
 pubmed_url = 'http://www.ncbi.nlm.nih.gov/pubmed/{}'
 
 server_files = ServerFiles(server=_server_url)
