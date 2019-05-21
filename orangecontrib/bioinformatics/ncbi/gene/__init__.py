@@ -3,7 +3,9 @@ import pickle
 
 from collections import defaultdict
 from functools import lru_cache
-from typing import List, Union, Optional
+from typing import List, Union
+from types import SimpleNamespace
+
 from requests.exceptions import ConnectTimeout, RequestException, ConnectionError
 
 from Orange.data import StringVariable, DiscreteVariable, Domain, Table
@@ -17,6 +19,13 @@ from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLU
 _no_hits, _single_hit, _multiple_hits = 0, 1, 2
 _source, _symbol, _synonym, _locus, _gene_id, _nom_symbol = \
     'External reference', 'Symbol', 'Synonym', 'Locus tag', 'NCBI ID', 'Nomenclature symbol'
+
+
+class OrangeTableAnnotations(SimpleNamespace):
+    tax_id: str = 'taxonomy_id'
+    gene_id_column: str = 'gene_id_column'
+    gene_id_attribute: str = 'gene_id_attribute'
+    gene_as_attribute_name: str = 'gene_as_attribute_name'
 
 
 class NoGeneNamesException(Exception):
@@ -333,9 +342,9 @@ class GeneMatcher:
 
         table = Table(domain, data_x)
         table.name = 'Gene Matcher Results'
-        table.attributes[TAX_ID] = next(tax_id)
-        table.attributes[GENE_AS_ATTRIBUTE_NAME] = False
-        table.attributes[GENE_ID_COLUMN] = NCBI_ID
+        table.attributes[OrangeTableAnnotations.tax_id] = next(tax_id)
+        table.attributes[OrangeTableAnnotations.gene_as_attribute_name] = False
+        table.attributes[OrangeTableAnnotations.gene_id_column] = NCBI_ID
         return table
 
     def run_matcher(self, progress_callback=None):
