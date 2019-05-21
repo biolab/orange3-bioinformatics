@@ -1,18 +1,13 @@
+""" GEO module tests """
 import unittest
-from os import makedirs, path
 
 from Orange.data import Table
 
-from orangecontrib.bioinformatics.geo.utils import (
-    gds_is_cached, gds_download_url, gds_ensure_downloaded, gds_download,
-    spots_mean, spots_median, spots_min, spots_max, unknown, parse_attribute_line, DOMAIN
-)
 from orangecontrib.bioinformatics.geo.dataset import GDSInfo, GDS
-from orangecontrib.bioinformatics.utils import serverfiles
+from orangecontrib.bioinformatics.ncbi.gene import OrangeTableAnnotations
 
 
 class TestGEO(unittest.TestCase):
-
     test_sample = 'GDS1001'
     test_organism = '10090'
 
@@ -24,66 +19,49 @@ class TestGEO(unittest.TestCase):
         self.assertGreater(len(gds_info.values()), 0)
 
         self.assertIsNotNone(gds_info[self.test_sample])
-        self.assertEqual(gds_info[self.test_sample]['gene_count'], 9561)
-        self.assertEqual(len(gds_info[self.test_sample]['samples']), 4)
+        self.assertEqual(gds_info[self.test_sample]['genes'], 9561)
+        self.assertEqual(int(gds_info[self.test_sample]['sample_count']), 4)
         self.assertEqual(len(gds_info[self.test_sample]['subsets']), 2)
 
-    def test_gds_utils(self):
-        self.assertEqual(spots_mean([2, 2, 8, 8]), 5)
-        self.assertEqual(spots_mean([8, unknown, 4, unknown]), 6)
-        self.assertIsInstance(spots_mean([unknown, unknown]), float)
-
-        self.assertEqual(spots_median([2, 2, 4, 8, 8]), 4)
-        self.assertEqual(spots_median([8, unknown, 4, unknown]), 6)
-        self.assertIsInstance(spots_median([unknown, unknown]), float)
-
-        self.assertEqual(spots_min([2, 2, 8, 8]), 2)
-        self.assertEqual(spots_min([8, unknown, 4, unknown]), 4)
-        self.assertIsInstance(spots_min([unknown, unknown]), float)
-
-        self.assertEqual(spots_max([2, 2, 8, 8]), 8)
-        self.assertEqual(spots_max([8, unknown, 4, unknown]), 8)
-        self.assertIsInstance(spots_max([unknown, unknown]), float)
-
-        self.assertEqual(parse_attribute_line('!dataset_title = test_title'), ('title', 'test_title'))
-        self.assertEqual(parse_attribute_line('!dataset_description = test_desc'),  ('description', 'test_desc'))
-        self.assertEqual(parse_attribute_line('!dataset_gds_type = test_type'), ('gds_type', 'test_type'))
-
-        # header like line
-        self.assertRaises(AttributeError, parse_attribute_line, 'ID  SAMPLE1 SAMPLE2 SAMPLE3')
-
     def test_gds_data(self):
-        # test url
-        self.assertIsNotNone(gds_download_url(self.test_sample))
+        gds_info = GDSInfo()
+        gds_table = GDS(self.test_sample)
 
-        # file not in cache
-        self.assertFalse(gds_is_cached(self.test_sample))
+        # test if data is downloaded
+        self.assertIsNotNone(gds_table)
+        self.assertIsInstance(gds_table, Table)
 
-        # download gds from serverfiles
-        try:
-            makedirs(serverfiles.localpath(DOMAIN))
-        except OSError:
-            if path.exists(serverfiles.localpath(DOMAIN)):
-                pass
-            else:
-                # There was an error on creation, so make sure we know about it
-                raise
-        gds_download(self.test_sample)
+        # test data table values
+        rows, columns = gds_table.X.shape
+        self.assertEqual(int(gds_info[self.test_sample]['sample_count']), rows)
+        self.assertEqual(int(gds_info[self.test_sample]['genes']), columns)
 
-        # file in cache
-        self.assertIsNone(gds_ensure_downloaded(self.test_sample))
-        self.assertTrue(gds_is_cached(self.test_sample))
+        # test data table annotations
+        self.assertTrue(OrangeTableAnnotations.gene_as_attribute_name in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.gene_id_attribute in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.tax_id in gds_table.attributes)
 
-        gds = GDS(self.test_sample)
-        self.assertIsNotNone(gds.info)
-        self.assertEqual(gds.info['gene_count'], 9561)
-        self.assertEqual(len(gds.info['samples']), 4)
-        self.assertEqual(len(gds.info['subsets']), 2)
+        self.assertTrue(gds_table.attributes[OrangeTableAnnotations.gene_as_attribute_name])
 
-        self.assertEqual(gds.info['taxid'], self.test_organism)
+    def test_gds_data_transposed(self):
+        gds_info = GDSInfo()
+        gds_table = GDS(self.test_sample, transpose=True)
 
-        self.assertIsInstance(gds.get_data(), Table)
-        self.assertIsInstance(gds.get_data(transpose=True), Table)
+        # test if data is downloaded
+        self.assertIsNotNone(gds_table)
+        self.assertIsInstance(gds_table, Table)
+
+        # test data table values
+        rows, columns = gds_table.X.shape
+        self.assertEqual(int(gds_info[self.test_sample]['sample_count']), columns)
+        self.assertEqual(int(gds_info[self.test_sample]['genes']), rows)
+
+        # test data table annotations
+        self.assertTrue(OrangeTableAnnotations.gene_as_attribute_name in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.gene_id_column in gds_table.attributes)
+        self.assertTrue(OrangeTableAnnotations.tax_id in gds_table.attributes)
+
+        self.assertFalse(gds_table.attributes[OrangeTableAnnotations.gene_as_attribute_name])
 
 
 if __name__ == '__main__':
