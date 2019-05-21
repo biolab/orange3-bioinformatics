@@ -76,7 +76,7 @@ class SearchableTableModel(TableModel):
     ColorForRole = {ClassVar: None, Meta: None, Attribute: None}
 
     def __init__(self, data, parent):
-        TableModel.__init__(self, data[:, data.domain.metas[:-1]], parent)
+        TableModel.__init__(self, data, parent)
         self._data = data
         self._roleData = {Qt.DisplayRole: self.source}
         self._roleData = partial(
@@ -93,9 +93,9 @@ class SearchableTableModel(TableModel):
         font = QFont()
         font.setUnderline(True)
         color = QColor(Qt.blue)
-        for i, row in enumerate(self._data):
+        for i, row in enumerate(self.source):
             link = row[HeaderLabels[HeaderIndex.URL]].value
-            if len(link):
+            if len(link) and 'http' in link:
                 self._roleData[gui.LinkRole][i][ref_col] = link
                 self._roleData[Qt.FontRole][i][ref_col] = font
                 self._roleData[Qt.ForegroundRole][i][ref_col] = color
@@ -115,6 +115,7 @@ class SearchableTableModel(TableModel):
     def wrap(self, table):
         self.beginResetModel()
         self.source = table
+        self._roleData.clear()
         self.resetSorting()
         self.endResetModel()
 
@@ -135,6 +136,7 @@ class SearchableTableModel(TableModel):
         # clear cache if model changes
         self._row_instance.cache_clear()
         self.wrap(self._data[self.filter_table(filter_pattern).any(axis=1), :])
+        self.set_column_links()
 
 
 class MarkerGroupContextHandler(settings.ContextHandler):
@@ -399,6 +401,7 @@ class OWMarkerGenes(widget.OWWidget):
 
         self.openContext(self.selected_group)
         self.call_filter_timer(self.filter_text)
+        self.view.hideColumn(HeaderIndex.URL)
         self.set_selection()
 
         self.commit()
