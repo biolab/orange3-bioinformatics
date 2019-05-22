@@ -16,13 +16,14 @@ class AnnotateSamples:
     ----------
     p_value_th : float
         A threshold for the FDR. FDR values bellow this value are accepted
-    p_value_fun : callable, optional
-        A function that calculates p-value
+    p_value_fun : callable, optional (defaults: statistics.Binomial().p_value)
+        A function that calculates p-value. It can be either
+        statistics.Binomial().p_value or hypergeom.sf.
     """
 
     def __init__(self, p_value_th, p_value_fun=statistics.Binomial().p_value):
         if p_value_fun == hypergeom.sf:  # because sf accept x-1 instead of x
-            self.p_value_fun = lambda x, N, m, k: p_value_fun(x-1, N, m, k)
+            self.p_value_fun = lambda x, n, m, k: p_value_fun(x-1, n, m, k)
         else:
             self.p_value_fun = p_value_fun
 
@@ -44,22 +45,25 @@ class AnnotateSamples:
         :obj:`list`
             Sets of selected genes for each cell
         """
+        if len(data.X) <= 0:
+            return [], []
         # rank data
         data_ge_ranked = rankdata(data.X, axis=0)
 
         # compute U, mu, sigma
         n2 = data_ge_ranked.shape[0]
         n = n2 + 1
-        U = data_ge_ranked - 1
+        u = data_ge_ranked - 1
         mu = n2 / 2
         sigma = np.zeros(data_ge_ranked.shape[1])
         for i in range(data_ge_ranked.shape[1]):
             _, counts = np.unique(data_ge_ranked[:, i], return_counts=True)
             sigma[i] = np.sqrt(
-                1 * n2 / 12 * ((n + 1) - np.sum((counts ** 3 - counts)) / (n * (n - 1))))
+                1 * n2 / 12 * ((n + 1) - np.sum((counts ** 3 - counts)) /
+                               (n * (n - 1))))
 
         # compute z
-        z = (U - mu) / sigma
+        z = (u - mu) / sigma
 
         # gene selection
         genes_np = np.array([
@@ -85,8 +89,6 @@ class AnnotateSamples:
             Set of most expressed genes for each cell.
         cell_types_markers : dict
             marker genes for each cell type
-        p_function : str
-            Function used to compute p-values
 
         Returns
         -------
@@ -115,7 +117,7 @@ class AnnotateSamples:
             return prob
 
         return np.array([hg_cell(cg) for cg in gene_sets]), \
-               [x[0] for x in marker_genes_items]
+            [x[0] for x in marker_genes_items]
 
     def annotate_samples(self, data, marker_genes):
         selected_genes, z = self.select_genes(data)
@@ -123,5 +125,7 @@ class AnnotateSamples:
             selected_genes, marker_genes)
 
         domain = Domain([ContinuousVariable(ct) for ct in cell_types])
+        if len(cell_types_scores) <= 0:
+            cell_types_scores = np.empty((0, len(domain)))
         cell_types_scores_table = Table(domain, cell_types_scores)
         return cell_types_scores_table
