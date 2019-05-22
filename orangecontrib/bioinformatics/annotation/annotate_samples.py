@@ -10,12 +10,28 @@ from scipy.stats import hypergeom
 
 class AnnotateSamples:
     """
-    This class annotate data items with the labels using Hyper-geometric test
+    AnnotateSamples is class used for the annotation of data items with the
+    labels Mann-Whitney U test for selecting important values and
+    the Hyper-geometric for assigning the labels.
+
+    Example of use:
+
+    >>> from Orange.data import Table
+    >>> from orangecontrib.bioinformatics.utils import serverfiles
+    >>> from orangecontrib.bioinformatics.annotation.annotate_samples import AnnotateSamples
+    >>>
+    >>> data = Table("https://datasets.orange.biolab.si/sc/aml-1k.tab.gz")
+    >>> markers_path = serverfiles.localpath_download(
+    >>>     'marker_genes','panglao_gene_markers.tab')
+    >>> marker = Table(markers_path)
+    >>> annotator = AnnotateSamples(p_value_th=0.05)
+    >>> annotations = annotator.annotate_samples(data, markers)
 
     Attributes
     ----------
     p_value_th : float
-        A threshold for the FDR. FDR values bellow this value are accepted
+        A threshold for accepting the annotations. Annotations that has FDR
+        value bellow this threshold are used.
     p_value_fun : callable, optional (defaults: statistics.Binomial().p_value)
         A function that calculates p-value. It can be either
         statistics.Binomial().p_value or hypergeom.sf.
@@ -30,20 +46,20 @@ class AnnotateSamples:
         self.p_threshold = p_value_th
 
     @staticmethod
-    def select_genes(data):
+    def _select_genes(data):
         """
-        This function selects "over"-expressed genes for cells
-        with Mann-Whitney U test.
+        Function selects "over"-expressed attributes for items with Mann-Whitney
+        U test.
 
         Parameters
         ----------
         data : Orange.data.Table
-            Gene expressions
+            Tabular data
 
         Returns
         -------
         :obj:`list`
-            Sets of selected genes for each cell
+            Sets of selected attributes for each cell
         """
         if len(data.X) <= 0:
             return [], []
@@ -66,46 +82,55 @@ class AnnotateSamples:
         z = (u - mu) / sigma
 
         # gene selection
-        genes_np = np.array([
+        attributes_np = np.array([
             a.attributes.get("Entrez ID") for a in data.domain.attributes])
-        ge_expressed_sets = [set(genes_np[row > 1]) - {None} for row in z]
-        return ge_expressed_sets, z
+        attributes_sets = [set(attributes_np[row > 1]) - {None} for row in z]
+        return attributes_sets, z
 
     @staticmethod
-    def group_marker_genes(markers):
-        types_genes_dict = defaultdict(set)
-        for m in markers:
-            types_genes_dict[str(m["Cell Type"])].add(int(m["Entrez ID"].value))
-        return types_genes_dict
-
-    def assign_annotations(self, gene_sets, cell_types_markers):
+    def _group_marker_attributes(markers):
         """
-        Function get set of genes that represents each cell and marker genes for
-        each cell type. It returns the cell type most significant for each cell.
+        Function transforms annotations table to dictionary with format
+        {annotation1: [attributes], annotation2: [attributes], ...}
+        """
+        types_dict = defaultdict(set)
+        for m in markers:
+            types_dict[str(m["Cell Type"])].add(int(m["Entrez ID"].value))
+        return types_dict
+
+    def _assign_annotations(self, items_sets, available_annotations):
+        """
+        Function get set of attributes (e.g. genes) that represents each item
+        and attributes for each annotation. It returns the annotations most
+        significant for each cell.
 
         Parameters
         ----------
-        gene_sets : list of sets
-            Set of most expressed genes for each cell.
-        cell_types_markers : dict
-            marker genes for each cell type
+        items_sets : list of sets
+            Set of most important attributes for each item.
+        available_annotations : Orange.data.Table
+            Available annotations (e.g. cell types)
 
         Returns
         -------
-            Cell type most important for each cell.
+        ndarray
+            Annotation probabilities
+        list
+            Annotation list
         """
         N = 20365  # number of all genes for human
 
-        marker_genes = self.group_marker_genes(cell_types_markers)
-        marker_genes_items = list(marker_genes.items())
+        grouped_annotations = self._group_marker_attributes(
+            available_annotations)
+        grouped_annotations_items = list(grouped_annotations.items())
 
-        def hg_cell(cell_genes):
+        def hg_cell(item_attributes):
             p_values = []
-            prob = np.zeros(len(marker_genes_items))
-            for i, (ct, genes) in enumerate(marker_genes_items):
-                x = len(cell_genes & genes)
-                k = len(cell_genes)  # drawn balls - features expressed for item
-                m = len(genes)  # number of marked balls - items for a process
+            prob = np.zeros(len(grouped_annotations_items))
+            for i, (ct, attributes) in enumerate(grouped_annotations_items):
+                x = len(item_attributes & attributes)
+                k = len(item_attributes)  # drawn balls - expressed for item
+                m = len(attributes)  # marked balls - items for a process
 
                 p_value = self.p_value_fun(x, N, m, k)
 
@@ -116,16 +141,31 @@ class AnnotateSamples:
             prob[np.array(fdrs) > self.p_threshold] = 0
             return prob
 
-        return np.array([hg_cell(cg) for cg in gene_sets]), \
-            [x[0] for x in marker_genes_items]
+        return np.array([hg_cell(cg) for cg in items_sets]), \
+            [x[0] for x in grouped_annotations_items]
 
-    def annotate_samples(self, data, marker_genes):
-        selected_genes, z = self.select_genes(data)
-        cell_types_scores, cell_types = self.assign_annotations(
-            selected_genes, marker_genes)
+    def annotate_samples(self, data, available_annotations):
+        """
+        Function marks the data with annotations that are provided provided.
 
-        domain = Domain([ContinuousVariable(ct) for ct in cell_types])
-        if len(cell_types_scores) <= 0:
-            cell_types_scores = np.empty((0, len(domain)))
-        cell_types_scores_table = Table(domain, cell_types_scores)
-        return cell_types_scores_table
+        Parameters
+        ----------
+        data : Orange.data.Table
+            Tabular data
+        available_annotations : Orange.data.Table
+            Available annotations (e.g. cell types)
+
+        Returns
+        -------
+        Orange.data.Table
+            Cell type most important for each cell.
+        """
+        selected_attributes, z = self._select_genes(data)
+        annotations_scores, annotations = self._assign_annotations(
+            selected_attributes, available_annotations)
+
+        domain = Domain([ContinuousVariable(ct) for ct in annotations])
+        if len(annotations_scores) <= 0:
+            annotations_scores = np.empty((0, len(domain)))
+        scores_table = Table(domain, annotations_scores)
+        return scores_table
