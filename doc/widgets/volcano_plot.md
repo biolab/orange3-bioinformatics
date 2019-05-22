@@ -1,8 +1,6 @@
 Volcano Plot
 ============
 
-![image](icons/volcano-plot.png)
-
 Plots significance versus fold-change for gene expression rates.
 
 

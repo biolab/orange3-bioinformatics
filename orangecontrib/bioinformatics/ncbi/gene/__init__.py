@@ -3,8 +3,9 @@ import pickle
 
 from collections import defaultdict
 from functools import lru_cache
-from typing import List, Union
+from typing import List, Union, Optional
 from types import SimpleNamespace
+
 from requests.exceptions import ConnectTimeout, RequestException, ConnectionError
 
 from Orange.data import StringVariable, DiscreteVariable, Domain, Table
@@ -74,13 +75,14 @@ class Gene:
             return
 
         info = GeneInfoDB().select_gene_info(self.ncbi_id)
-        for attr, value in zip(self.__slots__, info):
-            if attr == 'db_refs':
-                value = parse_sources(value)
-            elif attr == 'synonyms':
-                value = parse_synonyms(value)
+        if info:
+            for attr, value in zip(self.__slots__, info):
+                if attr == 'db_refs':
+                    value = parse_sources(value)
+                elif attr == 'synonyms':
+                    value = parse_synonyms(value)
 
-            setattr(self, attr, value)
+                setattr(self, attr, value)
 
     def to_list(self):
         _, header_tags = GENE_MATCHER_HEADER
@@ -255,6 +257,30 @@ class GeneMatcher:
             for gene in self.genes:
                 if gene.ncbi_id:
                     data_table.domain[gene.input_name].attributes[NCBI_ID] = gene.ncbi_id
+
+    def match_table_column(self, data_table: Table, column_name: str,
+                           target_column: Optional[StringVariable] = None) -> Table:
+        """ Helper function for gene name matching in data table.
+
+        :param data_table: data table
+        :param column_name: Name of the column where gene symbols are located
+        :param target_column: Column
+        :type data_table: :class:`Orange.data.Table`
+
+        """
+
+        if column_name in data_table.domain:
+            self.genes = data_table.get_column_view(column_name)[0]
+            self.run_matcher()
+
+            if target_column is None:
+                target_column = StringVariable(NCBI_ID)
+
+            domain = Domain([], metas=[target_column])
+            data = [[str(gene.ncbi_id) if gene.ncbi_id else '?'] for gene in self.genes]
+            table = Table(domain, data)
+
+            return Table.concatenate([data_table, table])
 
     @staticmethod
     def gene_match_status(gene):

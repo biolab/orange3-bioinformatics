@@ -16,6 +16,8 @@ Widgets
    widgets/kegg_pathways.md
    widgets/gene_set_enrichment.md
    widgets/cluster_analysis.md
+   widgets/volcano_plot.md
+   widgets/marker_genes.md
 
 
 
