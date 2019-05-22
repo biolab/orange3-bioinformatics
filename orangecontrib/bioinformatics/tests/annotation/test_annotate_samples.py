@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 from Orange.data import Table, Domain, StringVariable, ContinuousVariable
+from scipy.stats import hypergeom
 
 from orangecontrib.bioinformatics.annotation.annotate_samples import \
     AnnotateSamples
@@ -35,6 +36,20 @@ class TestAnnotateSamples(unittest.TestCase):
 
     def test_artificial_data(self):
         annotator = AnnotateSamples(p_value_th=0.05)
+        annotations = annotator.annotate_samples(self.data, self.markers)
+
+        self.assertEqual(type(annotations), Table)
+        self.assertEqual(len(annotations), len(self.data))
+        self.assertEqual(len(annotations[0]), 2)  # two types in the data
+        self.assertGreater(annotations.X.sum(), 0)
+        self.assertLessEqual(annotations.X.max(), 1)
+        self.assertGreaterEqual(annotations.X.min(), 0)
+
+    def test_sf(self):
+        """
+        Test annotations with hypergeom.sf
+        """
+        annotator = AnnotateSamples(p_value_th=0.05, p_value_fun=hypergeom.sf)
         annotations = annotator.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
