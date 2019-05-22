@@ -5,11 +5,11 @@ from typing import Union
 from collections import defaultdict
 
 from AnyQt.QtWidgets import (
-    QTreeView, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QWidget
+    QTreeView, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QWidget,
+    QGroupBox
 )
 from AnyQt.QtCore import Qt
 
-from Orange.widgets.gui import QGroupBox
 from orangecontrib.bioinformatics.geneset import GeneSet, GeneSets, load_gene_sets, list_all
 
 # TODO: better handle stored selection
