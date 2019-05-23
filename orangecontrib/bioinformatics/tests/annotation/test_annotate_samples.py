@@ -59,16 +59,9 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertLessEqual(annotations.X.max(), 1)
         self.assertGreaterEqual(annotations.X.min(), 0)
 
-    def test_empty_data(self):
-        annotator = AnnotateSamples(p_value_th=0.05)
-        self.data.X = np.empty((0, len(self.data.domain)))
-        annotations = annotator.annotate_samples(self.data, self.markers)
 
-        self.assertEqual(type(annotations), Table)
-        self.assertEqual(len(annotations), len(self.data))
-
-    def test_one_example(self):
-        self.data.X = self.data.X[:1]
+    def test_two_example(self):
+        self.data.X = self.data.X[:2]
 
         annotator = AnnotateSamples(p_value_th=0.05)
         annotations = annotator.annotate_samples(self.data, self.markers)

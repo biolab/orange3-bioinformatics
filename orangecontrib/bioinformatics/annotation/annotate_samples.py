@@ -61,14 +61,14 @@ class AnnotateSamples:
         :obj:`list`
             Sets of selected attributes for each cell
         """
-        if len(data.X) <= 0:
+        if len(data.X) <= 1:
             return [], []
         # rank data
         data_ge_ranked = rankdata(data.X, axis=0)
 
         # compute U, mu, sigma
-        n2 = data_ge_ranked.shape[0]
-        n = n2 + 1
+        n = data_ge_ranked.shape[0]
+        n2 = n - 1
         u = data_ge_ranked - 1
         mu = n2 / 2
         sigma = np.zeros(data_ge_ranked.shape[1])
@@ -79,7 +79,7 @@ class AnnotateSamples:
                                (n * (n - 1))))
 
         # compute z
-        z = (u - mu) / sigma
+        z = (u - mu) / (sigma + 1e-16)
 
         # gene selection
         attributes_np = np.array([
@@ -160,6 +160,9 @@ class AnnotateSamples:
         Orange.data.Table
             Cell type most important for each cell.
         """
+        assert len(data) > 1, "At least two data items are required for " \
+                              "method to work."
+
         selected_attributes, z = self._select_genes(data)
         annotations_scores, annotations = self._assign_annotations(
             selected_attributes, available_annotations)
