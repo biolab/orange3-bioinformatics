@@ -1,4 +1,4 @@
-Orange3
+Orange3>=3.21.0
 serverfiles
 requests
 requests-cache
