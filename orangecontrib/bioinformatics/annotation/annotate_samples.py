@@ -3,9 +3,12 @@ from collections import defaultdict
 import numpy as np
 from Orange.data import Domain, ContinuousVariable, Table
 
+from orangecontrib.bioinformatics.ncbi.gene import GeneInfo
 from orangecontrib.bioinformatics.utils import statistics
 from scipy.stats.mstats import rankdata
 from scipy.stats import hypergeom
+
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
 
 class AnnotateSamples:
@@ -18,12 +21,21 @@ class AnnotateSamples:
 
     >>> from Orange.data import Table
     >>> from orangecontrib.bioinformatics.utils import serverfiles
-    >>> from orangecontrib.bioinformatics.annotation.annotate_samples import AnnotateSamples
+    >>> from orangecontrib.bioinformatics.annotation.annotate_samples import \
+    ...     AnnotateSamples
+    >>> from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
     >>>
     >>> data = Table("https://datasets.orange.biolab.si/sc/aml-1k.tab.gz")
+    >>> data.attributes[TAX_ID] = "9606"  # table needs to have an organism ID
     >>> markers_path = serverfiles.localpath_download(
-    >>>     'marker_genes','panglao_gene_markers.tab')
+    ...     'marker_genes','panglao_gene_markers.tab')
     >>> marker = Table(markers_path)
+    >>>
+    >>> # filter only human markers
+    >>> from Orange.data.filter import FilterString, Values
+    >>> f = FilterString("Organism", FilterString.Equal, "Human")
+    >>> markers = Values([f])(markers)
+    >>>
     >>> annotator = AnnotateSamples(p_value_th=0.05)
     >>> annotations = annotator.annotate_samples(data, markers)
 
@@ -95,10 +107,12 @@ class AnnotateSamples:
         """
         types_dict = defaultdict(set)
         for m in markers:
-            types_dict[str(m["Cell Type"])].add(int(m["Entrez ID"].value))
+            if m["Entrez ID"].value is not None and \
+                    not m["Entrez ID"].value == "?":
+                types_dict[str(m["Cell Type"])].add(int(m["Entrez ID"].value))
         return types_dict
 
-    def _assign_annotations(self, items_sets, available_annotations):
+    def _assign_annotations(self, items_sets, available_annotations, tax_id):
         """
         Function get set of attributes (e.g. genes) that represents each item
         and attributes for each annotation. It returns the annotations most
@@ -118,7 +132,8 @@ class AnnotateSamples:
         list
             Annotation list
         """
-        N = 20365  # number of all genes for human
+        # retrieve number of genes for organism
+        N = len(GeneInfo(tax_id))
 
         grouped_annotations = self._group_marker_attributes(
             available_annotations)
@@ -144,7 +159,8 @@ class AnnotateSamples:
         return np.array([hg_cell(cg) for cg in items_sets]), \
             [x[0] for x in grouped_annotations_items]
 
-    def annotate_samples(self, data, available_annotations):
+    def annotate_samples(self, data, available_annotations,
+                         return_nonzero_annotations=True):
         """
         Function marks the data with annotations that are provided provided.
 
@@ -154,6 +170,9 @@ class AnnotateSamples:
             Tabular data
         available_annotations : Orange.data.Table
             Available annotations (e.g. cell types)
+        return_nonzero_annotations : bool
+            If true return scores for only annotations present in at least one
+            sample.
 
         Returns
         -------
@@ -162,10 +181,19 @@ class AnnotateSamples:
         """
         assert len(data) > 1, "At least two data items are required for " \
                               "method to work."
+        assert TAX_ID in data.attributes, "The input table needs to have a " \
+                                          "tax_id attribute"
+
+        tax_id = data.attributes[TAX_ID]
 
         selected_attributes, z = self._select_genes(data)
         annotations_scores, annotations = self._assign_annotations(
-            selected_attributes, available_annotations)
+            selected_attributes, available_annotations, tax_id)
+
+        if return_nonzero_annotations:
+            col_nonzero = np.sum(annotations_scores, axis=0) > 0
+            annotations_scores = annotations_scores[:, col_nonzero]
+            annotations = np.array(annotations)[col_nonzero]
 
         domain = Domain([ContinuousVariable(ct) for ct in annotations])
         if len(annotations_scores) <= 0:
