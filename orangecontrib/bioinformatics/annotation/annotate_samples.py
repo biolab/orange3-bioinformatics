@@ -17,7 +17,7 @@ class AnnotateSamples:
     labels Mann-Whitney U test for selecting important values and
     the Hyper-geometric for assigning the labels.
 
-    Example of use:
+    Example for full annotation:
 
     >>> from Orange.data import Table
     >>> from orangecontrib.bioinformatics.utils import serverfiles
@@ -38,6 +38,15 @@ class AnnotateSamples:
     >>>
     >>> annotator = AnnotateSamples(p_value_th=0.05)
     >>> annotations = annotator.annotate_samples(data, markers)
+
+    Example for full manual annotation. Here annotation is split in three
+    phases. We assume that data are already loaded.
+
+    >>> annotator = AnnotateSamples(p_value_th=0.05)
+    >>> selected_attributes, z = annotator.select_attributes(data)
+    >>> scores, p_val = annotator.assign_annotations(
+    ...     selected_attributes, markers, data.attributes[TAX_ID])
+    >>> scores = annotator.filter_annotations(scores, p_val)
 
     Attributes
     ----------
@@ -62,8 +71,7 @@ class AnnotateSamples:
         self.p_threshold = p_value_th
         self.z_threshold = z_threshold
 
-    @staticmethod
-    def select_attributes(data, z_threshold=1):
+    def select_attributes(self, data):
         """
         Function selects "over"-expressed attributes for items with Mann-Whitney
         U test.
@@ -72,9 +80,6 @@ class AnnotateSamples:
         ----------
         data : Orange.data.Table
             Tabular data
-        z_threshold : float
-            The threshold for selecting the attribute. For each item the
-            attributes with z-value above this value are selected.
 
         Returns
         -------
@@ -105,7 +110,7 @@ class AnnotateSamples:
         attributes_np = np.array([
             a.attributes.get("Entrez ID") for a in data.domain.attributes])
         attributes_sets = [
-            set(attributes_np[row > z_threshold]) - {None} for row in z]
+            set(attributes_np[row > self.z_threshold]) - {None} for row in z]
 
         # pack z values to data table
         # take only attributes in new domain
@@ -129,9 +134,9 @@ class AnnotateSamples:
 
     def assign_annotations(self, items_sets, available_annotations, tax_id):
         """
-        Function get set of attributes (e.g. genes) that represents each item
-        and attributes for each annotation. It returns the annotations most
-        significant for each cell.
+        The function gets a set of attributes (e.g. genes) for each cell and
+        attributes for each annotation. It returns the annotations significant
+        for each cell.
 
         Parameters
         ----------
@@ -183,10 +188,44 @@ class AnnotateSamples:
 
         return probs_table, fdrs_table
 
+    def filter_annotations(self, scores, p_values,
+                           return_nonzero_annotations=True):
+        """
+        This function filters the probabilities on places that do not reach the
+        threshold for p-value and filter zero columns
+        return_nonzero_annotations is True.
+
+        Parameters
+        ----------
+        scores : Orange.data.Table
+            Scores for each annotations for each cell
+        p_values : Orange.data.Table
+            p-value scores for annotations for each cell
+        return_nonzero_annotations : bool
+            Flag that enables filtering the non-zero columns.
+
+        Returns
+        -------
+        Orange.data.Table
+            Filtered scores for each annotations for each cell
+        """
+        scores_x = np.copy(scores.X)  # do not want to edit values inplace
+        scores_x[p_values.X > self.p_threshold] = 0
+        probs = Table(scores.domain, scores_x)
+
+        if return_nonzero_annotations:
+            col_nonzero = np.sum(probs, axis=0) > 0
+            new_domain = Domain(
+                np.array(scores.domain.attributes)[col_nonzero])
+            scores = Table(new_domain, scores)
+        return scores
+
     def annotate_samples(self, data, available_annotations,
                          return_nonzero_annotations=True):
         """
-        Function marks the data with annotations that are provided provided.
+        Function marks the data with annotations that are provided. This
+        function implements the complete functionality. First select genes,
+        then annotate them and filter them.
 
         Parameters
         ----------
@@ -210,16 +249,11 @@ class AnnotateSamples:
 
         tax_id = data.attributes[TAX_ID]
 
-        selected_attributes, z = self.select_attributes(
-            data, z_threshold=self.z_threshold)
+        selected_attributes, z = self.select_attributes(data)
         annotation_probs, annotation_fdrs = self.assign_annotations(
             selected_attributes, available_annotations, tax_id)
-        annotation_probs.X[annotation_fdrs.X > self.p_threshold] = 0
 
-        if return_nonzero_annotations:
-            col_nonzero = np.sum(annotation_probs.X, axis=0) > 0
-            new_domain = Domain(
-                np.array(annotation_probs.domain.attributes)[col_nonzero])
-            annotation_probs = Table(new_domain, annotation_probs)
+        annotation_probs = self.filter_annotations(
+            annotation_probs, annotation_fdrs, return_nonzero_annotations)
 
         return annotation_probs
