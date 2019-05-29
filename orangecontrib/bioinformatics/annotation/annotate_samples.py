@@ -34,7 +34,7 @@ class AnnotateSamples:
     >>> # filter only human markers
     >>> from Orange.data.filter import FilterString, Values
     >>> f = FilterString("Organism", FilterString.Equal, "Human")
-    >>> markers = Values([f])(markers)
+    >>> markers = Values([f])(marker)
     >>>
     >>> annotator = AnnotateSamples(p_value_th=0.05)
     >>> annotations = annotator.annotate_samples(data, markers)
@@ -124,7 +124,7 @@ class AnnotateSamples:
         for m in markers:
             if m["Entrez ID"].value is not None and \
                     not m["Entrez ID"].value == "?":
-                types_dict[str(m["Cell Type"])].add(int(m["Entrez ID"].value))
+                types_dict[str(m["Cell Type"])].add(m["Entrez ID"].value)
         return types_dict
 
     def assign_annotations(self, items_sets, available_annotations, tax_id):
