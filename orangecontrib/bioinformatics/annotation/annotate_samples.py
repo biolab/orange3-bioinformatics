@@ -36,23 +36,20 @@ class AnnotateSamples:
     >>> f = FilterString("Organism", FilterString.Equal, "Human")
     >>> markers = Values([f])(marker)
     >>>
-    >>> annotator = AnnotateSamples(p_value_th=0.05)
-    >>> annotations = annotator.annotate_samples(data, markers)
+    >>> annotator = AnnotateSamples()
+    >>> annotations = annotator.annotate_samples(data, markers, p_threshold=0.05)
 
     Example for full manual annotation. Here annotation is split in three
     phases. We assume that data are already loaded.
 
-    >>> annotator = AnnotateSamples(p_value_th=0.05)
+    >>> annotator = AnnotateSamples()
     >>> selected_attributes, z = annotator.select_attributes(data)
     >>> scores, p_val = annotator.assign_annotations(
     ...     selected_attributes, markers, data.attributes[TAX_ID])
-    >>> scores = annotator.filter_annotations(scores, p_val)
+    >>> scores = annotator.filter_annotations(scores, p_val, p_threshold=0.05)
 
     Attributes
     ----------
-    p_value_th : float
-        A threshold for accepting the annotations. Annotations that has FDR
-        value bellow this threshold are used.
     p_value_fun : str, optional (defaults: TEST_BINOMIAL)
         A function that calculates p-value. It can be either
         TEST_BINOMIAL that uses statistics.Binomial().p_value or
@@ -62,13 +59,12 @@ class AnnotateSamples:
         with z-value above this value are selected.
     """
 
-    def __init__(self, p_value_th, p_value_fun="TEST_BINOMIAL", z_threshold=1):
+    def __init__(self, p_value_fun="TEST_BINOMIAL", z_threshold=1):
         if p_value_fun == "TEST_HYPERGEOMETRIC":  # sf accept x-1 instead of x
             self.p_value_fun = lambda x, n, m, k: hypergeom.sf(x-1, n, m, k)
         else:
             self.p_value_fun = statistics.Binomial().p_value
 
-        self.p_threshold = p_value_th
         self.z_threshold = z_threshold
 
     def select_attributes(self, data):
@@ -189,7 +185,7 @@ class AnnotateSamples:
         return probs_table, fdrs_table
 
     def filter_annotations(self, scores, p_values,
-                           return_nonzero_annotations=True):
+                           return_nonzero_annotations=True, p_threshold=0.05):
         """
         This function filters the probabilities on places that do not reach the
         threshold for p-value and filter zero columns
@@ -203,6 +199,10 @@ class AnnotateSamples:
             p-value scores for annotations for each cell
         return_nonzero_annotations : bool
             Flag that enables filtering the non-zero columns.
+        p_threshold : float
+            A threshold for accepting the annotations. Annotations that has FDR
+            value bellow this threshold are used.
+
 
         Returns
         -------
@@ -210,7 +210,7 @@ class AnnotateSamples:
             Filtered scores for each annotations for each cell
         """
         scores_x = np.copy(scores.X)  # do not want to edit values inplace
-        scores_x[p_values.X > self.p_threshold] = 0
+        scores_x[p_values.X > p_threshold] = 0
         probs = Table(scores.domain, scores_x)
 
         if return_nonzero_annotations:
@@ -221,7 +221,7 @@ class AnnotateSamples:
         return scores
 
     def annotate_samples(self, data, available_annotations,
-                         return_nonzero_annotations=True):
+                         return_nonzero_annotations=True, p_threshold=0.05):
         """
         Function marks the data with annotations that are provided. This
         function implements the complete functionality. First select genes,
@@ -236,6 +236,9 @@ class AnnotateSamples:
         return_nonzero_annotations : bool, optional (default=True)
             If true return scores for only annotations present in at least one
             sample.
+        p_threshold : float
+            A threshold for accepting the annotations. Annotations that has FDR
+            value bellow this threshold are used.
 
         Returns
         -------
@@ -254,6 +257,8 @@ class AnnotateSamples:
             selected_attributes, available_annotations, tax_id)
 
         annotation_probs = self.filter_annotations(
-            annotation_probs, annotation_fdrs, return_nonzero_annotations)
+            annotation_probs, annotation_fdrs, return_nonzero_annotations,
+            p_threshold
+        )
 
         return annotation_probs

@@ -35,7 +35,7 @@ class TestAnnotateSamples(unittest.TestCase):
              ]))
         self.data.attributes[TAX_ID] = "9606"  # id for a human
 
-        self.annotator = AnnotateSamples(p_value_th=0.05)
+        self.annotator = AnnotateSamples()
 
     def test_artificial_data(self):
         annotations = self.annotator.annotate_samples(self.data, self.markers)
@@ -77,8 +77,7 @@ class TestAnnotateSamples(unittest.TestCase):
         """
         Test annotations with hypergeom.sf
         """
-        annotator = AnnotateSamples(
-            p_value_th=0.05, p_value_fun="TEST_HYPERGEOMETRIC")
+        annotator = AnnotateSamples(p_value_fun="TEST_HYPERGEOMETRIC")
         annotations = annotator.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
