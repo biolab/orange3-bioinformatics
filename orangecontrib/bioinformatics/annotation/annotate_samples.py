@@ -37,7 +37,8 @@ class AnnotateSamples:
     >>> markers = Values([f])(marker)
     >>>
     >>> annotator = AnnotateSamples()
-    >>> annotations = annotator.annotate_samples(data, markers, p_threshold=0.05)
+    >>> annotations = annotator.annotate_samples(
+    ...     data, markers, p_threshold=0.05)
 
     Example for full manual annotation. Here annotation is split in three
     phases. We assume that data are already loaded.
@@ -50,24 +51,11 @@ class AnnotateSamples:
 
     Attributes
     ----------
-    p_value_fun : str, optional (defaults: TEST_BINOMIAL)
-        A function that calculates p-value. It can be either
-        TEST_BINOMIAL that uses statistics.Binomial().p_value or
-        TEST_HYPERGEOMETRIC that uses hypergeom.sf.
-    z_threshold : float
-        The threshold for selecting the attribute. For each item the attributes
-        with z-value above this value are selected.
+
     """
 
-    def __init__(self, p_value_fun="TEST_BINOMIAL", z_threshold=1):
-        if p_value_fun == "TEST_HYPERGEOMETRIC":  # sf accept x-1 instead of x
-            self.p_value_fun = lambda x, n, m, k: hypergeom.sf(x-1, n, m, k)
-        else:
-            self.p_value_fun = statistics.Binomial().p_value
-
-        self.z_threshold = z_threshold
-
-    def select_attributes(self, data):
+    @staticmethod
+    def select_attributes(data, z_threshold=1):
         """
         Function selects "over"-expressed attributes for items with Mann-Whitney
         U test.
@@ -76,6 +64,9 @@ class AnnotateSamples:
         ----------
         data : Orange.data.Table
             Tabular data
+        z_threshold : float
+            The threshold for selecting the attribute. For each item the
+            attributes with z-value above this value are selected.
 
         Returns
         -------
@@ -106,7 +97,7 @@ class AnnotateSamples:
         attributes_np = np.array([
             a.attributes.get("Entrez ID") for a in data.domain.attributes])
         attributes_sets = [
-            set(attributes_np[row > self.z_threshold]) - {None} for row in z]
+            set(attributes_np[row > z_threshold]) - {None} for row in z]
 
         # pack z values to data table
         # take only attributes in new domain
@@ -128,7 +119,9 @@ class AnnotateSamples:
                 types_dict[str(m["Cell Type"])].add(m["Entrez ID"].value)
         return types_dict
 
-    def assign_annotations(self, items_sets, available_annotations, tax_id):
+    @staticmethod
+    def assign_annotations(items_sets, available_annotations, tax_id,
+                           p_value_fun="TEST_BINOMIAL"):
         """
         The function gets a set of attributes (e.g. genes) for each cell and
         attributes for each annotation. It returns the annotations significant
@@ -142,6 +135,10 @@ class AnnotateSamples:
             Available annotations (e.g. cell types)
         tax_id : str
             The id of the organism
+        p_value_fun : str, optional (defaults: TEST_BINOMIAL)
+            A function that calculates p-value. It can be either
+            TEST_BINOMIAL that uses statistics.Binomial().p_value or
+            TEST_HYPERGEOMETRIC that uses hypergeom.sf.
 
         Returns
         -------
@@ -150,10 +147,16 @@ class AnnotateSamples:
         Orange.data.Table
             Annotation fdrs
         """
+        # select function for p-value
+        if p_value_fun == "TEST_HYPERGEOMETRIC":  # sf accept x-1 instead of x
+            p_fun = lambda x, n, m, k: hypergeom.sf(x-1, n, m, k)
+        else:
+            p_fun = statistics.Binomial().p_value
+
         # retrieve number of genes for organism
         N = len(GeneInfo(tax_id))
 
-        grouped_annotations = self._group_marker_attributes(
+        grouped_annotations = AnnotateSamples._group_marker_attributes(
             available_annotations)
         grouped_annotations_items = list(grouped_annotations.items())
 
@@ -165,7 +168,7 @@ class AnnotateSamples:
                 k = len(item_attributes)  # drawn balls - expressed for item
                 m = len(attributes)  # marked balls - items for a process
 
-                p_value = self.p_value_fun(x, N, m, k)
+                p_value = p_fun(x, N, m, k)
 
                 p_values.append(p_value)
                 prob.append(x / (m + 1e-16))
@@ -184,8 +187,9 @@ class AnnotateSamples:
 
         return probs_table, fdrs_table
 
-    def filter_annotations(self, scores, p_values,
-                           return_nonzero_annotations=True, p_threshold=0.05):
+    @staticmethod
+    def filter_annotations(scores, p_values, return_nonzero_annotations=True,
+                           p_threshold=0.05):
         """
         This function filters the probabilities on places that do not reach the
         threshold for p-value and filter zero columns
@@ -220,8 +224,10 @@ class AnnotateSamples:
             scores = Table(new_domain, scores)
         return scores
 
-    def annotate_samples(self, data, available_annotations,
-                         return_nonzero_annotations=True, p_threshold=0.05):
+    @staticmethod
+    def annotate_samples(data, available_annotations,
+                         return_nonzero_annotations=True, p_threshold=0.05,
+                         p_value_fun="TEST_BINOMIAL", z_threshold=1):
         """
         Function marks the data with annotations that are provided. This
         function implements the complete functionality. First select genes,
@@ -239,6 +245,13 @@ class AnnotateSamples:
         p_threshold : float
             A threshold for accepting the annotations. Annotations that has FDR
             value bellow this threshold are used.
+        p_value_fun : str, optional (defaults: TEST_BINOMIAL)
+            A function that calculates p-value. It can be either
+            TEST_BINOMIAL that uses statistics.Binomial().p_value or
+            TEST_HYPERGEOMETRIC that uses hypergeom.sf.
+        z_threshold : float
+            The threshold for selecting the attribute. For each item the
+            attributes with z-value above this value are selected.
 
         Returns
         -------
@@ -252,11 +265,13 @@ class AnnotateSamples:
 
         tax_id = data.attributes[TAX_ID]
 
-        selected_attributes, z = self.select_attributes(data)
-        annotation_probs, annotation_fdrs = self.assign_annotations(
-            selected_attributes, available_annotations, tax_id)
+        selected_attributes, z = AnnotateSamples.select_attributes(
+            data, z_threshold=z_threshold)
+        annotation_probs, annotation_fdrs = AnnotateSamples.assign_annotations(
+            selected_attributes, available_annotations, tax_id,
+            p_value_fun=p_value_fun)
 
-        annotation_probs = self.filter_annotations(
+        annotation_probs = AnnotateSamples.filter_annotations(
             annotation_probs, annotation_fdrs, return_nonzero_annotations,
             p_threshold
         )

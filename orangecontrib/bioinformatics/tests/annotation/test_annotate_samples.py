@@ -77,8 +77,9 @@ class TestAnnotateSamples(unittest.TestCase):
         """
         Test annotations with hypergeom.sf
         """
-        annotator = AnnotateSamples(p_value_fun="TEST_HYPERGEOMETRIC")
-        annotations = annotator.annotate_samples(self.data, self.markers)
+        annotator = AnnotateSamples()
+        annotations = annotator.annotate_samples(
+            self.data, self.markers, p_value_fun="TEST_HYPERGEOMETRIC")
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
