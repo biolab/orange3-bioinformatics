@@ -4,7 +4,8 @@ import numpy as np
 from Orange.data import Table, Domain, StringVariable, ContinuousVariable
 
 from orangecontrib.bioinformatics.annotation.annotate_samples import \
-    AnnotateSamples
+    AnnotateSamples, SCORING_EXP_RATIO, SCORING_MARKERS_SUM, SCORING_LOG_FDR, \
+    SCORING_LOG_PVALUE
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
 
@@ -122,7 +123,7 @@ class TestAnnotateSamples(unittest.TestCase):
             [1/3, 2/3],
             [0, 1]])
         annotations, fdrs = self.annotator.assign_annotations(
-            attrs, self.markers, "9606")
+            attrs, self.markers, self.data, "9606")
 
         self.assertEqual(len(attrs), len(annotations))
         self.assertEqual(len(attrs), len(fdrs))
@@ -137,3 +138,48 @@ class TestAnnotateSamples(unittest.TestCase):
             [2, 0.05]])
 
         np.testing.assert_array_less(fdrs, exp_fdrs_smaller)
+
+    def test_scoring(self):
+        # scoring SCORING_EXP_RATIO
+        annotations = self.annotator.annotate_samples(
+            self.data, self.markers, scoring=SCORING_EXP_RATIO)
+
+        self.assertEqual(type(annotations), Table)
+        self.assertEqual(len(annotations), len(self.data))
+        self.assertEqual(len(annotations[0]), 2)  # two types in the data
+        self.assertGreater(annotations.X.sum(), 0)
+        self.assertLessEqual(annotations.X.max(), 1)
+        self.assertGreaterEqual(annotations.X.min(), 0)
+
+        # scoring SCORING_MARKERS_SUM
+        annotations = self.annotator.annotate_samples(
+            self.data, self.markers, scoring=SCORING_MARKERS_SUM)
+
+        self.assertEqual(type(annotations), Table)
+        self.assertEqual(len(annotations), len(self.data))
+        self.assertEqual(len(annotations[0]), 2)  # two types in the data
+
+        # based on provided data it should match
+        # the third row is skipped, since it is special
+        self.assertEqual(annotations[0, 0].value, self.data.X[0].sum())
+        self.assertEqual(annotations[1, 0].value, self.data.X[1].sum())
+        self.assertEqual(annotations[2, 0].value, self.data.X[2].sum())
+        self.assertEqual(annotations[4, 1].value, self.data.X[4].sum())
+        self.assertEqual(annotations[5, 1].value, self.data.X[5].sum())
+        self.assertEqual(annotations[6, 1].value, self.data.X[6].sum())
+
+        # scoring SCORING_LOG_FDR
+        annotations = self.annotator.annotate_samples(
+            self.data, self.markers, scoring=SCORING_LOG_FDR)
+
+        self.assertEqual(type(annotations), Table)
+        self.assertEqual(len(annotations), len(self.data))
+        self.assertEqual(len(annotations[0]), 2)  # two types in the data
+
+        # scoring SCORING_LOG_PVALUE
+        annotations = self.annotator.annotate_samples(
+            self.data, self.markers, scoring=SCORING_LOG_PVALUE)
+
+        self.assertEqual(type(annotations), Table)
+        self.assertEqual(len(annotations), len(self.data))
+        self.assertEqual(len(annotations[0]), 2)  # two types in the data

@@ -10,6 +10,11 @@ from scipy.stats import hypergeom
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
+SCORING_EXP_RATIO = "scoring_exp_ratio"
+SCORING_MARKERS_SUM = "scoring_sum_of_expressed_markers"
+SCORING_LOG_FDR = "scoring_log_fdr"
+SCORING_LOG_PVALUE = "scoring_log_p_value"
+
 
 class AnnotateSamples:
     """
@@ -63,7 +68,7 @@ class AnnotateSamples:
         Parameters
         ----------
         data : Orange.data.Table
-            Tabular data
+            Tabular data with gene expressions
         z_threshold : float
             The threshold for selecting the attribute. For each item the
             attributes with z-value above this value are selected.
@@ -107,21 +112,41 @@ class AnnotateSamples:
         return attributes_sets, z_table
 
     @staticmethod
-    def _group_marker_attributes(markers):
+    def _group_marker_attributes(markers, genes_order):
         """
         Function transforms annotations table to dictionary with format
         {annotation1: [attributes], annotation2: [attributes], ...}
         """
+        # dictionary with structure {celltype: [gene1, gene2, ...], ...}
         types_dict = defaultdict(set)
         for m in markers:
             if m["Entrez ID"].value is not None and \
                     not m["Entrez ID"].value == "?":
                 types_dict[str(m["Cell Type"])].add(m["Entrez ID"].value)
-        return types_dict
+        # dictionary as list of items
+        types_list = list(types_dict.items())
+
+        # create numpy matrix with cell type - gene affiliation
+        genes_celltypes = np.zeros(
+            (len(genes_order), len(types_list)))
+        for i, (_, genes) in enumerate(types_list):
+            for g in genes:
+                if g in genes_order:
+                    genes_celltypes[genes_order.index(g), i] = 1
+        return types_list, genes_celltypes
 
     @staticmethod
-    def assign_annotations(items_sets, available_annotations, tax_id,
-                           p_value_fun="TEST_BINOMIAL"):
+    def _scores_markers_sum(data, genes_types):
+        return data.X.dot(genes_types)
+
+    @staticmethod
+    def _scores_fdr(fdrs):
+        return -np.log(np.array(fdrs))
+
+    @staticmethod
+    def assign_annotations(items_sets, available_annotations, data, tax_id,
+                           p_value_fun="TEST_BINOMIAL",
+                           scoring=SCORING_EXP_RATIO):
         """
         The function gets a set of attributes (e.g. genes) for each cell and
         attributes for each annotation. It returns the annotations significant
@@ -139,6 +164,10 @@ class AnnotateSamples:
             A function that calculates p-value. It can be either
             TEST_BINOMIAL that uses statistics.Binomial().p_value or
             TEST_HYPERGEOMETRIC that uses hypergeom.sf.
+        data : Orange.data.Table
+            Tabular data with gene expressions - we need that to compute scores.
+        scoring : str, optional (default=SCORING_EXP_RATIO)
+            Type of scoring
 
         Returns
         -------
@@ -156,29 +185,39 @@ class AnnotateSamples:
         # retrieve number of genes for organism
         N = len(GeneInfo(tax_id))
 
-        grouped_annotations = AnnotateSamples._group_marker_attributes(
-            available_annotations)
-        grouped_annotations_items = list(grouped_annotations.items())
+        grouped_annotations_items, genes_celltypes = \
+            AnnotateSamples._group_marker_attributes(
+                available_annotations,
+                [d.attributes.get("Entrez ID")
+                 for d in data.domain.attributes])
 
-        def hg_cell(item_attributes):
+        def hg_cell(row_idx, item_attributes):
             p_values = []
-            prob = []
+            scores = []
             for i, (ct, attributes) in enumerate(grouped_annotations_items):
-                x = len(item_attributes & attributes)
+                intersect = item_attributes & attributes
+                x = len(intersect)
                 k = len(item_attributes)  # drawn balls - expressed for item
                 m = len(attributes)  # marked balls - items for a process
 
                 p_value = p_fun(x, N, m, k)
-
                 p_values.append(p_value)
-                prob.append(x / (m + 1e-16))
+
+                if scoring == SCORING_EXP_RATIO:
+                    scores.append(x / (m + 1e-16))
 
             fdrs = statistics.FDR(p_values)
-            # prob[np.array(fdrs) > self.p_threshold] = 0
-            return prob, fdrs
+            if scoring == SCORING_LOG_FDR or scoring == SCORING_LOG_PVALUE:
+                scores = AnnotateSamples._scores_fdr(
+                    fdrs if scoring == SCORING_LOG_FDR else p_values)
 
-        prob_fdrs = map(hg_cell, items_sets)
+            return scores, fdrs
+
+        prob_fdrs = [hg_cell(i, its) for i, its in enumerate(items_sets)]
         probs, fdrs = zip(*prob_fdrs)
+
+        if scoring == SCORING_MARKERS_SUM:
+            probs = AnnotateSamples._scores_markers_sum(data, genes_celltypes)
 
         domain = Domain(
             [ContinuousVariable(ct[0]) for ct in grouped_annotations_items])
@@ -227,7 +266,8 @@ class AnnotateSamples:
     @staticmethod
     def annotate_samples(data, available_annotations,
                          return_nonzero_annotations=True, p_threshold=0.05,
-                         p_value_fun="TEST_BINOMIAL", z_threshold=1):
+                         p_value_fun="TEST_BINOMIAL", z_threshold=1,
+                         scoring=SCORING_EXP_RATIO):
         """
         Function marks the data with annotations that are provided. This
         function implements the complete functionality. First select genes,
@@ -252,6 +292,8 @@ class AnnotateSamples:
         z_threshold : float
             The threshold for selecting the attribute. For each item the
             attributes with z-value above this value are selected.
+        scoring : str, optional (default = SCORING_EXP_RATIO)
+            Type of scoring
 
         Returns
         -------
@@ -268,8 +310,8 @@ class AnnotateSamples:
         selected_attributes, z = AnnotateSamples.select_attributes(
             data, z_threshold=z_threshold)
         annotation_probs, annotation_fdrs = AnnotateSamples.assign_annotations(
-            selected_attributes, available_annotations, tax_id,
-            p_value_fun=p_value_fun)
+            selected_attributes, available_annotations, data, tax_id,
+            p_value_fun=p_value_fun, scoring=scoring)
 
         annotation_probs = AnnotateSamples.filter_annotations(
             annotation_probs, annotation_fdrs, return_nonzero_annotations,
