@@ -118,7 +118,7 @@ class GeneInfoModel(itemmodels.PyTableModel):
         self.table = np.asarray([gene.to_list() for gene in list_of_genes])
 
     def get_filtered_genes(self):
-        return self._table[:, self.entrez_column_index]
+        return list(self._table[:, self.entrez_column_index]) if self._table.size else []
 
     def filter_table(self, filter_pattern: str):
         selection = np.full(self.table.shape, True)
@@ -325,10 +325,6 @@ class OWGenes(OWWidget):
         self.unknown_model.clear()
         self._update_info_box()
 
-    def __selection_changed(self):
-        genes = [model_index.data() for model_index in self.extended_view.get_selected_gens()]
-        self.extended_view.set_info_model(genes)
-
     def _update_info_box(self):
 
         if self.input_genes and self.gene_matcher:
@@ -385,7 +381,7 @@ class OWGenes(OWWidget):
         self.unknown_model.initialize(self.gene_matcher.genes)
         self.unknown_view.verticalHeader().setStretchLastSection(True)
 
-        self.commit()
+        self._apply_filter()
 
     def get_available_organisms(self):
         available_organism = sorted([(tax_id, taxonomy.name(tax_id)) for tax_id in taxonomy.common_taxids()],
@@ -489,14 +485,13 @@ class OWGenes(OWWidget):
             self.openContext(self.input_data.domain)
             self.find_genes_location()
             self.on_input_option_change()
-            self.handle_filter_callback()
 
     def commit(self):
         selection = self.table_view.selectionModel().selectedRows(self.table_model.entrez_column_index)
 
         selected_genes = [row.data() for row in selection]
         if not len(selected_genes):
-            selected_genes = list(self.table_model.get_filtered_genes())
+            selected_genes = self.table_model.get_filtered_genes()
 
         gene_ids = self.get_target_ids()
         known_genes = [gid for gid in gene_ids if gid != '?']
