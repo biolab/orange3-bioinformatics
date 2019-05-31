@@ -2,9 +2,10 @@ import unittest
 
 import numpy as np
 from Orange.clustering import DBSCAN, KMeans
-from Orange.data import Domain, ContinuousVariable, Table
+from Orange.data import Domain, ContinuousVariable, Table, DiscreteVariable
 
-from orangecontrib.bioinformatics.annotation.annotate_projection import annotate_projection
+from orangecontrib.bioinformatics.annotation.annotate_projection import \
+    annotate_projection, labels_locations
 
 
 class TestAnnotateProjection(unittest.TestCase):
@@ -25,49 +26,62 @@ class TestAnnotateProjection(unittest.TestCase):
         self.annotations = Table(domain_ann, data_ann)
 
     def test_annotate_projection(self):
-        clusters, annotations_cl = annotate_projection(
-            self.annotations, self.data, clustering_algorithm=DBSCAN(eps=2),
-            labels_per_cluster=2)
-        np.testing.assert_array_equal(
-            clusters, np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1]))
+        clusters, annotations_cl, locs = annotate_projection(
+            self.annotations, self.data, clustering_algorithm=DBSCAN,
+            labels_per_cluster=2, eps=3)
+        self.assertListEqual(
+            list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])),
+            ["0", "0", "0", "0", "0", "1", "1", "1", "1", "1"])
 
         self.assertEqual(len(annotations_cl), 2)
-        self.assertEqual(len(annotations_cl[0]), 2)
-        self.assertEqual(len(annotations_cl[1]), 2)
-        self.assertEqual(annotations_cl[1][0][0], 'c')
-        self.assertAlmostEqual(annotations_cl[1][0][1], 0.6, 5)
-        self.assertEqual(annotations_cl[1][1][0], 'b')
-        self.assertAlmostEqual(annotations_cl[1][1][1], 0.4, 5)
+        self.assertEqual(len(annotations_cl["0"]), 2)
+        self.assertEqual(len(annotations_cl["1"]), 2)
+        self.assertEqual(annotations_cl["1"][0][0], 'c')
+        self.assertAlmostEqual(annotations_cl["1"][0][1], 0.6, 5)
+        self.assertEqual(annotations_cl["1"][1][0], 'b')
+        self.assertAlmostEqual(annotations_cl["1"][1][1], 0.4, 5)
+
+        self.assertEqual(2, len(locs))
 
     def test_example_not_clustered(self):
         self.data[-1] = [23, 23]
-        clusters, annotations_cl = annotate_projection(
-            self.annotations, self.data, clustering_algorithm=DBSCAN(
-                eps=2, min_samples=3))
-        np.testing.assert_array_equal(
-            clusters, np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, -1]))
+        clusters, annotations_cl, locs = annotate_projection(
+            self.annotations, self.data, clustering_algorithm=DBSCAN,
+            eps=2, min_samples=3)
+        self.assertListEqual(
+            list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])),
+            ["0", "0", "0", "0", "0", "1", "1", "1", "1", "-1"])
 
         self.assertEqual(len(annotations_cl), 2)
-        self.assertEqual(len(annotations_cl[0]), 2)
-        self.assertEqual(len(annotations_cl[1]), 2)
-        self.assertEqual(annotations_cl[1][0][0], 'c')
-        self.assertAlmostEqual(annotations_cl[1][0][1], 0.75, 5)
-        self.assertEqual(annotations_cl[1][1][0], 'b')
-        self.assertAlmostEqual(annotations_cl[1][1][1], 0.25, 5)
+        self.assertEqual(len(annotations_cl["0"]), 2)
+        self.assertEqual(len(annotations_cl["1"]), 2)
+        self.assertEqual(annotations_cl["1"][0][0], 'c')
+        self.assertAlmostEqual(annotations_cl["1"][0][1], 0.75, 5)
+        self.assertEqual(annotations_cl["1"][1][0], 'b')
+        self.assertAlmostEqual(annotations_cl["1"][1][1], 0.25, 5)
 
     def test_one_ex(self):
         self.data.X = self.data.X[:1]
         self.annotations.X = self.annotations.X[:1]
 
-        clusters, annotations_cl = annotate_projection(
-            self.annotations, self.data, clustering_algorithm=DBSCAN(
-                eps=2, min_samples=3))
+        clusters, annotations_cl, locs = annotate_projection(
+            self.annotations, self.data, clustering_algorithm=DBSCAN,
+            eps=2, min_samples=3)
 
     def test_other_clustering(self):
-        clusters, annotations_cl = annotate_projection(
+        clusters, annotations_cl, locs = annotate_projection(
             self.annotations, self.data,
-            clustering_algorithm=KMeans(n_clusters=2),
+            clustering_algorithm=KMeans, n_clusters=2,
             labels_per_cluster=2)
-        self.assertEqual(2, len(set(clusters)))
-        self.assertEqual(2, len(annotations_cl[0]))
-        self.assertEqual(2, len(annotations_cl[1]))
+        self.assertEqual(2, len(set(clusters.X.flatten())))
+        self.assertEqual(2, len(annotations_cl["0"]))
+        self.assertEqual(2, len(annotations_cl["1"]))
+
+    def test_labels_location(self):
+        clusters = Table(Domain([DiscreteVariable("cl", values=["1", "2"])]),
+                         [[0]] * 5 + [[1]] * 5)
+        locs = labels_locations(self.data, clusters)
+
+        self.assertEqual(dict, type(locs))
+        self.assertEqual(tuple, type(locs["1"]))
+        self.assertEqual(tuple, type(locs["2"]))

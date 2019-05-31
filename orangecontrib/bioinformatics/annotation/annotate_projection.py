@@ -8,8 +8,10 @@ Example:
 >>> from Orange.projection import TSNE
 >>> from Orange.data import Table
 >>> from orangecontrib.bioinformatics.utils import serverfiles
->>> from orangecontrib.bioinformatics.annotation.annotate_projection import annotate_projection
->>> from orangecontrib.bioinformatics.annotation.annotate_samples import AnnotateSamples
+>>> from orangecontrib.bioinformatics.annotation.annotate_projection import \
+...     annotate_projection
+>>> from orangecontrib.bioinformatics.annotation.annotate_samples import \
+...     AnnotateSamples
 >>>
 >>> # load data
 >>> data = Table("https://datasets.orange.biolab.si/sc/aml-1k.tab.gz")
@@ -38,7 +40,7 @@ from Orange.clustering import DBSCAN
 import numpy as np
 
 
-def _cluster_data(coordinates, clustering_algorithm):
+def cluster_data(coordinates, clustering_algorithm, **kwargs):
     """
     This function receives data and cluster them.
 
@@ -47,26 +49,27 @@ def _cluster_data(coordinates, clustering_algorithm):
     coordinates : Orange.data.Table
         Data to be clustered
     clustering_algorithm : callable
-        Algorithm used in clustering.
+        Algorithm used for clustering.
 
     Returns
     -------
-    ndarray
+    Orange.data.Table
         List of cluster indices.
     """
-    model = clustering_algorithm(coordinates)
-    return model(coordinates).X.flatten()
+    learner = clustering_algorithm(**kwargs)
+    model = learner(coordinates)
+    return model(coordinates)
     # TODO: this need to be changed when clustering in orange is changed
 
 
-def _assign_labels(clusters, annotations, labels_per_cluster):
+def assign_labels(clusters, annotations, labels_per_cluster):
     """
     This function assigns a certain number of labels per cluster. Each cluster
     gets `labels_per_cluster` number of most common labels in cluster assigned.
 
     Parameters
     ----------
-    clusters : ndarray
+    clusters : Orange.data.Table
         Cluster indices for each item.
     annotations : Orange.data.Table
         Table with annotations and their probabilities.
@@ -84,10 +87,14 @@ def _assign_labels(clusters, annotations, labels_per_cluster):
     annotation_best_idx = np.argmax(annotations.X, axis=1)
     annotation_best = labels[annotation_best_idx]
 
-    clusters_unique = set(clusters) - {-1}  # -1 means that item not clustered
+    clusters_unique = set(
+        clusters.domain[0].values) - {"-1"}  # -1 is not clustered
     annotations_clusters = {}
     for cl in clusters_unique:
-        labels_cl = annotation_best[clusters == cl]
+        mask = np.array(list(
+            map(clusters.domain.attributes[0].repr_val,
+                clusters.X[:, 0]))).flatten() == cl
+        labels_cl = annotation_best[mask]
         counts = Counter(labels_cl)
         annotations_clusters[cl] = [
             (l, c / len(labels_cl))
@@ -96,9 +103,40 @@ def _assign_labels(clusters, annotations, labels_per_cluster):
     return annotations_clusters
 
 
+def labels_locations(coordinates, clusters):
+    """
+    Function computes the location of the label for each cluster.
+    The location is compute as a center point.
+
+    Parameters
+    ----------
+    coordinates : Orange.data.Table
+        Data points
+    clusters : Orange.data.Table
+        Cluster indices for each item.
+
+    Returns
+    -------
+    dict
+        The coordinates for locating the label. Dictionary with cluster index
+        as a key and tuple (x, y) as a value.
+    """
+    clusters_unique = set(
+        clusters.domain[0].values) - {"-1"}  # -1 is not clustered
+    locations = {}
+    for cl in clusters_unique:
+        mask = np.array(list(
+            map(clusters.domain.attributes[0].repr_val,
+                clusters.X[:, 0]))).flatten() == cl
+        cl_coordinates = coordinates.X[mask, :]
+        x, y = np.mean(cl_coordinates, axis=0)
+        locations[cl] = (x, y)
+    return locations
+
+
 def annotate_projection(annotations, coordinates,
-                        clustering_algorithm=DBSCAN(),
-                        labels_per_cluster=3):
+                        clustering_algorithm=DBSCAN,
+                        labels_per_cluster=3, **kwargs):
     """
     Function cluster the data based on coordinates, and assigns a certain number
     of labels per cluster. Each cluster gets `labels_per_cluster` number of most
@@ -117,20 +155,26 @@ def annotate_projection(annotations, coordinates,
 
     Returns
     -------
-    ndarray
+    Orange.data.Table
         List of cluster indices.
     dict
         Dictionary with cluster index as a key and list of annotations as a
         value. Each list include tuples with the annotation name and their
         proportion in the cluster.
+    dict
+        The coordinates for locating the label. Dictionary with cluster index
+        as a key and tuple (x, y) as a value.
     """
     assert len(annotations) == len(coordinates)
     assert len(coordinates) > 0  # sklearn clustering want to have one example
     assert len(annotations.domain) > 0
     assert len(coordinates.domain) > 0
     # get clusters
-    clusters = _cluster_data(coordinates, clustering_algorithm)
+    clusters = cluster_data(coordinates, clustering_algorithm, **kwargs)
 
     # assign top n labels to group
-    annotations_cl = _assign_labels(clusters, annotations, labels_per_cluster)
-    return clusters, annotations_cl
+    annotations_cl = assign_labels(clusters, annotations, labels_per_cluster)
+
+    labels_loc = labels_locations(coordinates, clusters)
+
+    return clusters, annotations_cl, labels_loc
