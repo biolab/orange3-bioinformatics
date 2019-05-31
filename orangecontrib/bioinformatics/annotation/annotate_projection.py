@@ -38,6 +38,7 @@ from collections import Counter
 
 from Orange.clustering import DBSCAN
 import numpy as np
+from scipy.spatial import distance
 
 
 def cluster_data(coordinates, clustering_algorithm, **kwargs):
@@ -133,6 +134,38 @@ def labels_locations(coordinates, clusters):
         locations[cl] = (x, y)
     return locations
 
+
+def get_epsilon(data, k=10, skip=0.1):
+    """
+    The function computes the epsilon parameter for DBSCAN through method
+    proposed in the paper.
+
+    Parameters
+    ----------
+    data : Orange.data.Table
+        Input data which wil be clustered
+    k : int
+        Number kth observed neighbour
+    skip : float
+        Percentage of skipped neighborus.
+
+    Returns
+    -------
+    float
+        Epsilon parameter for DBSCAN
+    """
+    x = data.X
+    if len(x) > 1000:  # subsampling is required
+        i = len(x) // 1000
+        x = x[::i]
+    print(len(x))
+    d = distance.squareform(distance.pdist(x))
+    kth_point = np.argpartition(d, k+1, axis=1)[:, k+1]
+    # k+1 since first one is item itself
+    kth_dist = np.sort(d[np.arange(0, len(kth_point)), kth_point])
+
+    # currently mark proportion equal to skip as a noise
+    return kth_dist[-int(np.round(len(kth_dist) * skip))]
 
 def annotate_projection(annotations, coordinates,
                         clustering_algorithm=DBSCAN,

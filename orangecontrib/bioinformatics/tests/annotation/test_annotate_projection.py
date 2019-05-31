@@ -5,7 +5,7 @@ from Orange.clustering import DBSCAN, KMeans
 from Orange.data import Domain, ContinuousVariable, Table, DiscreteVariable
 
 from orangecontrib.bioinformatics.annotation.annotate_projection import \
-    annotate_projection, labels_locations
+    annotate_projection, labels_locations, get_epsilon
 
 
 class TestAnnotateProjection(unittest.TestCase):
@@ -85,3 +85,9 @@ class TestAnnotateProjection(unittest.TestCase):
         self.assertEqual(dict, type(locs))
         self.assertEqual(tuple, type(locs["1"]))
         self.assertEqual(tuple, type(locs["2"]))
+
+    def test_get_epsilon(self):
+        data = Table("Iris")
+        eps = get_epsilon(data)
+
+        self.assertGreaterEqual(eps, 0.9)
