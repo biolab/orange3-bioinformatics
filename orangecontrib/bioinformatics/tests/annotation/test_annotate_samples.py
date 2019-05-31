@@ -16,23 +16,26 @@ class TestAnnotateSamples(unittest.TestCase):
             [], None, [
                 StringVariable("Cell Type"), StringVariable("Entrez ID")])
         m_data = [["Type 1", "111"], ["Type 1", "112"], ["Type 1", "113"],
-                  ["Type 2", "211"], ["Type 2", "212"], ["Type 2", "213"]]
+                  ["Type 1", "114"],
+                  ["Type 2", "211"], ["Type 2", "212"], ["Type 2", "213"],
+                  ["Type 2", "214"],
+                  ]
         self.markers = Table(m_domain, np.empty((len(m_data), 0)), None, m_data)
 
-        genes = ["111", "112", "113", "211", "212", "213"]
+        genes = ["111", "112", "113", "114", "211", "212", "213", "214"]
         domain = Domain([ContinuousVariable(
             str(g)) for g in genes])
         for v, g in zip(domain.attributes, genes):
             v.attributes = {"Entrez ID": g}
         self.data = Table(domain, np.array(
-            [[1, 1, 1, 0, 0, 0],
-             [1, .8, .9, 0, 0, 0],
-             [.7, 1.1, 1, 0, 0, 0],
-             [.8, .7, 1.1, 0, .1, 0],
-             [0, 0, 0, 1.05, 1.05, 1.1],
-             [0, 0, 0, 1.1, 1.0, 1.05],
-             [0, 0, 0, 1.05, .9, 1.1],
-             [0, 0, 0, .9, .9, 1.2]
+            [[1, 1, 1, 1.1, 0, 0, 0, 0],
+             [1, .8, .9, 1, 0, 0, 0, 0],
+             [.7, 1.1, 1, 1.2, 0, 0, 0, 0],
+             [.8, .7, 1.1, 1, 0, .1, 0, 0],
+             [0, 0, 0, 0, 1.05, 1.05, 1.1, 1],
+             [0, 0, 0, 0, 1.1, 1.0, 1.05, 1.1],
+             [0, 0, 0, 0, 1.05, .9, 1.1, 1.1],
+             [0, 0, 0, 0, .9, .9, 1.2, 1]
              ]))
         self.data.attributes[TAX_ID] = "9606"  # id for a human
 
@@ -53,7 +56,9 @@ class TestAnnotateSamples(unittest.TestCase):
             [], None, [
                 StringVariable("Cell Type"), StringVariable("Entrez ID")])
         m_data = [["Type 1", "111"], ["Type 1", "112"], ["Type 1", "113"],
+                  ["Type 1", "114"],
                   ["Type 2", "211"], ["Type 2", "212"], ["Type 2", "213"],
+                  ["Type 2", "214"],
                   ["Type 3", "311"], ["Type 3", "312"], ["Type 3", "313"]]
         markers = Table(m_domain, np.empty((len(m_data), 0)), None, m_data)
 
@@ -99,7 +104,8 @@ class TestAnnotateSamples(unittest.TestCase):
 
     def test_markers_without_entrez_id(self):
         self.markers[1, "Entrez ID"] = "?"
-        annotations = self.annotator.annotate_samples(self.data, self.markers)
+        annotations = self.annotator.annotate_samples(
+            self.data, self.markers, return_nonzero_annotations=False)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -112,15 +118,15 @@ class TestAnnotateSamples(unittest.TestCase):
         selected_attrs, z = self.annotator.select_attributes(self.data)
 
         self.assertEqual(len(self.data), len(selected_attrs))
-        self.assertSetEqual({"112", "111"}, selected_attrs[0])
+        self.assertSetEqual({"112", "111", "114"}, selected_attrs[0])
 
     def test_assign_annotations(self):
-        attrs = [{"111", "112", "113"}, {"111", "112", "211"},
-                 {"211", "212", "111"}, {"211", "212", "213"}]
+        attrs = [{"111", "112", "113", "114"}, {"111", "112", "211"},
+                 {"211", "212", "111"}, {"211", "212", "213", "214"}]
         exp_ann = np.array([
             [1, 0],
-            [2/3, 1/3],
-            [1/3, 2/3],
+            [1/2, 1/4],
+            [1/4, 1/2],
             [0, 1]])
         annotations, fdrs = self.annotator.assign_annotations(
             attrs, self.markers, self.data, "9606")
@@ -133,8 +139,8 @@ class TestAnnotateSamples(unittest.TestCase):
 
         exp_fdrs_smaller = np.array([
             [0.05, 2],
-            [0.05, 2],
-            [2, 0.05],
+            [2, 2],
+            [2, 2],
             [2, 0.05]])
 
         np.testing.assert_array_less(fdrs, exp_fdrs_smaller)
@@ -183,3 +189,7 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
+
+    def test_log_cpm(self):
+        norm_data = self.annotator.log_cpm(self.data)
+        self.assertTupleEqual(self.data.X.shape, norm_data.X.shape)

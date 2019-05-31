@@ -15,6 +15,9 @@ SCORING_MARKERS_SUM = "scoring_sum_of_expressed_markers"
 SCORING_LOG_FDR = "scoring_log_fdr"
 SCORING_LOG_PVALUE = "scoring_log_p_value"
 
+PFUN_BINOMIAL = "binomial_p_function"
+PFUN_HYPERGEOMETRIC = "HYPERGEOMETRIC_p_function"
+
 
 class AnnotateSamples:
     """
@@ -58,6 +61,35 @@ class AnnotateSamples:
     ----------
 
     """
+    @staticmethod
+    def log_cpm(data):
+        """
+        Function normalizes data with CPM methods and normalize them.
+
+        Parameters
+        ----------
+        data : Orange.data.Table
+            Tabular data with gene expressions
+
+        Returns
+        -------
+        Orange.data.Table
+            Normalized gene expression data
+        """
+        norm_data = np.log(1 + AnnotateSamples._cpm(data.X))
+        return Table(data.domain, norm_data)
+
+    @staticmethod
+    def _cpm(data):
+        """
+        This function normalizes data with CPM methods.
+
+        Parameters
+        ----------
+        data : array_like
+            Numpy array with data. Columns are genes, rows are cells.
+        """
+        return data / np.sum(data, axis=1)[:, None] * 1e6
 
     @staticmethod
     def select_attributes(data, z_threshold=1):
@@ -145,7 +177,7 @@ class AnnotateSamples:
 
     @staticmethod
     def assign_annotations(items_sets, available_annotations, data, tax_id,
-                           p_value_fun="TEST_BINOMIAL",
+                           p_value_fun=PFUN_BINOMIAL,
                            scoring=SCORING_EXP_RATIO):
         """
         The function gets a set of attributes (e.g. genes) for each cell and
@@ -162,8 +194,8 @@ class AnnotateSamples:
             The id of the organism
         p_value_fun : str, optional (defaults: TEST_BINOMIAL)
             A function that calculates p-value. It can be either
-            TEST_BINOMIAL that uses statistics.Binomial().p_value or
-            TEST_HYPERGEOMETRIC that uses hypergeom.sf.
+            PFUN_BINOMIAL that uses statistics.Binomial().p_value or
+            PFUN_HYPERGEOMETRIC that uses hypergeom.sf.
         data : Orange.data.Table
             Tabular data with gene expressions - we need that to compute scores.
         scoring : str, optional (default=SCORING_EXP_RATIO)
@@ -177,7 +209,7 @@ class AnnotateSamples:
             Annotation fdrs
         """
         # select function for p-value
-        if p_value_fun == "TEST_HYPERGEOMETRIC":  # sf accept x-1 instead of x
+        if p_value_fun == PFUN_HYPERGEOMETRIC:  # sf accept x-1 instead of x
             p_fun = lambda x, n, m, k: hypergeom.sf(x-1, n, m, k)
         else:
             p_fun = statistics.Binomial().p_value
@@ -191,7 +223,7 @@ class AnnotateSamples:
                 [d.attributes.get("Entrez ID")
                  for d in data.domain.attributes])
 
-        def hg_cell(row_idx, item_attributes):
+        def hg_cell(item_attributes):
             p_values = []
             scores = []
             for i, (ct, attributes) in enumerate(grouped_annotations_items):
@@ -200,7 +232,10 @@ class AnnotateSamples:
                 k = len(item_attributes)  # drawn balls - expressed for item
                 m = len(attributes)  # marked balls - items for a process
 
-                p_value = p_fun(x, N, m, k)
+                if x > 2:  # avoid the heavy computation when intersect small
+                    p_value = p_fun(x, N, m, k)
+                else:
+                    p_value = 1
                 p_values.append(p_value)
 
                 if scoring == SCORING_EXP_RATIO:
@@ -213,7 +248,7 @@ class AnnotateSamples:
 
             return scores, fdrs
 
-        prob_fdrs = [hg_cell(i, its) for i, its in enumerate(items_sets)]
+        prob_fdrs = [hg_cell(its) for its in items_sets]
         probs, fdrs = zip(*prob_fdrs)
 
         if scoring == SCORING_MARKERS_SUM:
@@ -266,8 +301,8 @@ class AnnotateSamples:
     @staticmethod
     def annotate_samples(data, available_annotations,
                          return_nonzero_annotations=True, p_threshold=0.05,
-                         p_value_fun="TEST_BINOMIAL", z_threshold=1,
-                         scoring=SCORING_EXP_RATIO):
+                         p_value_fun=PFUN_BINOMIAL, z_threshold=1,
+                         scoring=SCORING_EXP_RATIO, normalize=False):
         """
         Function marks the data with annotations that are provided. This
         function implements the complete functionality. First select genes,
@@ -287,13 +322,15 @@ class AnnotateSamples:
             value bellow this threshold are used.
         p_value_fun : str, optional (defaults: TEST_BINOMIAL)
             A function that calculates p-value. It can be either
-            TEST_BINOMIAL that uses statistics.Binomial().p_value or
-            TEST_HYPERGEOMETRIC that uses hypergeom.sf.
+            PFUN_BINOMIAL that uses statistics.Binomial().p_value or
+            PFUN_HYPERGEOMETRIC that uses hypergeom.sf.
         z_threshold : float
             The threshold for selecting the attribute. For each item the
             attributes with z-value above this value are selected.
         scoring : str, optional (default = SCORING_EXP_RATIO)
             Type of scoring
+        normalize : bool, optional (default = False)
+            This variable tells whether to normalize data or not.
 
         Returns
         -------
@@ -304,6 +341,9 @@ class AnnotateSamples:
                               "method to work."
         assert TAX_ID in data.attributes, "The input table needs to have a " \
                                           "tax_id attribute"
+
+        if normalize:
+            data = AnnotateSamples.log_cpm(data)
 
         tax_id = data.attributes[TAX_ID]
 
