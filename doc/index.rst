@@ -35,3 +35,4 @@ Scripting Reference
    scripting_references/dicty_phenotypes
    scripting_references/kegg
    scripting_references/resolwe
+   scripting_references/annotation
