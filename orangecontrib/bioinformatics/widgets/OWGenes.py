@@ -4,10 +4,10 @@ import sys
 import numpy as np
 
 from AnyQt.QtWidgets import (
-    QSplitter, QTableView,  QHeaderView, QAbstractItemView, QStyle, QApplication
+    QSplitter, QTableView,  QHeaderView, QAbstractItemView, QStyle
 )
 from AnyQt.QtCore import (
-    Qt, QSize, QThreadPool, QAbstractTableModel, QVariant, QModelIndex
+    Qt, QSize, QThreadPool, QAbstractTableModel, QVariant, QModelIndex, QTimer,
 )
 from AnyQt.QtGui import (
     QFont, QColor
@@ -48,7 +48,7 @@ class GeneInfoModel(itemmodels.PyTableModel):
             raise ValueError("Make sure 'ncbi_id' is set in gene.GENE_MATCHER_HEADER")
 
         self.genes = None
-        self.data_table = None
+        self.table = None
 
         self.font = QFont()
         self.font.setUnderline(True)
@@ -62,7 +62,10 @@ class GeneInfoModel(itemmodels.PyTableModel):
     def initialize(self, list_of_genes):
         self.genes = list_of_genes
         self.__table_from_genes([gene for gene in list_of_genes if gene.ncbi_id])
-        self.show_table()
+        self.update_model()
+
+    def rowCount(self, parent=QModelIndex()):
+        return 0 if parent.isValid() else len(self._table)
 
     def columnCount(self, parent=QModelIndex()):
         return 0 if (parent.isValid() or self._table.size == 0) else self._table.shape[1]
@@ -112,26 +115,24 @@ class GeneInfoModel(itemmodels.PyTableModel):
 
     def __table_from_genes(self, list_of_genes):
         # type: (list) -> None
-        self.data_table = np.asarray([gene.to_list() for gene in list_of_genes])
+        self.table = np.asarray([gene.to_list() for gene in list_of_genes])
 
-    def filter_table(self, filter_pattern):
-        _, col_size = self.data_table.shape
-        invalid_result = np.array([-1 for _ in range(col_size)])
+    def get_filtered_genes(self):
+        return self._table[:, self.entrez_column_index]
 
-        filtered_rows = []
-        for row in self.data_table:
-            match_result = np.core.defchararray.rfind(np.char.lower(row), filter_pattern.lower())
-            filtered_rows.append(not np.array_equal(match_result, invalid_result))
-        return filtered_rows
+    def filter_table(self, filter_pattern: str):
+        selection = np.full(self.table.shape, True)
+        for search_word in filter_pattern.split():
+            match_result = np.core.defchararray.find(np.char.lower(self.table), search_word.lower()) >= 0
+            selection = selection & match_result
+        return selection
 
-    def show_table(self, filter_pattern=None):
-        # Don't call filter if filter_pattern is empty
-        if filter_pattern:
-            # clear cache if model changes
-            self._row_instance.cache_clear()
-            self.wrap(self.data_table[self.filter_table(filter_pattern)])
-        else:
-            self.wrap(self.data_table)
+    def update_model(self, filter_pattern=''):
+        # clear cache if model changes
+        self._row_instance.cache_clear()
+
+        if self.table.size:
+            self.wrap(self.table[self.filter_table(filter_pattern).any(axis=1), :])
 
 
 class UnknownGeneInfoModel(itemmodels.PyListModel):
@@ -167,9 +168,8 @@ class OWGenes(OWWidget):
     priority = 5
     want_main_area = True
 
-    selected_organism = Setting(11)
-
-    search_pattern = Setting('')
+    selected_organism: int = Setting(11)
+    search_pattern: str = Setting('')
     exclude_unmatched = Setting(True)
     replace_id_with_symbol = Setting(True)
     auto_commit = Setting(True)
@@ -218,6 +218,10 @@ class OWGenes(OWWidget):
 
         # progress bar
         self.progress_bar = None
+
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._apply_filter)
+        self._timer.setSingleShot(True)
 
         # GUI SECTION #
 
@@ -270,7 +274,7 @@ class OWGenes(OWWidget):
         # Main area
         self.filter = lineEdit(self.mainArea, self,
                                'search_pattern', 'Filter:',
-                               callbackOnType=True, callback=self.apply_filter)
+                               callbackOnType=True, callback=self.handle_filter_callback)
         # rubber(self.radio_group)
         self.mainArea.layout().addWidget(self.filter)
 
@@ -304,16 +308,15 @@ class OWGenes(OWWidget):
 
         self.mainArea.layout().addWidget(self.splitter)
 
-    def apply_filter(self):
+    def handle_filter_callback(self):
+        self._timer.stop()
+        self._timer.start(500)
+
+    def _apply_filter(self):
         # filter only if input data is present and model is populated
-        if self.input_data is not None and self.table_model.data_table is not None:
-            self.table_view.clearSpans()
-            self.table_view.setModel(None)
-            self.table_view.setSortingEnabled(False)
-            self.table_model.show_table(str(self.search_pattern))
-            self.table_view.setModel(self.table_model)
-            self.table_view.selectionModel().selectionChanged.connect(self.commit)
-            self.table_view.setSortingEnabled(True)
+        if self.table_model.table is not None:
+            self.table_model.update_model(filter_pattern=str(self.search_pattern))
+            self.commit()
 
     def __reset_widget_state(self):
         self.table_view.clearSpans()
@@ -480,16 +483,21 @@ class OWGenes(OWWidget):
             # check for gene location. Default is that genes are attributes in the input table.
             self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.use_attr_names)
 
-            if self.tax_id in self.organisms:
+            if self.tax_id in self.organisms and not self.selected_organism:
                 self.selected_organism = self.organisms.index(self.tax_id)
 
             self.openContext(self.input_data.domain)
             self.find_genes_location()
             self.on_input_option_change()
+            self.handle_filter_callback()
 
     def commit(self):
         selection = self.table_view.selectionModel().selectedRows(self.table_model.entrez_column_index)
+
         selected_genes = [row.data() for row in selection]
+        if not len(selected_genes):
+            selected_genes = list(self.table_model.get_filtered_genes())
+
         gene_ids = self.get_target_ids()
         known_genes = [gid for gid in gene_ids if gid != '?']
 
@@ -589,3 +597,18 @@ class OWGenes(OWWidget):
 
     def get_target_ids(self):
         return [str(gene.ncbi_id) if gene.ncbi_id else '?' for gene in self.gene_matcher.genes]
+
+
+if __name__ == "__main__":
+    def main_test():
+        from AnyQt.QtWidgets import QApplication
+
+        app = QApplication([])
+        w = OWGenes()
+        w.show()
+        w.raise_()
+        r = app.exec_()
+        w.saveSettings()
+        return r
+
+    sys.exit(main_test())
