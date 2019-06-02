@@ -193,3 +193,22 @@ class TestAnnotateSamples(unittest.TestCase):
     def test_log_cpm(self):
         norm_data = self.annotator.log_cpm(self.data)
         self.assertTupleEqual(self.data.X.shape, norm_data.X.shape)
+
+    def test_entrez_id_not_string(self):
+        """
+        It seems that some datasets (e.g. AML dataset) have Entrez ID as int
+        although they should be strings. Here we add the test for those cases.
+        """
+        # change Entrez IDs to int
+        for i, att in enumerate(self.data.domain.attributes):
+            att.attributes["Entrez ID"] = int(att.attributes["Entrez ID"])
+
+        annotations = self.annotator.annotate_samples(self.data,
+                                                      self.markers)
+
+        self.assertEqual(type(annotations), Table)
+        self.assertEqual(len(annotations), len(self.data))
+        self.assertEqual(len(annotations[0]), 2)  # two types in the data
+        self.assertGreater(annotations.X.sum(), 0)
+        self.assertLessEqual(annotations.X.max(), 1)
+        self.assertGreaterEqual(annotations.X.min(), 0)
