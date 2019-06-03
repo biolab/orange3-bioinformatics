@@ -39,9 +39,13 @@ from collections import Counter
 from Orange.clustering import DBSCAN
 import numpy as np
 from scipy.spatial import distance
+import shapely.geometry as geometry
+from scipy.spatial import Delaunay
+from shapely.ops import cascaded_union, polygonize
+from math import sqrt
 
 
-def cluster_data(coordinates, clustering_algorithm, **kwargs):
+def cluster_data(coordinates, clustering_algorithm=DBSCAN, **kwargs):
     """
     This function receives data and cluster them.
 
@@ -211,3 +215,90 @@ def annotate_projection(annotations, coordinates,
     labels_loc = labels_locations(coordinates, clusters)
 
     return clusters, annotations_cl, labels_loc
+
+
+def compute_concave_hulls(coordinates, clusters, epsilon):
+    """
+    Function computes the points of the concave hull around points.
+
+    Parameters
+    ----------
+    coordinates : Orange.data.Table
+       Data points
+    clusters : Orange.data.Table
+       Cluster indices for each item.
+    epsilon : float
+        Epsilon used by DBSCAN to cluster the data
+
+    Returns
+    -------
+    dict
+       The points of the concave hull. Dictionary with cluster index
+       as a key and list of points as a value -
+       [[x1, x2, x,3 ...], [y1, y2, y3, ...]]
+    """
+
+    def get_shape(points, epsilon):
+        """
+        Compute the shape (concave hull) of a set of a cluster.
+        """
+        if len(points) < 4:
+            # When you have a triangle, there is no sense in computing the hull
+            return geometry.MultiPoint(list(points)).convex_hull
+
+        def add_edge(edges, edge_points, coords, i, j):
+            """
+            Add a line between the i-th and j-th points,
+            if not in the list already
+            """
+            if (i, j) in edges or (j, i) in edges:
+                # already added
+                return
+            edges.add((i, j))
+            edge_points.append(coords[[i, j]])
+
+        tri = Delaunay(points)
+        edges = set()
+        edge_points = []
+        # loop over triangles:
+        # ia, ib, ic = indices of corner points of the triangle
+        for ia, ib, ic in tri.vertices:
+            pa = points[ia]
+            pb = points[ib]
+            pc = points[ic]
+
+            # Lengths of sides of triangle
+            a = sqrt((pa[0] - pb[0]) ** 2 + (pa[1] - pb[1]) ** 2)
+            b = sqrt((pb[0] - pc[0]) ** 2 + (pb[1] - pc[1]) ** 2)
+            c = sqrt((pc[0] - pa[0]) ** 2 + (pc[1] - pa[1]) ** 2)
+
+            # filter - longest edge of triangle smaller than epsilon
+            if max(a, b, c) <= epsilon:
+                add_edge(edges, edge_points, points, ia, ib)
+                add_edge(edges, edge_points, points, ib, ic)
+                add_edge(edges, edge_points, points, ic, ia)
+
+        m = geometry.MultiLineString(edge_points)
+        triangles = list(polygonize(m))
+        return cascaded_union(triangles)
+
+    hulls = {}
+    clusters_array = np.array(list(map(
+        clusters.domain.attributes[0].repr_val, clusters.X[:, 0])))
+    for cl in set(clusters_array) - {"None", "?"}:
+        points = coordinates.X[clusters_array == cl]
+
+        # subsample when more than 1000 points
+        # it keeps time finding hull under 0.3 s on my computer
+        if points.shape[0] > 1000:
+            points = points[np.random.randint(points.shape[0], size=1000), :]
+
+        # epsilon * 2 seems to be good parameter for lines to be smooth enough
+        concave_hull = get_shape(points, epsilon=epsilon * 2)
+        # expand_and_smooth the curve - selecting epsilon for the distance
+        # shows approximately what is DBSCAN neighbourhood
+        concave_hull = concave_hull.buffer(epsilon, resolution=16)
+
+        hulls[cl] = list(map(list, concave_hull.exterior.coords.xy))
+
+    return hulls

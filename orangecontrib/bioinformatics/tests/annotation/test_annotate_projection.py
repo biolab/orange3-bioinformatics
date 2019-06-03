@@ -1,11 +1,14 @@
+import time
 import unittest
 
 import numpy as np
 from Orange.clustering import DBSCAN, KMeans
 from Orange.data import Domain, ContinuousVariable, Table, DiscreteVariable
+from Orange.projection import TSNE
 
 from orangecontrib.bioinformatics.annotation.annotate_projection import \
-    annotate_projection, labels_locations, get_epsilon
+    annotate_projection, labels_locations, get_epsilon, compute_concave_hulls, \
+    cluster_data
 
 
 class TestAnnotateProjection(unittest.TestCase):
@@ -41,7 +44,7 @@ class TestAnnotateProjection(unittest.TestCase):
         self.assertEqual(annotations_cl["1"][1][0], 'b')
         self.assertAlmostEqual(annotations_cl["1"][1][1], 0.4, 5)
 
-        self.assertEqual(2, len(locs))
+        # self.assertEqual(2, len(locs))
 
     def test_example_not_clustered(self):
         self.data[-1] = [23, 23]
@@ -91,3 +94,16 @@ class TestAnnotateProjection(unittest.TestCase):
         eps = get_epsilon(data)
 
         self.assertGreaterEqual(eps, 0.9)
+
+    def test_compute_concave_hulls(self):
+        data = Table("Iris")[:, 2:4]
+        clusters = Table(
+            Domain([DiscreteVariable("cl", values=["1", "2", "3"])]),
+            [[0]] * 50 + [[1]] * 50 + [[2]] * 50
+        )
+        hulls = compute_concave_hulls(data, clusters, epsilon=0.5)
+
+        self.assertEqual(3, len(hulls))
+        self.assertEqual(2, len(hulls["1"]))  # hull have x and y
+        self.assertEqual(2, len(hulls["2"]))  # hull have x and y
+        self.assertEqual(2, len(hulls["3"]))  # hull have x and y
