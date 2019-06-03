@@ -179,7 +179,7 @@ class AnnotateSamples:
         return -np.log(np.array(fdrs))
 
     @staticmethod
-    def assign_annotations(items_sets, available_annotations, data, tax_id,
+    def assign_annotations(items_sets, available_annotations, data,
                            p_value_fun=PFUN_BINOMIAL,
                            scoring=SCORING_EXP_RATIO):
         """
@@ -193,8 +193,6 @@ class AnnotateSamples:
             Set of most important attributes for each item.
         available_annotations : Orange.data.Table
             Available annotations (e.g. cell types)
-        tax_id : str
-            The id of the organism
         p_value_fun : str, optional (defaults: TEST_BINOMIAL)
             A function that calculates p-value. It can be either
             PFUN_BINOMIAL that uses statistics.Binomial().p_value or
@@ -211,6 +209,10 @@ class AnnotateSamples:
         Orange.data.Table
             Annotation fdrs
         """
+        assert TAX_ID in data.attributes, "The input table needs to have a " \
+                                          "tax_id attribute"
+        tax_id = data.attributes[TAX_ID]
+
         # select function for p-value
         if p_value_fun == PFUN_HYPERGEOMETRIC:  # sf accept x-1 instead of x
             p_fun = lambda x, n, m, k: hypergeom.sf(x-1, n, m, k)
@@ -342,18 +344,14 @@ class AnnotateSamples:
         """
         assert len(data) > 1, "At least two data items are required for " \
                               "method to work."
-        assert TAX_ID in data.attributes, "The input table needs to have a " \
-                                          "tax_id attribute"
 
         if normalize:
             data = AnnotateSamples.log_cpm(data)
 
-        tax_id = data.attributes[TAX_ID]
-
         selected_attributes, z = AnnotateSamples.select_attributes(
             data, z_threshold=z_threshold)
         annotation_probs, annotation_fdrs = AnnotateSamples.assign_annotations(
-            selected_attributes, available_annotations, data, tax_id,
+            selected_attributes, available_annotations, data,
             p_value_fun=p_value_fun, scoring=scoring)
 
         annotation_probs = AnnotateSamples.filter_annotations(
