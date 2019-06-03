@@ -134,7 +134,10 @@ class AnnotateSamples:
         attributes_np = np.array([
             a.attributes.get("Entrez ID") for a in data.domain.attributes])
         attributes_sets = [
-            set(attributes_np[row > z_threshold]) - {None} for row in z]
+            set(map(str, set(attributes_np[row > z_threshold]) - {None}))
+            for row in z]
+        # map to string was added since there seems to be no guarantee that
+        # Entrez ID is a string.
 
         # pack z values to data table
         # take only attributes in new domain
