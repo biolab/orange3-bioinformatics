@@ -5,7 +5,7 @@ from Orange.data import Table, Domain, StringVariable, ContinuousVariable
 
 from orangecontrib.bioinformatics.annotation.annotate_samples import \
     AnnotateSamples, SCORING_EXP_RATIO, SCORING_MARKERS_SUM, SCORING_LOG_FDR, \
-    SCORING_LOG_PVALUE
+    SCORING_LOG_PVALUE, PFUN_HYPERGEOMETRIC
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
 

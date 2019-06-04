@@ -1,4 +1,4 @@
-from collections import defaultdict
+import time
 
 import numpy as np
 from Orange.data import Domain, ContinuousVariable, Table
@@ -6,7 +6,7 @@ from Orange.data import Domain, ContinuousVariable, Table
 from orangecontrib.bioinformatics.ncbi.gene import GeneInfo
 from orangecontrib.bioinformatics.utils import statistics
 from scipy.stats.mstats import rankdata
-from scipy.stats import hypergeom
+from scipy.stats import hypergeom, binom
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
@@ -17,6 +17,10 @@ SCORING_LOG_PVALUE = "scoring_log_p_value"
 
 PFUN_BINOMIAL = "binomial_p_function"
 PFUN_HYPERGEOMETRIC = "HYPERGEOMETRIC_p_function"
+
+
+class ScoringNotImplemented(Exception):
+    pass
 
 
 class AnnotateSamples:
@@ -92,23 +96,19 @@ class AnnotateSamples:
         return data / np.sum(data, axis=1)[:, None] * 1e6
 
     @staticmethod
-    def select_attributes(data, z_threshold=1):
+    def mann_whitney_test(data):
         """
-        Function selects "over"-expressed attributes for items with Mann-Whitney
-        U test.
+        Compute z values with test Mann-Whitney U test.
 
         Parameters
         ----------
         data : Orange.data.Table
             Tabular data with gene expressions
-        z_threshold : float
-            The threshold for selecting the attribute. For each item the
-            attributes with z-value above this value are selected.
 
         Returns
         -------
-        :obj:`list`
-            Sets of selected attributes for each cell
+        Orange.data.Table
+            Z-value for each item.
         """
         if len(data.X) <= 1:
             return [], []
@@ -130,21 +130,75 @@ class AnnotateSamples:
         # compute z
         z = (u - mu) / (sigma + 1e-16)
 
-        # gene selection
-        attributes_np = np.array([
-            a.attributes.get("Entrez ID") for a in data.domain.attributes])
-        attributes_sets = [
-            set(map(str, set(attributes_np[row > z_threshold]) - {None}))
-            for row in z]
-        # map to string was added since there seems to be no guarantee that
-        # Entrez ID is a string.
-
         # pack z values to data table
         # take only attributes in new domain
         domain = Domain([x for x in data.domain.attributes])
         z_table = Table(domain, z)
 
-        return attributes_sets, z_table
+        return z_table
+
+    @staticmethod
+    def _reorder_matrix(matrix, genes_order):
+        """
+        Function reorder the columns of the array to fit to the genes_order
+
+        Parameters
+        ----------
+        matrix : Orange.data.Table
+            Tabular data tha needs to be reordered
+        genes_order : list
+            Desired genes order
+
+        Returns
+        ------
+        np.ndarray
+            Reordered array.
+        """
+        current_order = np.array(
+            [x.attributes.get("Entrez ID") for x in matrix.domain.attributes])
+        values = matrix.X
+
+        # filter out genes without entrez ID
+        has_entrez_id = current_order != None
+        current_order = current_order[has_entrez_id]
+        values = values[:, has_entrez_id]
+
+        genes_order = np.array(genes_order)
+
+        xsorted = np.argsort(genes_order)
+        ypos = np.searchsorted(genes_order[xsorted], current_order)
+        indices = xsorted[ypos]  # index which tell where should be the column
+
+        reordered_values = np.zeros((values.shape[0], len(genes_order)))
+        for i_curr, i_dest in enumerate(indices):
+            reordered_values[:, i_dest] = values[:, i_curr]
+
+        return reordered_values
+
+    @staticmethod
+    def _select_attributes(z, genes_order, z_threshold=1):
+        """
+        Function selects "over"-expressed attributes for items based on z
+        values. It also reorder the matrix columns.
+
+        Parameters
+        ----------
+        z : Orange.data.Table
+            Tabular data z values for each item in the table
+        genes_order : list
+            Desired genes order
+        z_threshold : float
+            The threshold for selecting the attribute. For each item the
+            attributes with z-value above this value are selected.
+
+        Returns
+        -------
+        np.ndarray
+            Reordered and thresholded z-values/
+        """
+        reordered_z = AnnotateSamples._reorder_matrix(z, genes_order)
+
+        return reordered_z > z_threshold
 
     @staticmethod
     def _group_marker_attributes(markers, genes_order):
@@ -152,34 +206,32 @@ class AnnotateSamples:
         Function transforms annotations table to dictionary with format
         {annotation1: [attributes], annotation2: [attributes], ...}
         """
-        # dictionary with structure {celltype: [gene1, gene2, ...], ...}
-        types_dict = defaultdict(set)
+        types = sorted(list(set(markers[:, "Cell Type"].metas.flatten())))
+        genes_celltypes = np.zeros((len(genes_order), len(types)))
+
         for m in markers:
-            if m["Entrez ID"].value is not None and \
-                    not m["Entrez ID"].value == "?":
-                types_dict[str(m["Cell Type"])].add(m["Entrez ID"].value)
-        # dictionary as list of items
-        types_list = list(types_dict.items())
+            g = m["Entrez ID"].value
+            m = m["Cell Type"].value
+            if g is not None and not g == "?":
+                genes_celltypes[genes_order.index(g), types.index(m)] = 1
 
-        # create numpy matrix with cell type - gene affiliation
-        genes_celltypes = np.zeros(
-            (len(genes_order), len(types_list)))
-        for i, (_, genes) in enumerate(types_list):
-            for g in genes:
-                if g in genes_order:
-                    genes_celltypes[genes_order.index(g), i] = 1
-        return types_list, genes_celltypes
+        return genes_celltypes, types
 
     @staticmethod
-    def _scores_markers_sum(data, genes_types):
-        return data.X.dot(genes_types)
+    def _score(scoring_type, p_values, fdrs, data, M, x, m, genes_order):
+        if scoring_type == SCORING_MARKERS_SUM:
+            return AnnotateSamples._reorder_matrix(data, genes_order).dot(M)
+        if scoring_type == SCORING_EXP_RATIO:
+            return x / m
+        if scoring_type == SCORING_LOG_FDR:
+            return -np.log(fdrs)
+        if scoring_type == SCORING_LOG_PVALUE:
+            return -np.log(p_values)
+        else:
+            raise ScoringNotImplemented()
 
     @staticmethod
-    def _scores_fdr(fdrs):
-        return -np.log(np.array(fdrs))
-
-    @staticmethod
-    def assign_annotations(items_sets, available_annotations, data,
+    def assign_annotations(z_values, available_annotations, data, z_threshold=1,
                            p_value_fun=PFUN_BINOMIAL,
                            scoring=SCORING_EXP_RATIO):
         """
@@ -189,10 +241,13 @@ class AnnotateSamples:
 
         Parameters
         ----------
-        items_sets : list of sets
-            Set of most important attributes for each item.
+        z_values : Orange.data.Table
+            Table which show z values for each item
         available_annotations : Orange.data.Table
             Available annotations (e.g. cell types)
+        z_threshold : float
+            The threshold for selecting the attribute. For each item the
+            attributes with z-value above this value are selected.
         p_value_fun : str, optional (defaults: TEST_BINOMIAL)
             A function that calculates p-value. It can be either
             PFUN_BINOMIAL that uses statistics.Binomial().p_value or
@@ -214,57 +269,48 @@ class AnnotateSamples:
         tax_id = data.attributes[TAX_ID]
 
         # select function for p-value
-        if p_value_fun == PFUN_HYPERGEOMETRIC:  # sf accept x-1 instead of x
-            p_fun = lambda x, n, m, k: hypergeom.sf(x-1, n, m, k)
+        if p_value_fun == PFUN_HYPERGEOMETRIC:
+            p_fun = lambda x, N, m, k: hypergeom.sf(x, N, m, k)
         else:
-            p_fun = statistics.Binomial().p_value
+            p_fun = lambda x, N, m, k: binom.sf(x, k, m / N)
 
-        # retrieve number of genes for organism
-        N = len(GeneInfo(tax_id))
+        N = len(GeneInfo(tax_id))  # number of genes for organism
 
-        grouped_annotations_items, genes_celltypes = \
-            AnnotateSamples._group_marker_attributes(
-                available_annotations,
-                [d.attributes.get("Entrez ID")
-                 for d in data.domain.attributes])
+        # make an attributes order
+        genes_data = [str(x.attributes["Entrez ID"])
+                      for x in z_values.domain.attributes
+                      if "Entrez ID" in x.attributes]
+        genes_celltypes = [
+            x for x in available_annotations[:, "Entrez ID"].metas.flatten()
+            if x is not None and not x == "?"]
+        genes_order = list(set(genes_data) | set(genes_celltypes))
 
-        def hg_cell(item_attributes):
-            p_values = []
-            scores = []
-            for i, (ct, attributes) in enumerate(grouped_annotations_items):
-                intersect = item_attributes & attributes
-                x = len(intersect)
-                k = len(item_attributes)  # drawn balls - expressed for item
-                m = len(attributes)  # marked balls - items for a process
+        # get marker genes matrix M
+        M, annotations = AnnotateSamples._group_marker_attributes(
+            available_annotations, genes_order)
 
-                if x > 2:  # avoid the heavy computation when intersect small
-                    p_value = p_fun(x, N, m, k)
-                else:
-                    p_value = 1
-                p_values.append(p_value)
+        Z = AnnotateSamples._select_attributes(
+            z_values, genes_order, z_threshold)
 
-                if scoring == SCORING_EXP_RATIO:
-                    scores.append(x / (m + 1e-16))
+        x = Z.dot(M)
+        k = np.repeat(Z.sum(axis=1).reshape(-1, 1), x.shape[1], axis=1)
+        m = np.repeat(M.sum(axis=0).reshape(1, -1), x.shape[0], axis=0)
 
-            fdrs = statistics.FDR(p_values)
-            if scoring == SCORING_LOG_FDR or scoring == SCORING_LOG_PVALUE:
-                scores = AnnotateSamples._scores_fdr(
-                    fdrs if scoring == SCORING_LOG_FDR else p_values)
+        p_values = p_fun(x - 1, N, m, k)
 
-            return scores, fdrs
+        fdrs = np.zeros(p_values.shape)
+        for i, row in enumerate(p_values):
+            fdrs[i] = np.array(statistics.FDR(row.tolist()))
 
-        prob_fdrs = [hg_cell(its) for its in items_sets]
-        probs, fdrs = zip(*prob_fdrs)
-
-        if scoring == SCORING_MARKERS_SUM:
-            probs = AnnotateSamples._scores_markers_sum(data, genes_celltypes)
+        scores = AnnotateSamples._score(
+            scoring, p_values, fdrs, data, M, x, m, genes_order)
 
         domain = Domain(
-            [ContinuousVariable(ct[0]) for ct in grouped_annotations_items])
-        probs_table = Table(domain, np.array(probs))
-        fdrs_table = Table(domain, np.array(fdrs))
+            [ContinuousVariable(ct) for ct in annotations])
+        scores_table = Table(domain, scores)
+        fdrs_table = Table(domain, fdrs)
 
-        return probs_table, fdrs_table
+        return scores_table, fdrs_table
 
     @staticmethod
     def filter_annotations(scores, p_values, return_nonzero_annotations=True,
@@ -348,10 +394,11 @@ class AnnotateSamples:
         if normalize:
             data = AnnotateSamples.log_cpm(data)
 
-        selected_attributes, z = AnnotateSamples.select_attributes(
-            data, z_threshold=z_threshold)
+        z = AnnotateSamples.mann_whitney_test(
+            data)
+
         annotation_probs, annotation_fdrs = AnnotateSamples.assign_annotations(
-            selected_attributes, available_annotations, data,
+            z, available_annotations, data, z_threshold=z_threshold,
             p_value_fun=p_value_fun, scoring=scoring)
 
         annotation_probs = AnnotateSamples.filter_annotations(
