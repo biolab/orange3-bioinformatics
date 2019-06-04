@@ -38,6 +38,7 @@ from collections import Counter
 
 from Orange.clustering import DBSCAN
 import numpy as np
+from Orange.data import Domain, DiscreteVariable, Table
 from scipy.spatial import distance
 import shapely.geometry as geometry
 from scipy.spatial import Delaunay
@@ -63,8 +64,28 @@ def cluster_data(coordinates, clustering_algorithm=DBSCAN, **kwargs):
     """
     learner = clustering_algorithm(**kwargs)
     model = learner(coordinates)
-    return model(coordinates)
+    clustrs = model(coordinates)
     # TODO: this need to be changed when clustering in orange is changed
+
+    # sort classes in descending order base on number of cases in the cluster
+    if "-1" in clustrs.domain.attributes[0].values:  # -1 means not cluster
+        nan_idx = clustrs.domain.attributes[0].values.index("-1")
+    else:
+        nan_idx = None
+    sorted_clust_idx = [
+        v for v, _ in Counter(clustrs.X[:, 0]).most_common() if v != nan_idx]
+
+    # re-indexed array
+    new_clustering = np.empty(len(clustrs))
+    new_clustering[:] = np.nan  # nan for not clustered
+    for i, v in enumerate(sorted_clust_idx):
+        new_clustering[clustrs.X[:, 0] == v] = i
+
+    # create the table
+    new_domain = Domain([DiscreteVariable(
+        "Clusters", values=[
+            "C{}".format(i) for i in range(1, len(sorted_clust_idx) + 1)])])
+    return Table(new_domain, new_clustering.reshape((-1, 1)))
 
 
 def assign_labels(clusters, annotations, labels_per_cluster):
@@ -92,8 +113,7 @@ def assign_labels(clusters, annotations, labels_per_cluster):
     annotation_best_idx = np.argmax(annotations.X, axis=1)
     annotation_best = labels[annotation_best_idx]
 
-    clusters_unique = set(
-        clusters.domain[0].values) - {"-1"}  # -1 is not clustered
+    clusters_unique = set(clusters.domain[0].values)
     annotations_clusters = {}
     for cl in clusters_unique:
         mask = np.array(list(
@@ -162,7 +182,7 @@ def get_epsilon(data, k=10, skip=0.1):
     if len(x) > 1000:  # subsampling is required
         i = len(x) // 1000
         x = x[::i]
-    print(len(x))
+
     d = distance.squareform(distance.pdist(x))
     kth_point = np.argpartition(d, k+1, axis=1)[:, k+1]
     # k+1 since first one is item itself
