@@ -56,9 +56,8 @@ class AnnotateSamples:
     phases. We assume that data are already loaded.
 
     >>> annotator = AnnotateSamples()
-    >>> selected_attributes, z = annotator.select_attributes(data)
-    >>> scores, p_val = annotator.assign_annotations(
-    ...     selected_attributes, markers, data.attributes[TAX_ID])
+    >>> z = annotator.mann_whitney_test(data)
+    >>> scores, p_val = AnnotateSamples.assign_annotations(z, markers, data)
     >>> scores = annotator.filter_annotations(scores, p_val, p_threshold=0.05)
 
     Attributes
