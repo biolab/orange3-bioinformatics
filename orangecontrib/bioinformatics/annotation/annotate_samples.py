@@ -174,12 +174,14 @@ class AnnotateSamples:
             Reordered array.
         """
         current_order = np.array(
-            [x.attributes.get("Entrez ID") for x in matrix.domain.attributes])
+            [x.attributes.get("Entrez ID")
+             for x in matrix.domain.attributes])
         values = matrix.X
 
         # filter out genes without entrez ID
         has_entrez_id = current_order != None
-        current_order = current_order[has_entrez_id]
+        # just in case if Entrez ID not strings
+        current_order = np.array([str(x) for x in current_order[has_entrez_id]])
         values = values[:, has_entrez_id]
 
         genes_order = np.array(genes_order)
@@ -229,7 +231,7 @@ class AnnotateSamples:
         genes_celltypes = np.zeros((len(genes_order), len(types)))
 
         for m in markers:
-            g = m["Entrez ID"].value
+            g = str(m["Entrez ID"].value)
             m = m["Cell Type"].value
             if g is not None and not g == "?":
                 genes_celltypes[genes_order.index(g), types.index(m)] = 1
@@ -300,7 +302,7 @@ class AnnotateSamples:
                       for x in z_values.domain.attributes
                       if "Entrez ID" in x.attributes]
         genes_celltypes = [
-            x for x in available_annotations[:, "Entrez ID"].metas.flatten()
+            str(x) for x in available_annotations[:, "Entrez ID"].metas.flatten()
             if x is not None and not x == "?"]
         genes_order = list(set(genes_data) | set(genes_celltypes))
 
