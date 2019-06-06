@@ -1,5 +1,3 @@
-import time
-
 import numpy as np
 from Orange.data import Domain, ContinuousVariable, Table
 
@@ -95,6 +93,26 @@ class AnnotateSamples:
         return data / np.sum(data, axis=1)[:, None] * 1e6
 
     @staticmethod
+    def _ranks(data):
+        """
+        This function computes ranks for data in the table along axis=0.
+        """
+        x_len = data.shape[0]
+        x_mask = data.sum(axis=0) > 0
+
+        # create a matrix of ranges - init with average rank
+        # for columns without nonzero expressions
+        data_ge_ranked = np.ones(data.shape) * (1 + data.shape[0]) / 2
+
+        # compute ranks only for nonzero columns
+        for i in np.where(x_mask)[0]:
+            mask = data[:, i] > 0
+            col = np.ones(x_len) * (1 + (x_len - mask.sum())) / 2
+            col[mask] = rankdata(data[mask, i]) + (x_len - mask.sum())
+            data_ge_ranked[:, i] = col
+        return data_ge_ranked
+
+    @staticmethod
     def mann_whitney_test(data):
         """
         Compute z values with test Mann-Whitney U test.
@@ -111,8 +129,9 @@ class AnnotateSamples:
         """
         if len(data.X) <= 1:
             return [], []
+
         # rank data
-        data_ge_ranked = rankdata(data.X, axis=0)
+        data_ge_ranked = AnnotateSamples._ranks(data.X)
 
         # compute U, mu, sigma
         n = data_ge_ranked.shape[0]
@@ -120,6 +139,7 @@ class AnnotateSamples:
         u = data_ge_ranked - 1
         mu = n2 / 2
         sigma = np.zeros(data_ge_ranked.shape[1])
+
         for i in range(data_ge_ranked.shape[1]):
             _, counts = np.unique(data_ge_ranked[:, i], return_counts=True)
             sigma[i] = np.sqrt(
