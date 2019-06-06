@@ -20,7 +20,7 @@ Example:
 >>> markers = Table(marker_p)
 >>>
 >>> # annotate data with labels
->>> annotator = AnnotateSamples(p_value_th=0.05)
+>>> annotator = AnnotateSamples()
 >>> annotations = annotator.annotate_samples(data, markers)
 >>>
 >>> # project data in 2D
@@ -29,8 +29,15 @@ Example:
 >>> embedding = tsne_model(data)
 >>>
 >>> # get clusters and annotations for clusters
->>> clusters, annotations_cl = annotate_projection(annotations, embedding,
-...     clustering_algorithm=DBSCAN(eps=2))
+>>> clusters, clusters_meta, eps = annotate_projection(annotations, embedding,
+...     clustering_algorithm=DBSCAN, eps=1.2)
+
+In case when user uses a DBSCAN algorithm and do not provide eps to the
+`annotate_projection` function it is computed automatically with knn method.
+
+>>> clusters, clusters_meta, eps = annotate_projection(annotations, embedding,
+...     clustering_algorithm=DBSCAN)
+
 """
 
 
@@ -53,7 +60,7 @@ def cluster_data(coordinates, clustering_algorithm=DBSCAN, **kwargs):
     Parameters
     ----------
     coordinates : Orange.data.Table
-        Data to be clustered
+        Visualisation coordinates - embeddings
     clustering_algorithm : callable
         Algorithm used for clustering.
 
@@ -136,7 +143,7 @@ def labels_locations(coordinates, clusters):
     Parameters
     ----------
     coordinates : Orange.data.Table
-        Data points
+        Visualisation coordinates - embeddings
     clusters : Orange.data.Table
         Cluster indices for each item.
 
@@ -159,15 +166,15 @@ def labels_locations(coordinates, clusters):
     return locations
 
 
-def get_epsilon(data, k=10, skip=0.1):
+def get_epsilon(coordinates, k=10, skip=0.1):
     """
     The function computes the epsilon parameter for DBSCAN through method
     proposed in the paper.
 
     Parameters
     ----------
-    data : Orange.data.Table
-        Input data which wil be clustered
+    coordinates : Orange.data.Table
+        Visualisation coordinates - embeddings
     k : int
         Number kth observed neighbour
     skip : float
@@ -178,7 +185,7 @@ def get_epsilon(data, k=10, skip=0.1):
     float
         Epsilon parameter for DBSCAN
     """
-    x = data.X
+    x = coordinates.X
     if len(x) > 1000:  # subsampling is required
         i = len(x) // 1000
         x = x[::i]
@@ -191,51 +198,6 @@ def get_epsilon(data, k=10, skip=0.1):
     # currently mark proportion equal to skip as a noise
     return kth_dist[-int(np.round(len(kth_dist) * skip))]
 
-def annotate_projection(annotations, coordinates,
-                        clustering_algorithm=DBSCAN,
-                        labels_per_cluster=3, **kwargs):
-    """
-    Function cluster the data based on coordinates, and assigns a certain number
-    of labels per cluster. Each cluster gets `labels_per_cluster` number of most
-    common labels in cluster assigned.
-
-    Parameters
-    ----------
-    annotations : Orange.data.Table
-        Table with annotations and their probabilities.
-    coordinates : Orange.data.Table
-        Data to be clustered
-    clustering_algorithm : callable, optional (default = DBSCAN)
-        Algorithm used in clustering.
-    labels_per_cluster : int, optional (default = 3)
-        Number of labels that need to be assigned to each cluster.
-
-    Returns
-    -------
-    Orange.data.Table
-        List of cluster indices.
-    dict
-        Dictionary with cluster index as a key and list of annotations as a
-        value. Each list include tuples with the annotation name and their
-        proportion in the cluster.
-    dict
-        The coordinates for locating the label. Dictionary with cluster index
-        as a key and tuple (x, y) as a value.
-    """
-    assert len(annotations) == len(coordinates)
-    assert len(coordinates) > 0  # sklearn clustering want to have one example
-    assert len(annotations.domain) > 0
-    assert len(coordinates.domain) > 0
-    # get clusters
-    clusters = cluster_data(coordinates, clustering_algorithm, **kwargs)
-
-    # assign top n labels to group
-    annotations_cl = assign_labels(clusters, annotations, labels_per_cluster)
-
-    labels_loc = labels_locations(coordinates, clusters)
-
-    return clusters, annotations_cl, labels_loc
-
 
 def compute_concave_hulls(coordinates, clusters, epsilon):
     """
@@ -244,7 +206,7 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
     Parameters
     ----------
     coordinates : Orange.data.Table
-       Data points
+        Visualisation coordinates - embeddings
     clusters : Orange.data.Table
        Cluster indices for each item.
     epsilon : float
@@ -254,8 +216,8 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
     -------
     dict
        The points of the concave hull. Dictionary with cluster index
-       as a key and list of points as a value -
-       [[x1, x2, x,3 ...], [y1, y2, y3, ...]]
+       as a key and np.ndaray of points as a value -
+       [[x1, y1], [x2, y2], [x3, y3], ...]
     """
 
     def get_shape(points, epsilon):
@@ -319,6 +281,64 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
         # shows approximately what is DBSCAN neighbourhood
         concave_hull = concave_hull.buffer(epsilon, resolution=16)
 
-        hulls[cl] = list(map(list, concave_hull.exterior.coords.xy))
+        hulls[cl] = np.array(list(map(list, concave_hull.exterior.coords.xy))).T
 
     return hulls
+
+
+def annotate_projection(annotations, coordinates,
+                        clustering_algorithm=DBSCAN,
+                        labels_per_cluster=3, **kwargs):
+    """
+    Function cluster the data based on coordinates, and assigns a certain number
+    of labels per cluster. Each cluster gets `labels_per_cluster` number of most
+    common labels in cluster assigned.
+
+    Parameters
+    ----------
+    annotations : Orange.data.Table
+        Table with annotations and their probabilities.
+    coordinates : Orange.data.Table
+        Visualisation coordinates - embeddings
+    clustering_algorithm : callable, optional (default = DBSCAN)
+        Algorithm used in clustering.
+    labels_per_cluster : int, optional (default = 3)
+        Number of labels that need to be assigned to each cluster.
+
+    Returns
+    -------
+    Orange.data.Table
+        List of cluster indices.
+    dict
+        Dictionary with cluster index as a key and list of annotations as a
+        value. Each list include tuples with the annotation name and their
+        proportion in the cluster.
+    dict
+        The coordinates for locating the label. Dictionary with cluster index
+        as a key and tuple (x, y) as a value.
+    """
+    assert len(annotations) == len(coordinates)
+    assert len(coordinates) > 0  # sklearn clustering want to have one example
+    assert len(annotations.domain) > 0
+    assert len(coordinates.domain) > 0
+
+    eps = kwargs.get("eps", get_epsilon(coordinates))
+    if clustering_algorithm == DBSCAN:
+        kwargs["eps"] = eps
+
+    # get clusters
+    clusters = cluster_data(coordinates, clustering_algorithm, **kwargs)
+
+    # assign top n labels to group
+    annotations_cl = assign_labels(clusters, annotations, labels_per_cluster)
+
+    labels_loc = labels_locations(coordinates, clusters)
+
+    concave_hull = compute_concave_hulls(coordinates, clusters, eps)
+
+    clusters_meta = {}
+    for cl in annotations_cl.keys():
+        clusters_meta[cl] = (
+            annotations_cl[cl], labels_loc[cl], concave_hull[cl])
+
+    return clusters, clusters_meta, eps
