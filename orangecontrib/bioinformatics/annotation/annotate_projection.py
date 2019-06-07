@@ -116,11 +116,15 @@ def assign_labels(clusters, annotations, labels_per_cluster):
         value. Each list include tuples with the annotation name and their
         proportion in the cluster.
     """
+    clusters_unique = set(clusters.domain[0].values)
+
+    if len(annotations.domain) == 0:
+        return {cl: [] for cl in clusters_unique}
+
     labels = np.array(list(map(str, annotations.domain.attributes)))
     annotation_best_idx = np.argmax(annotations.X, axis=1)
     annotation_best = labels[annotation_best_idx]
 
-    clusters_unique = set(clusters.domain[0].values)
     annotations_clusters = {}
     for cl in clusters_unique:
         mask = np.array(list(
@@ -317,10 +321,12 @@ def annotate_projection(annotations, coordinates,
         The coordinates for locating the label. Dictionary with cluster index
         as a key and tuple (x, y) as a value.
     """
-    assert len(annotations) == len(coordinates)
-    assert len(coordinates) > 0  # sklearn clustering want to have one example
-    assert len(annotations.domain) > 0
-    assert len(coordinates.domain) > 0
+    assert len(annotations) == len(coordinates), \
+        "Number of coordinates does not match to number of annotations"
+    # sklearn clustering want to have one example
+    assert len(coordinates) > 0, "At least one data point need to be provided"
+    assert len(coordinates.domain) > 0, \
+        "Coordinates need to have at least one attribute"
 
     eps = kwargs.get("eps", get_epsilon(coordinates))
     if clustering_algorithm == DBSCAN:

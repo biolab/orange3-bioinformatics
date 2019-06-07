@@ -110,3 +110,30 @@ class TestAnnotateProjection(unittest.TestCase):
         self.assertEqual(2, hulls["1"].shape[1])  # hull have x and y
         self.assertEqual(2, hulls["2"].shape[1])  # hull have x and y
         self.assertEqual(2, hulls["3"].shape[1])  # hull have x and y
+
+    def test_empty_annotations(self):
+        ann = Table(Domain([]), np.empty((len(self.data), 0)))
+        clusters, clusters_meta, eps = annotate_projection(ann, self.data)
+
+        self.assertGreater(len(clusters), 0)
+        self.assertGreater(len(clusters_meta), 0)
+        self.assertEqual(0, len(clusters_meta["C1"][0]))
+        self.assertGreater(len(clusters_meta["C1"][1]), 0)
+        self.assertGreater(len(clusters_meta["C1"][2]), 0)
+
+    def test_one_label(self):
+        """
+        Test whether having only one label works fine, in this case one cluster
+        will not have a label assigned - this must work fine as well.
+        """
+        domain_ann = Domain([ContinuousVariable("a")])
+        data_ann = np.array([[0.9], [0.9], [0.9], [0.9], [0.9],
+                             [0], [0], [0], [0], [0], [0], [0]])
+        ann = Table(domain_ann, data_ann)
+        clusters, clusters_meta, eps = annotate_projection(ann, self.data,
+                                                           eps=2)
+        self.assertGreater(len(clusters), 0)
+        self.assertGreater(len(clusters_meta), 0)
+        self.assertGreater(len(clusters_meta["C1"][0]), 0)
+        self.assertGreater(len(clusters_meta["C1"][1]), 0)
+        self.assertGreater(len(clusters_meta["C1"][2]), 0)
