@@ -47,11 +47,14 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
-        self.assertGreater(annotations.X.sum(), 0)
-        self.assertLessEqual(annotations.X.max(), 1)
-        self.assertGreaterEqual(annotations.X.min(), 0)
+        self.assertGreater(np.nansum(annotations.X), 0)
+        self.assertLessEqual(np.nanmax(annotations.X), 1)
+        self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
     def test_remove_empty_column(self):
+        """
+        Type 3 column must be removed here
+        """
         m_domain = Domain(
             [], None, [
                 StringVariable("Cell Type"), StringVariable("Entrez ID")])
@@ -67,17 +70,17 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
-        self.assertGreater(annotations.X.sum(), 0)
-        self.assertLessEqual(annotations.X.max(), 1)
-        self.assertGreaterEqual(annotations.X.min(), 0)
+        self.assertGreater(np.nansum(annotations.X), 0)
+        self.assertLessEqual(np.nanmax(annotations.X), 1)
+        self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
         annotations = self.annotator.annotate_samples(
             self.data, markers, return_nonzero_annotations=False)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 3)  # two types in the data
-        self.assertGreater(annotations.X.sum(), 0)
-        self.assertLessEqual(annotations.X.max(), 1)
-        self.assertGreaterEqual(annotations.X.min(), 0)
+        self.assertGreater(np.nansum(annotations.X), 0)
+        self.assertLessEqual(np.nanmax(annotations.X), 1)
+        self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
     def test_sf(self):
         """
@@ -90,9 +93,9 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
-        self.assertGreater(annotations.X.sum(), 0)
-        self.assertLessEqual(annotations.X.max(), 1)
-        self.assertGreaterEqual(annotations.X.min(), 0)
+        self.assertGreater(np.nansum(annotations.X), 0)
+        self.assertLessEqual(np.nanmax(annotations.X), 1)
+        self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
     def test_two_example(self):
         self.data.X = self.data.X[:2]
@@ -110,9 +113,9 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
-        self.assertGreater(annotations.X.sum(), 0)
-        self.assertLessEqual(annotations.X.max(), 1)
-        self.assertGreaterEqual(annotations.X.min(), 0)
+        self.assertGreater(np.nansum(annotations.X), 0)
+        self.assertLessEqual(np.nanmax(annotations.X), 1)
+        self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
     def test_select_attributes(self):
         z = self.annotator.mann_whitney_test(self.data)
@@ -162,9 +165,9 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
-        self.assertGreater(annotations.X.sum(), 0)
-        self.assertLessEqual(annotations.X.max(), 1)
-        self.assertGreaterEqual(annotations.X.min(), 0)
+        self.assertGreater(np.nansum(annotations.X), 0)
+        self.assertLessEqual(np.nanmax(annotations.X), 1)
+        self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
         # scoring SCORING_MARKERS_SUM
         annotations = self.annotator.annotate_samples(
@@ -176,12 +179,8 @@ class TestAnnotateSamples(unittest.TestCase):
 
         # based on provided data it should match
         # the third row is skipped, since it is special
-        self.assertAlmostEqual(annotations[0, 0].value, self.data.X[0].sum())
-        self.assertAlmostEqual(annotations[1, 0].value, self.data.X[1].sum())
-        self.assertAlmostEqual(annotations[2, 0].value, self.data.X[2].sum())
-        self.assertAlmostEqual(annotations[4, 1].value, self.data.X[4].sum())
-        self.assertAlmostEqual(annotations[5, 1].value, self.data.X[5].sum())
-        self.assertAlmostEqual(annotations[6, 1].value, self.data.X[6].sum())
+        self.assertEqual(annotations[0, 0].value, self.data.X[0].sum())
+        self.assertEqual(annotations[5, 1].value, self.data.X[5].sum())
 
         # scoring SCORING_LOG_FDR
         annotations = self.annotator.annotate_samples(
@@ -218,6 +217,7 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
-        self.assertGreater(annotations.X.sum(), 0)
-        self.assertLessEqual(annotations.X.max(), 1)
-        self.assertGreaterEqual(annotations.X.min(), 0)
+        self.assertGreater(np.nansum(annotations.X), 0)
+        self.assertLessEqual(np.nanmax(annotations.X), 1)
+        self.assertGreaterEqual(np.nanmin(annotations.X), 0)
+
