@@ -6,7 +6,8 @@ from Orange.clustering import DBSCAN, KMeans
 from Orange.data import Domain, ContinuousVariable, Table, DiscreteVariable
 
 from orangecontrib.bioinformatics.annotation.annotate_projection import \
-    annotate_projection, labels_locations, get_epsilon, compute_concave_hulls
+    annotate_projection, labels_locations, get_epsilon, compute_concave_hulls, \
+    assign_labels
 
 
 class TestAnnotateProjection(unittest.TestCase):
@@ -140,3 +141,40 @@ class TestAnnotateProjection(unittest.TestCase):
         self.assertGreater(len(clusters_meta["C1"][0]), 0)
         self.assertGreater(len(clusters_meta["C1"][1]), 0)
         self.assertGreater(len(clusters_meta["C1"][2]), 0)
+
+    def test_socres_with_nan(self):
+        self.annotations.X[0, 0] = np.nan
+        self.annotations.X[1, 1] = np.nan
+        self.annotations.X[1, 2] = np.nan
+
+        self.annotations.X[2, 0] = np.nan
+        self.annotations.X[2, 1] = np.nan
+        self.annotations.X[2, 2] = np.nan
+
+        clusters = Table(
+            Domain([DiscreteVariable("Cluster", values=["C1", "C3"])]),
+            np.array([[0] * 5 + [1] * 7]).reshape(-1, 1))
+
+        labels_dict, labels_items = assign_labels(clusters, self.annotations, 3)
+
+        transformed_labels = list(
+            map(labels_items.domain.attributes[0].repr_val,
+                labels_items.X[:, 0]))
+        self.assertListEqual(
+            ['b', 'a', '?', 'b', 'a', 'c', 'c', 'b', 'c', 'b', 'b', 'b'],
+            transformed_labels
+        )
+        self.assertTupleEqual((0.4, 0.4), list(zip(*labels_dict["C1"]))[1])
+
+        # check all nans
+        self.annotations.X[:, :] = np.nan
+        labels_dict, labels_items = assign_labels(clusters, self.annotations, 3)
+        transformed_labels = list(
+            map(labels_items.domain.attributes[0].repr_val,
+                labels_items.X[:, 0]))
+        self.assertListEqual(
+            ['?'] * len(self.annotations),
+            transformed_labels
+        )
+        self.assertEqual(0, len(labels_dict["C1"]))
+        self.assertEqual(0, len(labels_dict["C3"]))

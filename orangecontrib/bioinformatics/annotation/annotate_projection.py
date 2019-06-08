@@ -126,24 +126,41 @@ def assign_labels(clusters, annotations, labels_per_cluster):
                      np.ones((len(clusters), 1)) * np.nan)
 
     labels = np.array(list(map(str, annotations.domain.attributes)))
-    annotation_best_idx = np.argmax(annotations.X, axis=1)
+
+    # remove rows with all nans
+    nan_mask = np.isnan(annotations.X).all(axis=1)
+    ann_not_nan = annotations.X[~nan_mask]
+
+    # find indices and labels
+    annotation_best_idx = np.nanargmax(ann_not_nan, axis=1)
     annotation_best = labels[annotation_best_idx]
+
+    # join back together
+    items_annotations = np.empty(annotations.X.shape[0], dtype=labels.dtype)
+    items_annotations[~nan_mask] = annotation_best
 
     annotations_clusters = {}
     for cl in clusters_unique:
         mask = np.array(list(
             map(clusters.domain.attributes[0].repr_val,
                 clusters.X[:, 0]))).flatten() == cl
-        labels_cl = annotation_best[mask]
-        counts = Counter(labels_cl)
+        labels_cl = items_annotations[mask]
+        # remove nans from labels
+        labels_cl_filtered = labels_cl[~(labels_cl == "")]
+
+        counts = Counter(labels_cl_filtered)
         annotations_clusters[cl] = [
             (l, c / len(labels_cl))
             for l, c in counts.most_common(labels_per_cluster)]
 
     # pack item annotations to Table
-    values, indices = np.unique(annotation_best, return_inverse=True)
+    nan_mask = items_annotations == ""
+    values, indices = np.unique(
+        items_annotations[~nan_mask], return_inverse=True)
+    corrected_idx = np.ones(items_annotations.shape) * np.nan
+    corrected_idx[~nan_mask] = indices
     domain = Domain([DiscreteVariable("Annotation", values=values)])
-    item_annotations = Table(domain, indices.reshape((-1, 1)))
+    item_annotations = Table(domain, corrected_idx.reshape((-1, 1)))
 
     return annotations_clusters, item_annotations
 
