@@ -23,11 +23,11 @@ class TestAnnotateSamples(unittest.TestCase):
         self.markers = Table(m_domain, np.empty((len(m_data), 0)), None, m_data)
 
         genes = ["111", "112", "113", "114", "211", "212", "213", "214"]
-        domain = Domain([ContinuousVariable(
+        self.domain = Domain([ContinuousVariable(
             str(g)) for g in genes])
-        for v, g in zip(domain.attributes, genes):
+        for v, g in zip(self.domain.attributes, genes):
             v.attributes = {"Entrez ID": g}
-        self.data = Table(domain, np.array(
+        self.data = Table(self.domain, np.array(
             [[1, 1, 1, 1.1, 0, 0, 0, 0],
              [1, .8, .9, 1, 0, 0, 0, 0],
              [.7, 1.1, 1, 1.2, 0, 0, 0, 0],
@@ -115,12 +115,21 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertGreaterEqual(annotations.X.min(), 0)
 
     def test_select_attributes(self):
-        selected_attrs, z = self.annotator.select_attributes(self.data)
+        z = self.annotator.mann_whitney_test(self.data)
 
-        self.assertEqual(len(self.data), len(selected_attrs))
-        self.assertSetEqual({"112", "111", "114"}, selected_attrs[0])
+        self.assertEqual(z.X.shape, self.data.X.shape)
+        self.assertGreaterEqual(z.X[0, 0], 1)
+        self.assertGreaterEqual(z.X[0, 1], 1)
+        self.assertGreaterEqual(z.X[0, 3], 1)
 
     def test_assign_annotations(self):
+        z = np.array([
+            [1.1, 1.1, 1.1, 1.1, 0, 0, 0, 0],
+            [1.1, 1.1, 0, 0, 1.1, 0, 0, 0],
+            [1.1, 0, 0, 0, 1.1, 1.1, 0, 0],
+            [0, 0, 0, 0, 1.1, 1.1, 1.1, 1.1]
+        ])
+        z_table = Table(self.domain, z)
         attrs = [{"111", "112", "113", "114"}, {"111", "112", "211"},
                  {"211", "212", "111"}, {"211", "212", "213", "214"}]
         exp_ann = np.array([
@@ -129,7 +138,7 @@ class TestAnnotateSamples(unittest.TestCase):
             [1/4, 1/2],
             [0, 1]])
         annotations, fdrs = self.annotator.assign_annotations(
-            attrs, self.markers, self.data, "9606")
+            z_table, self.markers, self.data)
 
         self.assertEqual(len(attrs), len(annotations))
         self.assertEqual(len(attrs), len(fdrs))
@@ -167,12 +176,12 @@ class TestAnnotateSamples(unittest.TestCase):
 
         # based on provided data it should match
         # the third row is skipped, since it is special
-        self.assertEqual(annotations[0, 0].value, self.data.X[0].sum())
-        self.assertEqual(annotations[1, 0].value, self.data.X[1].sum())
-        self.assertEqual(annotations[2, 0].value, self.data.X[2].sum())
-        self.assertEqual(annotations[4, 1].value, self.data.X[4].sum())
-        self.assertEqual(annotations[5, 1].value, self.data.X[5].sum())
-        self.assertEqual(annotations[6, 1].value, self.data.X[6].sum())
+        self.assertAlmostEqual(annotations[0, 0].value, self.data.X[0].sum())
+        self.assertAlmostEqual(annotations[1, 0].value, self.data.X[1].sum())
+        self.assertAlmostEqual(annotations[2, 0].value, self.data.X[2].sum())
+        self.assertAlmostEqual(annotations[4, 1].value, self.data.X[4].sum())
+        self.assertAlmostEqual(annotations[5, 1].value, self.data.X[5].sum())
+        self.assertAlmostEqual(annotations[6, 1].value, self.data.X[6].sum())
 
         # scoring SCORING_LOG_FDR
         annotations = self.annotator.annotate_samples(
