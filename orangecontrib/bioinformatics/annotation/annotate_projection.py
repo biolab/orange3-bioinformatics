@@ -115,24 +115,54 @@ def assign_labels(clusters, annotations, labels_per_cluster):
         Dictionary with cluster index as a key and list of annotations as a
         value. Each list include tuples with the annotation name and their
         proportion in the cluster.
+    Orange.data.Table
+        The array with the annotation assigned to the item.
     """
+    clusters_unique = set(clusters.domain[0].values)
+
+    if len(annotations.domain) == 0:
+        return {cl: [] for cl in clusters_unique}, \
+               Table(Domain([DiscreteVariable("Annotation", values=[])]),
+                     np.ones((len(clusters), 1)) * np.nan)
+
     labels = np.array(list(map(str, annotations.domain.attributes)))
-    annotation_best_idx = np.argmax(annotations.X, axis=1)
+
+    # remove rows with all nans
+    nan_mask = np.isnan(annotations.X).all(axis=1)
+    ann_not_nan = annotations.X[~nan_mask]
+
+    # find indices and labels
+    annotation_best_idx = np.nanargmax(ann_not_nan, axis=1)
     annotation_best = labels[annotation_best_idx]
 
-    clusters_unique = set(clusters.domain[0].values)
+    # join back together
+    items_annotations = np.empty(annotations.X.shape[0], dtype=labels.dtype)
+    items_annotations[~nan_mask] = annotation_best
+
     annotations_clusters = {}
     for cl in clusters_unique:
         mask = np.array(list(
             map(clusters.domain.attributes[0].repr_val,
                 clusters.X[:, 0]))).flatten() == cl
-        labels_cl = annotation_best[mask]
-        counts = Counter(labels_cl)
+        labels_cl = items_annotations[mask]
+        # remove nans from labels
+        labels_cl_filtered = labels_cl[~(labels_cl == "")]
+
+        counts = Counter(labels_cl_filtered)
         annotations_clusters[cl] = [
             (l, c / len(labels_cl))
             for l, c in counts.most_common(labels_per_cluster)]
 
-    return annotations_clusters
+    # pack item annotations to Table
+    nan_mask = items_annotations == ""
+    values, indices = np.unique(
+        items_annotations[~nan_mask], return_inverse=True)
+    corrected_idx = np.ones(items_annotations.shape) * np.nan
+    corrected_idx[~nan_mask] = indices
+    domain = Domain([DiscreteVariable("Annotation", values=values)])
+    item_annotations = Table(domain, corrected_idx.reshape((-1, 1)))
+
+    return annotations_clusters, item_annotations
 
 
 def labels_locations(coordinates, clusters):
@@ -317,10 +347,12 @@ def annotate_projection(annotations, coordinates,
         The coordinates for locating the label. Dictionary with cluster index
         as a key and tuple (x, y) as a value.
     """
-    assert len(annotations) == len(coordinates)
-    assert len(coordinates) > 0  # sklearn clustering want to have one example
-    assert len(annotations.domain) > 0
-    assert len(coordinates.domain) > 0
+    assert len(annotations) == len(coordinates), \
+        "Number of coordinates does not match to number of annotations"
+    # sklearn clustering want to have one example
+    assert len(coordinates) > 0, "At least one data point need to be provided"
+    assert len(coordinates.domain) > 0, \
+        "Coordinates need to have at least one attribute"
 
     eps = kwargs.get("eps", get_epsilon(coordinates))
     if clustering_algorithm == DBSCAN:
@@ -330,15 +362,23 @@ def annotate_projection(annotations, coordinates,
     clusters = cluster_data(coordinates, clustering_algorithm, **kwargs)
 
     # assign top n labels to group
-    annotations_cl = assign_labels(clusters, annotations, labels_per_cluster)
+    annotations_cl, item_annotations = assign_labels(
+        clusters, annotations, labels_per_cluster)
 
     labels_loc = labels_locations(coordinates, clusters)
 
     concave_hull = compute_concave_hulls(coordinates, clusters, eps)
 
+    # crate the dictionary with annotations, labels locations, and hulls for
+    # each cluster
     clusters_meta = {}
     for cl in annotations_cl.keys():
         clusters_meta[cl] = (
             annotations_cl[cl], labels_loc[cl], concave_hull[cl])
 
-    return clusters, clusters_meta, eps
+    # add the labels to the cluster table
+    clusters_ann = Table(
+        Domain(clusters.domain.attributes + item_annotations.domain.attributes),
+        np.concatenate((clusters.X, item_annotations.X), axis=1))
+
+    return clusters_ann, clusters_meta, eps
