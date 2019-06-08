@@ -1,5 +1,6 @@
 # pylint: disable=too-many-ancestors
-from typing import Tuple
+from enum import IntEnum
+from typing import Tuple, Optional
 from types import SimpleNamespace as namespace
 from itertools import chain
 import numpy as np
@@ -11,9 +12,12 @@ import pyqtgraph as pg
 
 from Orange.data import Table, Domain
 from Orange.data.filter import FilterString, Values
-from Orange.projection import Projector, TSNE
-from Orange.widgets import gui
+from Orange.projection import Projector, PCA
+from Orange.widgets import gui, report
 from Orange.widgets.settings import Setting, SettingProvider
+from Orange.widgets.unsupervised.owtsne import pca_preprocessing, \
+    prepare_tsne_obj
+from Orange.widgets.utils.colorpalette import ColorPaletteGenerator
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.owscatterplotgraph import OWScatterPlotBase
@@ -23,7 +27,8 @@ from Orange.widgets.widget import Input, Msg
 from orangecontrib.bioinformatics.annotation.annotate_projection import \
     annotate_projection
 from orangecontrib.bioinformatics.annotation.annotate_samples import \
-    AnnotateSamples
+    AnnotateSamples, SCORING_EXP_RATIO, SCORING_MARKERS_SUM, \
+    SCORING_LOG_FDR, PFUN_BINOMIAL, PFUN_HYPERGEOMETRIC
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
 
@@ -35,77 +40,182 @@ class Result(namespace):
 
 class Runner:
     @staticmethod
-    def compute_scores(data: Table, genes: Table, p_value_th: float,
-                       result: Result, state: TaskState):
+    def compute_scores(data: Table, genes: Table, p_threshold: float,
+                       p_value_fun: str, scoring: str, start: float,
+                       end: float, result: Result, state: TaskState):
         if not data or not genes:
-            result.scores = None
+            result.scores.z_vals = None
+            result.scores.annotations = None
+            result.scores.p_vals = None
+            result.scores.table = None
         else:
             state.set_status("Computing scores...")
-            result.scores = AnnotateSamples.annotate_samples(
-                data, genes, p_threshold=p_value_th)
+            weights = np.array([15, 75, 10]) * (end - start) / 100
+
+            if not result.scores.z_vals:
+                result.scores.z_vals = AnnotateSamples.mann_whitney_test(data)
+                state.set_partial_result(("scores", result))
+            state.set_progress_value(weights[0])
+            if state.is_interruption_requested():
+                return
+
+            if not result.scores.annotations or not result.scores.p_vals:
+                annot, p_vals = AnnotateSamples.assign_annotations(
+                    result.scores.z_vals, genes, data,
+                    p_value_fun=p_value_fun, scoring=scoring)
+                result.scores.annotations = annot
+                result.scores.p_vals = p_vals
+                state.set_partial_result(("scores", result))
+            state.set_progress_value(weights[1])
+            if state.is_interruption_requested():
+                return
+
+            result.scores.table = AnnotateSamples.filter_annotations(
+                result.scores.annotations, result.scores.p_vals,
+                p_threshold=p_threshold)
+
         state.set_partial_result(("scores", result))
 
     @staticmethod
-    def compute_embedding(data: Table, projector: Projector,
+    def compute_tsne_embedding(data: Table, start: float, end: float,
+                               state: TaskState):
+        count, weights = (0, np.array([7, 1, 1, 5, 1, 23, 61, 1]) *
+                          (end - start) / 100)
+        tsne = prepare_tsne_obj(data, 30, False, 1)
+
+        def set_progress():
+            nonlocal start
+            nonlocal count
+            start += weights[count]
+            count += 1
+            state.set_progress_value(start)
+            return 0 if state.is_interruption_requested() else 1
+
+        pca_data = pca_preprocessing(data, 20, True)
+        if not set_progress():
+            return None
+
+        pp_data = tsne.preprocess(pca_data)
+        if not set_progress():
+            return None
+
+        init = tsne.compute_initialization(pp_data.X)
+        if not set_progress():
+            return None
+
+        affinities = tsne.compute_affinities(pp_data.X)
+        if not set_progress():
+            return None
+
+        tsne_embedding = tsne.prepare_embedding(affinities, init)
+        if not set_progress():
+            return None
+
+        def tsne_optimization(n_iter, **kwargs):
+            nonlocal tsne_embedding
+            step_size = 25
+            n_iter_done = 0
+            while n_iter_done < n_iter:
+                n_iter_done += step_size
+                tsne_embedding = tsne_embedding.optimize(
+                    n_iter=step_size, inplace=True, **kwargs)
+                step = n_iter_done / n_iter * weights[count]
+                state.set_progress_value(start + step)
+                if state.is_interruption_requested():
+                    return None
+
+        kwargs = {"exaggeration": tsne.early_exaggeration, "momentum": 0.5}
+        tsne_optimization(tsne.early_exaggeration_iter, **kwargs)
+        if not set_progress():
+            return None
+
+        kwargs = {"exaggeration": tsne.exaggeration, "momentum": 0.8}
+        tsne_optimization(tsne.n_iter, **kwargs)
+        if not set_progress():
+            return None
+
+        tsne_embedding = tsne.convert_embedding_to_model(
+            pp_data, tsne_embedding)
+        set_progress()
+        return tsne_embedding.embedding
+
+    @staticmethod
+    def compute_embedding(data: Table, projector: Optional[Projector],
+                          start: float, end: float,
                           result: Result, state: TaskState):
         if not data:
             result.embedding = None
         else:
             state.set_status("Computing 2D projection...")
-            if isinstance(projector, TSNE):
-                embedding = projector(data).embedding
-            else:
-                # Only OWPCA has Projector output
+            if projector is None:
+                # Use t-SNE by default
+                embedding = Runner.compute_tsne_embedding(
+                    data, start, end, state)
+            elif isinstance(projector, PCA):
                 embedding = projector(data)(data)[:, :2]
+            else:
+                raise NotImplementedError
             result.embedding = embedding
         state.set_partial_result(("embedding", result))
 
     @staticmethod
     def compute_clusters(result: Result, state: TaskState):
-        if not result.scores or not result.embedding:
-            result.scores = None
+        if not result.scores.table or not result.embedding:
+            result.clusters.table = None
+            result.clusters.groups = None
         else:
             state.set_status("Finding clusters...")
             kwargs = {}
             if result.clusters.epsilon is not None:
                 kwargs["eps"] = result.clusters.epsilon
             clusters = annotate_projection(
-                result.scores, result.embedding, **kwargs)
+                result.scores.table, result.embedding, **kwargs)
             result.clusters.table = clusters[0]
             result.clusters.groups = clusters[1]
             result.clusters.epsilon = clusters[2]
         state.set_partial_result(("clusters", result))
 
     @classmethod
-    def run(cls, data: Table, genes: Table, projector: Projector,
-            p_value_th: float, result: Result, state: TaskState):
+    def run(cls, data: Table, genes: Table, projector: Optional[Projector],
+            p_threshold: float, p_value_fun: str, scoring: str,
+            result: Result, state: TaskState):
 
-        state.set_progress_value(0)
-        if state.is_interruption_requested():
+        start, step, weights = 0, 0, np.array([25, 70, 5])
+
+        def set_progress():
+            nonlocal start
+            nonlocal step
+            start = int(start + weights[step])
+            step += 1
+            state.set_progress_value(start)
+            return 0 if state.is_interruption_requested() else 1
+
+        if not result.scores.table:
+            end = start + weights[step]
+            cls.compute_scores(data, genes, p_threshold, p_value_fun,
+                               scoring, start, end, result, state)
+        if not set_progress():
             return result
 
-        if result.scores is None:
-            cls.compute_scores(data, genes, p_value_th, result, state)
-        state.set_progress_value(20)
-        if state.is_interruption_requested():
+        if not result.embedding:
+            end = start + weights[step]
+            cls.compute_embedding(data, projector, start, end, result, state)
+        if not set_progress():
             return result
 
-        if result.embedding is None:
-            cls.compute_embedding(data, projector, result, state)
-        state.set_progress_value(80)
-        if state.is_interruption_requested():
-            return result
-
-        if result.clusters is None or result.clusters.table is None:
+        if not result.clusters.table:
             cls.compute_clusters(result, state)
-        state.set_progress_value(100)
-
+        set_progress()
         return result
 
 
 class CenteredTextItem(pg.TextItem):
-    def __init__(self, view_box, x, y, text, color, tooltip):
-        super().__init__(text, color)
+    def __init__(self, view_box, x, y, text, tooltip, rgb):
+        bg_color = QColor(*rgb)  # TODO - remove rgb, or use it
+        bg_color = QColor(Qt.white)
+        bg_color.setAlpha(200)
+        color = QColor(Qt.black)
+        super().__init__(text, pg.mkColor(color), fill=pg.mkBrush(bg_color))
         self._x = x
         self._y = y
         self._view_box = view_box
@@ -142,12 +252,13 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase):
         self.cluster_labels_items.clear()
 
     def reset_view(self):
+        x, y = self.get_coordinates()
         hulls = self.master.get_cluster_hulls()
-        if not hulls:
+        if not hulls or x is None or y is None:
             return
-        x = np.hstack([hull[:, 0] for hull in hulls])
+        x = np.hstack([hull[:, 0] for hull, _ in hulls] + [x])
         min_x, max_x = np.min(x), np.max(x)
-        y = np.hstack([hull[:, 1] for hull in hulls])
+        y = np.hstack([hull[:, 1] for hull, _ in hulls] + [y])
         min_y, max_y = np.min(y), np.max(y)
         rect = QRectF(min_x, min_y, max_x - min_x or 1, max_y - min_y or 1)
         self.view_box.setRange(rect, padding=0.025)
@@ -167,10 +278,10 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase):
         hulls = self.master.get_cluster_hulls()
         if hulls is None:
             return
-        for hull in hulls:
+        for hull, color in hulls:
+            pen = pg.mkPen(color=QColor(*color), style=Qt.DashLine, width=3)
             item = pg.PlotCurveItem(
-                x=hull[:, 0], y=hull[:, 1],
-                pen=pg.mkPen(QColor(Qt.black), width=1), antialias=True)
+                x=hull[:, 0], y=hull[:, 1], pen=pen, antialias=True)
             self.plot_widget.addItem(item)
             self.cluster_hulls_items.append(item)
 
@@ -182,13 +293,36 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase):
         labels = self.master.get_cluster_labels()
         if labels is None:
             return
-        for label_per, (xp, yp) in labels:
+        for label_per, (xp, yp), color in labels:
             text = "\n".join([l for l, _ in label_per[:self.n_cluster_labels]])
-            ttip = "\n".join([f"{l}  {round(p * 100)}%" for l, p in label_per])
-            item = CenteredTextItem(self.view_box, xp, yp, text,
-                                    pg.mkColor(0, 0, 0), ttip)
+            ttip = "\n".join([f"{round(p * 100)}%  {l}" for l, p in label_per])
+            item = CenteredTextItem(self.view_box, xp, yp, text, ttip, color)
             self.plot_widget.addItem(item)
             self.cluster_labels_items.append(item)
+
+
+class ScoringMethod(IntEnum):
+    ExpRatio, MarkersSum, LogFdr = range(3)
+
+    @staticmethod
+    def values():
+        return [SCORING_LOG_FDR, SCORING_MARKERS_SUM, SCORING_EXP_RATIO]
+
+    @staticmethod
+    def items():
+        return ["-Log(FDR)", "Marker expression", "Marker expression (%)"]
+
+
+class StatisticalTest(IntEnum):
+    Binomial, Hypergeometric = range(2)
+
+    @staticmethod
+    def values():
+        return [PFUN_BINOMIAL, PFUN_HYPERGEOMETRIC]
+
+    @staticmethod
+    def items():
+        return ["Binomial", "Hypergeometric"]
 
 
 class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
@@ -202,11 +336,18 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     graph = SettingProvider(OWAnnotateProjectionGraph)
     left_side_scrolling = True  # remove this line when https://github.com/biolab/orange3/pull/3863 is merged
 
-    p_value_th = Setting(0.05)
+    scoring_method = Setting(ScoringMethod.ExpRatio)
+    statistical_test = Setting(StatisticalTest.Binomial)
+    p_threshold = Setting(0.05)
     use_user_epsilon = Setting(False)
     epsilon = Setting(0)
+    color_by_cluster = Setting(False)
 
-    PROJECTOR = TSNE(n_components=2)
+    class Scores(namespace):
+        z_vals = None  # type: Optional[Table]
+        annotations = None  # type: Optional[Table]
+        p_vals = None  # type: Optional[Table]
+        table = None  # type: Optional[Table]
 
     class Clusters(namespace):
         table = None  # type: Optional[Table]
@@ -226,7 +367,8 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
     class Error(OWDataProjectionWidget.Error):
         proj_error = Msg("An error occurred while annotating data.\n{}")
-        missing_tax_id = Msg(f"'{TAX_ID}' is missing in data table.")
+        missing_tax_id = Msg(f"'{TAX_ID}' is missing in data table. "
+                             f"Try using 'Genes' widget.")
         missing_entrez_id = Msg("'Entred ID' is missing in genes table.")
         missing_cell_type = Msg("'Cell Type' is missing in genes table.")
 
@@ -234,12 +376,13 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         OWDataProjectionWidget.__init__(self)
         ConcurrentWidgetMixin.__init__(self)
         # inputs
-        self.projector = self.PROJECTOR  # type: Projector
+        self.projector = None  # type: Optional[Projector]
         self.genes = None  # type: Optional[Table]
         # annotations
-        self.scores = None  # type: Optional[Table]
+        self.scores = None  # type: Scores
         self.embedding = None  # type: Optional[Table]
         self.clusters = None  # type: Clusters
+        self.__invalidate_scores()
         self.__invalidate_clusters()
 
     # GUI
@@ -252,15 +395,29 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             maxValue=3, step=1,
             createLabel=False, callback=self.graph.update_cluster_labels
         )
+        self._plot_box.children()[1].hide()  # Hide 'Show color regions'
         gui.checkBox(
             self._plot_box, self.graph, "show_cluster_hull",
             "Show cluster hull", callback=self.graph.update_cluster_hull)
+        gui.checkBox(
+            self._plot_box, self, "color_by_cluster",
+            "Color points by cluster",
+            callback=self.__color_by_cluster_changed)
 
     def __add_annotation_controls(self):
         box = gui.vBox(self.controlArea, True)
+        gui.comboBox(
+            box, self, "scoring_method", label="Scoring method:",
+            items=ScoringMethod.items(), orientation=Qt.Horizontal,
+            contentsLength=13, labelWidth=100,
+            callback=self.__scoring_combo_changed)
+        gui.comboBox(
+            box, self, "statistical_test", label="Statistical test:",
+            items=StatisticalTest.items(), orientation=Qt.Horizontal,
+            labelWidth=100, callback=self.__scoring_combo_changed)
         gui.doubleSpin(
-            box, self, "p_value_th", 0, 1, 0.01, label="p-value threshold:",
-            callback=self.__p_value_th_changed)
+            box, self, "p_threshold", 0, 1, 0.01, label="FDR threshold:",
+            callback=self.__p_threshold_changed)
         hbox = gui.hBox(box)
         gui.checkBox(
             hbox, self, "use_user_epsilon", "ε for DBSCAN:",
@@ -269,19 +426,42 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             hbox, self, "epsilon", 0, 10, 0.1, callback=self.__epsilon_changed)
         self.run_button = gui.button(box, self, "Start", self._toggle_run)
 
-    def __p_value_th_changed(self):
-        self.scores = None
-        self.__invalidate_clusters()
-        self.Information.modified()
+    def __color_by_cluster_changed(self):
+        self.controls.attr_color.setEnabled(not self.color_by_cluster)
+        self.graph.update_colors()
+
+    def __scoring_combo_changed(self):
+        self.__invalidate_scores_annotations()
+        self.__parameter_changed()
+
+    def __p_threshold_changed(self):
+        self.__invalidate_scores_table()
+        self.__parameter_changed()
 
     def __epsilon_changed(self):
+        self.__parameter_changed()
+
+    def __parameter_changed(self):
         self.__invalidate_clusters()
         self.Information.modified()
+        self.Error.proj_error.clear()
 
     def __epsilon_check_changed(self):
         self.enable_epsilon_spin()
         if not self.use_user_epsilon:
             self.__epsilon_changed()
+
+    def __invalidate_scores(self):
+        self.scores = self.Scores(z_vals=None, annotations=None,
+                                  p_vals=None, scores=None)
+
+    def __invalidate_scores_table(self):
+        self.scores.table = None
+
+    def __invalidate_scores_annotations(self):
+        self.scores.annotations = None
+        self.scores.p_vals = None
+        self.__invalidate_scores_table()
 
     def __invalidate_clusters(self):
         epsilon = self.epsilon if self.use_user_epsilon else None
@@ -297,14 +477,21 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
     def _run(self):
         self.Information.modified.clear()
-        if self.data is None:
+        if not self.data:
             return
+
+        # Remove cluster hulls and labels
+        self.graph.update_cluster_hull()
+        self.graph.update_cluster_labels()
+
         self.run_button.setText("Stop")
         result = Result(scores=self.scores,
                         embedding=self.embedding,
                         clusters=self.clusters)
         self.start(Runner.run, self.data, self.genes, self.projector,
-                   self.p_value_th, result)
+                   self.p_threshold,
+                   StatisticalTest.values()[self.statistical_test],
+                   ScoringMethod.values()[self.scoring_method], result)
 
     def on_partial_result(self, value: Tuple[str, Result]):
         which, result = value
@@ -319,6 +506,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
                 self.epsilon = result.clusters.epsilon
             self.graph.update_cluster_hull()
             self.graph.update_cluster_labels()
+            self.graph.update_colors()
             self.graph.reset_view()
 
     def on_done(self, result: Result):
@@ -356,24 +544,26 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     def enable_controls(self):
         super().enable_controls()
         self.enable_epsilon_spin()
+        self.controls.attr_color.setEnabled(not self.color_by_cluster)
 
     def enable_epsilon_spin(self):
         self.epsilon_spin.setEnabled(self.use_user_epsilon)
 
     @Inputs.genes
-    def set_genes(self, genes: Table):
+    def set_genes(self, genes: Optional[Table]):
         self.genes = genes
-        self.scores = None
+        self.__invalidate_scores_annotations()
         self.__invalidate_clusters()
         self.check_data()
         self.check_genes()
 
     @Inputs.projector
-    def set_projector(self, projector: Projector):
-        self.clear()
+    def set_projector(self, projector: Optional[Projector]):
+        self.cancel()
+        self.embedding = None
         self._invalidated = True
         self.__invalidate_clusters()
-        self.projector = projector or self.PROJECTOR
+        self.projector = projector
 
     def handleNewSignals(self):
         self._run()
@@ -386,48 +576,95 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         return coordinates
 
     def get_embedding(self):
-        if self.embedding is None:
+        if not self.embedding:
             self.valid_data = None
             return None
 
         self.valid_data = np.all(np.isfinite(self.embedding.X), 1)
         return self.embedding.X
 
+    def get_color_data(self):
+        if not self.color_by_cluster or not self.clusters.table:
+            return super().get_color_data()
+
+        attr = self.clusters.table.domain["Clusters"]
+        all_data = self.clusters.table.get_column_view(attr)[0]
+        if all_data.dtype == object and attr.is_primitive():
+            all_data = all_data.astype(float)
+        if self.valid_data is not None:
+            all_data = all_data[self.valid_data]
+        return all_data
+
+    def get_color_labels(self):
+        if not self.color_by_cluster or not self.clusters.table:
+            return super().get_color_labels()
+        return self.clusters.table.domain["Clusters"].values
+
+    def is_continuous_color(self):
+        if not self.color_by_cluster or not self.clusters.table:
+            return super().is_continuous_color()
+        return False
+
+    def get_palette(self):
+        if not self.color_by_cluster or not self.clusters.table:
+            return super().get_palette()
+
+        colors = self.clusters.table.domain["Clusters"].colors
+        return ColorPaletteGenerator(number_of_colors=len(colors),
+                                     rgb_colors=colors)
+
     def get_cluster_hulls(self):
-        if self.clusters is None or self.clusters.groups is None:
+        if not self.clusters.groups:
             return None
-        return [hull for _, _, hull in self.clusters.groups.values()]
+        var = self.clusters.table.domain["Clusters"]
+        return [(hull, var.colors[var.values.index(key)])
+                for key, (_, _, hull) in self.clusters.groups.items()]
 
     def get_cluster_labels(self):
-        if self.clusters is None or self.clusters.groups is None:
+        if not self.clusters.groups:
             return None
-        return [(ann, lab) for ann, lab, _ in self.clusters.groups.values()]
+        var = self.clusters.table.domain["Clusters"]
+        return [(ann, lab, var.colors[var.values.index(key)])
+                for key, (ann, lab, _) in self.clusters.groups.items()]
 
     def _get_projection_data(self):
-        if not self.scores or not self.embedding or not self.clusters.table:
+        if not self.scores.table or not self.embedding or not self.clusters.table:
             return self.data
-        n_sco = self.scores.X.shape[1]
+        n_sco = self.scores.table.X.shape[1]
         n_emb = self.embedding.X.shape[1]
         n_clu = self.clusters.table.X.shape[1]
         domain = self.data.domain
-        metas = chain(self.scores.domain.attributes,
+        metas = chain(self.scores.table.domain.attributes,
                       self.embedding.domain.attributes,
                       self.clusters.table.domain.attributes,
                       domain.metas)
         domain = Domain(domain.attributes, domain.class_vars, metas)
 
         augmented_data = self.data.transform(domain)
-        augmented_data.metas[:, :n_sco] = self.scores.X
+        augmented_data.metas[:, :n_sco] = self.scores.table.X
         augmented_data.metas[:, n_sco:n_sco + n_emb] = self.embedding.X
         ind = n_sco + n_emb + n_clu
         augmented_data.metas[:, n_sco + n_emb: ind] = self.clusters.table.X
         augmented_data.metas[:, ind:] = self.data.metas
         return augmented_data
 
+    def _get_send_report_caption(self):
+        color_vr_name = "Clusters" if self.color_by_cluster else \
+            self._get_caption_var_name(self.attr_color)
+        return report.render_items_vert((
+            ("Color", color_vr_name),
+            ("Label", self._get_caption_var_name(self.attr_label)),
+            ("Shape", self._get_caption_var_name(self.attr_shape)),
+            ("Size", self._get_caption_var_name(self.attr_size)),
+            ("Jittering", self.graph.jitter_size != 0 and
+             "{} %".format(self.graph.jitter_size))))
+
     def clear(self):
         super().clear()
         self.cancel()
         self.embedding = None
+        self.__invalidate_scores()
+        self.__invalidate_clusters()
 
     def onDeleteWidget(self):
         self.shutdown()
@@ -435,7 +672,6 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
 
 if __name__ == "__main__":
-    from Orange.projection import PCA
     from orangecontrib.bioinformatics.utils import serverfiles
 
     data_path = "https://datasets.orange.biolab.si/sc/aml-1k.tab.gz"
@@ -450,5 +686,5 @@ if __name__ == "__main__":
         set_data=table_data,
         set_subset_data=table_data[::10],
         set_genes=table_genes,
-        set_projector=PCA()
+        # set_projector=PCA()
     )

@@ -7,7 +7,7 @@ import numpy as np
 
 from Orange.data import Table, Variable
 from Orange.data.filter import FilterString, Values
-from Orange.projection import PCA, TSNE
+from Orange.projection import PCA, MDS
 from Orange.widgets.tests.base import WidgetTest, WidgetOutputsTestMixin, \
     ProjectionWidgetTestMixin, simulate
 
@@ -24,7 +24,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         super().setUpClass()
         path = "https://datasets.orange.biolab.si/sc/aml-1k.tab.gz"
         Variable._clear_all_caches()
-        cls.data = Table(path)[::10]
+        cls.data = Table(path)[::50]
         cls.data.attributes[TAX_ID] = "9606"
 
         cls.signal_name = "Data"
@@ -40,16 +40,23 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         self.widget = self.create_widget(OWAnnotateProjection)
         self.send_signal(self.widget.Inputs.projector, PCA())
 
+    def tearDown(self):
+        self.widget.cancel()
+        self.wait_until_stop_blocking()
+
     def test_input_projector(self):
         self.send_signal(self.widget.Inputs.projector, None)
+        self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.assertIsInstance(self.widget.projector, TSNE)
         self.wait_until_stop_blocking()
+        self.assertFalse(self.widget.Error.proj_error.is_shown())
+        self.assertIsNotNone(self.widget.embedding)
         self.send_signal(self.widget.Inputs.projector, PCA())
         self.assertIsInstance(self.widget.projector, PCA)
         self.wait_until_stop_blocking()
-        self.send_signal(self.widget.Inputs.projector, None)
-        self.assertIsInstance(self.widget.projector, TSNE)
+        self.send_signal(self.widget.Inputs.projector, MDS())
+        self.wait_until_stop_blocking()
+        self.assertTrue(self.widget.Error.proj_error.is_shown())
 
     def test_input_genes(self):
         self.send_signal(self.widget.Inputs.data, self.data)
@@ -64,6 +71,53 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         self.send_signal(self.widget.Inputs.data, None)
         self.assertFalse(self.widget.Warning.no_genes.is_shown())
 
+    @unittest.skip("Skip due to timeout")
+    def test_scoring_method_control(self):
+        def start():
+            self.widget.run_button.click()
+            self.wait_until_stop_blocking()
+
+        self.send_signal(self.widget.Inputs.genes, self.genes)
+        self.send_signal(self.widget.Inputs.data, self.data)
+        self.wait_until_stop_blocking()
+        output1 = self.get_output(self.widget.Outputs.annotated_data)
+        cbox = self.widget.controls.scoring_method
+        simulate.combobox_activate_index(cbox, 2)
+        start()
+        output2 = self.get_output(self.widget.Outputs.annotated_data)
+        np.testing.assert_array_equal(output1.X, output2.X)
+        np.testing.assert_array_equal(output1.Y, output2.Y)
+
+    @unittest.skip("Skip due to timeout")
+    def test_statistical_test_control(self):
+        def start():
+            self.widget.run_button.click()
+            self.wait_until_stop_blocking()
+
+        self.send_signal(self.widget.Inputs.genes, self.genes)
+        self.send_signal(self.widget.Inputs.data, self.data)
+        self.wait_until_stop_blocking()
+        output1 = self.get_output(self.widget.Outputs.annotated_data)
+        cbox = self.widget.controls.statistical_test
+        simulate.combobox_activate_index(cbox, 1)
+        start()
+        output2 = self.get_output(self.widget.Outputs.annotated_data)
+        np.testing.assert_array_equal(output1.X, output2.X)
+        np.testing.assert_array_equal(output1.Y, output2.Y)
+        self.assertFalse((output1.metas == output2.metas).all())
+
+    def test_p_threshold_control(self):
+        self.send_signal(self.widget.Inputs.genes, self.genes)
+        self.send_signal(self.widget.Inputs.data, self.data)
+        self.wait_until_stop_blocking()
+        output1 = self.get_output(self.widget.Outputs.annotated_data)
+        self.widget.controls.p_threshold.valueChanged.emit(0.1)
+        self.widget.run_button.click()
+        self.wait_until_stop_blocking()
+        output2 = self.get_output(self.widget.Outputs.annotated_data)
+        np.testing.assert_array_equal(output1.X, output2.X)
+        np.testing.assert_array_equal(output1.Y, output2.Y)
+
     def test_epsilon_control(self):
         self.send_signal(self.widget.Inputs.data, self.data)
         self.assertFalse(self.widget.epsilon_spin.isEnabled())
@@ -75,7 +129,6 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
 
     def test_output_data(self):
         self.send_signal(self.widget.Inputs.data, self.data)
-#         self.assertIsNone(self.get_output(self.widget.Outputs.annotated_data))
         self.wait_until_stop_blocking()
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.wait_until_stop_blocking()
@@ -83,9 +136,9 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         n = len(self.data.domain.metas)
         self.assertGreater(len(output.domain.metas), n + 4)
         self.assertListEqual(
-            ["PC1", "PC2", "Clusters"] +
+            ["PC1", "PC2", "Clusters", "Annotation"] +
             [m.name for m in self.data.domain.metas] + ["Selected"],
-            [m.name for m in output.domain.metas[-n-4:]])
+            [m.name for m in output.domain.metas[-n-5:]])
         np.testing.assert_array_equal(output.X, self.data.X)
         np.testing.assert_array_equal(output.Y, self.data.Y)
         np.testing.assert_array_equal(output.metas[:, -n - 1:-1],
@@ -135,15 +188,28 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         self.send_signal(w.Inputs.data, self.data, widget=w)
         self.wait_until_stop_blocking(widget=w)
 
-        self.assertEqual(np.sum(w.graph.selection), 10)
+        self.assertEqual(np.sum(w.graph.selection), 2)
         np.testing.assert_equal(self.widget.graph.selection, w.graph.selection)
 
     def test_outputs(self):
-        self.data = self.data
-        self.signal_data = self.data
         self.send_signal(self.widget.Inputs.genes, self.genes)
         super().test_outputs()
-        self.signal_data = self.data
+
+    def test_color_by_cluster(self):
+        self.send_signal(self.widget.Inputs.genes, self.genes)
+        self.send_signal(self.widget.Inputs.data, self.data)
+        self.wait_until_stop_blocking()
+        self.assertTrue(self.widget.controls.attr_color.isEnabled())
+
+        simulate.combobox_activate_index(self.widget.controls.attr_color, 0)
+        is_grey = [brush.color().name() == "#808080" for brush in
+                   self.widget.graph.scatterplot_item.data['brush']]
+        self.assertTrue(all(is_grey))
+        self.widget.controls.color_by_cluster.click()
+        self.assertFalse(self.widget.controls.attr_color.isEnabled())
+        is_not_grey = [brush.color().name() != "#808080" for brush in
+                       self.widget.graph.scatterplot_item.data['brush']]
+        self.assertTrue(any(is_not_grey))
 
     def test_attr_label_metas(self):
         self.send_signal(self.widget.Inputs.data, self.data)
