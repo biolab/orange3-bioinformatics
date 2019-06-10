@@ -309,7 +309,9 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
         concave_hull = get_shape(points, epsilon=epsilon * 2)
         # expand_and_smooth the curve - selecting epsilon for the distance
         # shows approximately what is DBSCAN neighbourhood
-        concave_hull = concave_hull.buffer(epsilon, resolution=16)
+        # this move the hull further away and then move it back to make it more
+        # smooth
+        concave_hull = concave_hull.buffer(3 * epsilon).buffer(-epsilon * 2)
 
         hulls[cl] = np.array(list(map(list, concave_hull.exterior.coords.xy))).T
 
