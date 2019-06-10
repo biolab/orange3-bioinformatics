@@ -360,13 +360,13 @@ class AnnotateSamples:
             Filtered scores for each annotations for each cell
         """
         scores_x = np.copy(scores.X)  # do not want to edit values inplace
-        scores_x[p_values.X > p_threshold] = 0
-        probs = Table(scores.domain, scores_x)
+        scores_x[p_values.X > p_threshold] = np.nan
+        scores = Table(scores.domain, scores_x)
 
         if return_nonzero_annotations:
-            col_nonzero = np.sum(probs, axis=0) > 0
+            col_not_empty = ~np.isnan(scores).all(axis=0)
             new_domain = Domain(
-                np.array(scores.domain.attributes)[col_nonzero])
+                np.array(scores.domain.attributes)[col_not_empty])
             scores = Table(new_domain, scores)
         return scores
 
