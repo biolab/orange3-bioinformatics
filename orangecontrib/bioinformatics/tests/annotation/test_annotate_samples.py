@@ -5,7 +5,7 @@ from Orange.data import Table, Domain, StringVariable, ContinuousVariable
 
 from orangecontrib.bioinformatics.annotation.annotate_samples import \
     AnnotateSamples, SCORING_EXP_RATIO, SCORING_MARKERS_SUM, SCORING_LOG_FDR, \
-    SCORING_LOG_PVALUE
+    SCORING_LOG_PVALUE, SCORING_MARKERS_SUM_WEIGHTED
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
 
@@ -183,6 +183,21 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertAlmostEqual(annotations[5, 1].value, self.data.X[5].sum())
         self.assertAlmostEqual(annotations[6, 1].value, self.data.X[6].sum())
 
+        # scoring SCORING_MARKERS_SUM_WEIGHTED
+        n_type_1 = sum(self.markers.metas[:, 0] == "Type 1")
+        n_type_2 = sum(self.markers.metas[:, 0] == "Type 2")
+        annotations = self.annotator.annotate_samples(
+            self.data, self.markers, scoring=SCORING_MARKERS_SUM_WEIGHTED)
+        self.assertEqual(type(annotations), Table)
+        self.assertEqual(len(annotations), len(self.data))
+        self.assertAlmostEqual(annotations[0, 0].value, self.data.X[0].sum() / n_type_1)
+        self.assertAlmostEqual(annotations[1, 0].value, self.data.X[1].sum() / n_type_1)
+        self.assertAlmostEqual(annotations[2, 0].value, self.data.X[2].sum() / n_type_1)
+        self.assertAlmostEqual(annotations[3, 0].value, self.data.X[3, :4].sum() / n_type_1)
+        self.assertAlmostEqual(annotations[4, 1].value, self.data.X[4].sum() / n_type_2)
+        self.assertAlmostEqual(annotations[5, 1].value, self.data.X[5].sum() / n_type_2)
+        self.assertAlmostEqual(annotations[6, 1].value, self.data.X[6].sum() / n_type_2)
+
         # scoring SCORING_LOG_FDR
         annotations = self.annotator.annotate_samples(
             self.data, self.markers, scoring=SCORING_LOG_FDR)
@@ -198,6 +213,8 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
+
+
 
     def test_log_cpm(self):
         norm_data = self.annotator.log_cpm(self.data)

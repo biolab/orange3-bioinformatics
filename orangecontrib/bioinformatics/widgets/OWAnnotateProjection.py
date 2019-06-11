@@ -28,7 +28,7 @@ from orangecontrib.bioinformatics.annotation.annotate_projection import \
     annotate_projection
 from orangecontrib.bioinformatics.annotation.annotate_samples import \
     AnnotateSamples, SCORING_EXP_RATIO, SCORING_MARKERS_SUM, \
-    SCORING_LOG_FDR, PFUN_BINOMIAL, PFUN_HYPERGEOMETRIC
+    SCORING_LOG_FDR, SCORING_MARKERS_SUM_WEIGHTED, PFUN_BINOMIAL, PFUN_HYPERGEOMETRIC
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
 
@@ -306,12 +306,13 @@ class ScoringMethod(IntEnum):
 
     @staticmethod
     def values():
-        return [SCORING_LOG_FDR, SCORING_MARKERS_SUM, SCORING_EXP_RATIO]
+        return [SCORING_LOG_FDR, SCORING_MARKERS_SUM,
+                SCORING_MARKERS_SUM_WEIGHTED, SCORING_EXP_RATIO]
 
     @staticmethod
     def items():
-        return ["-Log(FDR)", "Marker expression", "Marker expression (%)"]
-
+        return ["-Log(FDR)", "Marker expression",
+                "Marker expression (weighted)", "Marker expression (%)"]
 
 class StatisticalTest(IntEnum):
     Binomial, Hypergeometric = range(2)

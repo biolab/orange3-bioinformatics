@@ -10,6 +10,7 @@ from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
 SCORING_EXP_RATIO = "scoring_exp_ratio"
 SCORING_MARKERS_SUM = "scoring_sum_of_expressed_markers"
+SCORING_MARKERS_SUM_WEIGHTED = "scoring_sum_of_expressed_markers_weighted"
 SCORING_LOG_FDR = "scoring_log_fdr"
 SCORING_LOG_PVALUE = "scoring_log_p_value"
 
@@ -242,6 +243,10 @@ class AnnotateSamples:
     def _score(scoring_type, p_values, fdrs, data, M, x, m, genes_order):
         if scoring_type == SCORING_MARKERS_SUM:
             return AnnotateSamples._reorder_matrix(data, genes_order).dot(M)
+        if scoring_type == SCORING_MARKERS_SUM_WEIGHTED:
+            print("M.shape: ", M.shape)
+            A = AnnotateSamples._reorder_matrix(data, genes_order).dot(M)
+            return A / M.sum(axis=0).reshape((1, -1))
         if scoring_type == SCORING_EXP_RATIO:
             return x / m
         if scoring_type == SCORING_LOG_FDR:
