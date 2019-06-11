@@ -311,8 +311,7 @@ class ScoringMethod(IntEnum):
 
     @staticmethod
     def items():
-        return ["-Log(FDR)", "Marker expression",
-                "Marker expression (weighted)", "Marker expression (%)"]
+        return ["-Log(FDR)", "Marker expr.", "Marker expr. (weighted)", "Marker expr. (%)", ]
 
 class StatisticalTest(IntEnum):
     Binomial, Hypergeometric = range(2)
@@ -413,7 +412,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             contentsLength=13, labelWidth=100,
             callback=self.__scoring_combo_changed)
         gui.comboBox(
-            box, self, "statistical_test", label="Statistical test:",
+            box, self, "statistical_test", label="Enrichment test:",
             items=StatisticalTest.items(), orientation=Qt.Horizontal,
             labelWidth=100, callback=self.__scoring_combo_changed)
         gui.doubleSpin(
