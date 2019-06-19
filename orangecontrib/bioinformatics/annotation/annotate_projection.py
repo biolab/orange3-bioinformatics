@@ -70,23 +70,23 @@ def cluster_data(coordinates, clustering_algorithm=DBSCAN, **kwargs):
         List of cluster indices.
     """
     learner = clustering_algorithm(**kwargs)
-    model = learner(coordinates)
-    clustrs = model(coordinates)
-    # TODO: this need to be changed when clustering in orange is changed
+    clusters = learner(coordinates)
+    if not isinstance(clusters, np.ndarray):  # old clustering method
+        clusters = clusters(coordinates)
+        clusters = np.array(list(map(int, map(
+            clusters.domain.attributes[0].repr_val, clusters.X[:, 0]
+        )))).flatten()
 
     # sort classes in descending order base on number of cases in the cluster
-    if "-1" in clustrs.domain.attributes[0].values:  # -1 means not cluster
-        nan_idx = clustrs.domain.attributes[0].values.index("-1")
-    else:
-        nan_idx = None
     sorted_clust_idx = [
-        v for v, _ in Counter(clustrs.X[:, 0]).most_common() if v != nan_idx]
+        v for v, _ in Counter(clusters).most_common() if v != -1]
 
     # re-indexed array
-    new_clustering = np.empty(len(clustrs))
+    new_clustering = np.empty(len(clusters))
     new_clustering[:] = np.nan  # nan for not clustered
+    # reindex based on descending cluster size
     for i, v in enumerate(sorted_clust_idx):
-        new_clustering[clustrs.X[:, 0] == v] = i
+        new_clustering[clusters == v] = i
 
     # create the table
     new_domain = Domain([DiscreteVariable(
