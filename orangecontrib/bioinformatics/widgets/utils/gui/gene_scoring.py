@@ -3,11 +3,11 @@ from collections import namedtuple
 from typing import Union
 
 from AnyQt.QtWidgets import (
-    QWidget
+    QWidget, QGroupBox
 )
 
 from Orange.widgets.gui import (
-    radioButtons, QGroupBox, comboBox
+    radioButtons, comboBox
 )
 
 

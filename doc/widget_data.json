@@ -61,5 +61,12 @@
     "icon": "widgets/icons/cluster-analysis.png",
     "keywords": ["clustering"],
     "category": "Bioinformatics"
+    },
+"Annotator": {
+    "title": "Annotator",
+    "file": "widgets/annotate_projection.md",
+    "icon": "widgets/icons/annotator.png",
+    "keywords": ["visualisation", "cell", "annotation", "clustering"],
+    "category": "Bioinformatics"
     }
 }

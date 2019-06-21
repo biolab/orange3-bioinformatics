@@ -22,8 +22,10 @@ from Orange.widgets.utils.datacaching import data_hints
 
 from orangecontrib.bioinformatics.widgets.utils.settings import SetContextHandler
 from orangecontrib.bioinformatics.widgets.utils import gui as guiutils
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME
 from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_test
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    GENE_AS_ATTRIBUTE_NAME, GENE_ID_ATTRIBUTE, GENE_ID_COLUMN, TAX_ID
+)
 
 
 def score_fold_change(a, b, **kwargs):
@@ -1273,7 +1275,6 @@ class OWDifferentialExpression(widget.OWWidget):
         remaining = np.flatnonzero(~selected)
 
         domain = self.data.domain
-
         if axis == 0:
             # Select rows
             score_var = Orange.data.ContinuousVariable(score_name)
@@ -1292,7 +1293,9 @@ class OWDifferentialExpression(widget.OWWidget):
 
             self.send("Selected genes", table_selected_genes[indices])
         else:
+            gene_ids = self.data.attributes[GENE_ID_ATTRIBUTE]
             domain_selected_genes = Orange.data.Domain([], metas=[Orange.data.StringVariable('genes'),
+                                                                  Orange.data.StringVariable(gene_ids),
                                                                   Orange.data.ContinuousVariable(score_name)])
             data_selected_genes = []
 
@@ -1300,9 +1303,12 @@ class OWDifferentialExpression(widget.OWWidget):
             attrs = [copy_variable(var) for var in domain.attributes]
             for var, score in zip(attrs, scores):
                 var.attributes[score_name] = str(score)
-                data_selected_genes.append([var.name, score])
+                data_selected_genes.append([var.name, var.attributes.get(gene_ids, ''), score])
 
             table_selected_genes = Orange.data.Table(domain_selected_genes, data_selected_genes)
+            table_selected_genes.attributes[GENE_AS_ATTRIBUTE_NAME] = False
+            table_selected_genes.attributes[GENE_ID_COLUMN] = gene_ids
+            table_selected_genes.attributes[TAX_ID] = self.data.attributes[TAX_ID]
 
             selected_attrs = [attrs[i] for i in indices]
             remaining_attrs = [attrs[i] for i in remaining]
