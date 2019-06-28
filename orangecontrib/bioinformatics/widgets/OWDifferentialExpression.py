@@ -14,11 +14,12 @@ from AnyQt.QtCore import (
     Qt, pyqtSignal as Signal, pyqtSlot as Slot, QSize, QRectF, QLineF
 )
 
-from Orange.canvas.report import report
 from Orange.preprocess import transformation
 from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils import concurrent
 from Orange.widgets.utils.datacaching import data_hints
+
+from orangewidget.report import report
 
 from orangecontrib.bioinformatics.widgets.utils.settings import SetContextHandler
 from orangecontrib.bioinformatics.widgets.utils import gui as guiutils
