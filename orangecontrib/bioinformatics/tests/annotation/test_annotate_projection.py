@@ -31,27 +31,24 @@ class TestAnnotateProjection(unittest.TestCase):
     def test_annotate_projection(self):
         clusters, clusters_meta, eps = annotate_projection(
             self.annotations, self.data, clustering_algorithm=DBSCAN,
-            labels_per_cluster=2, eps=3)
+            labels_per_cluster=2, eps=3.0)
 
-        self.assertLessEqual(int(Orange.__version__.split(".")[1]), 22)
-        # TODO: uncomment when new Orange released, and remove version check
-        # self.assertListEqual(
-        #     list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])),
-        #     ["0", "0", "0", "0", "0", "1", "1", "1", "1", "1"])
+        self.assertListEqual(
+            list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])),
+            ["C2"] * 5 + ["C1"] * 7)
 
-        # self.assertEqual(len(clusters_meta), 2)
-        # self.assertEqual(len(clusters_meta["C0"]), 3)
-        # self.assertEqual(len(clusters_meta["C1"]), 3)
-        # self.assertEqual(clusters_meta["C1"][0][0][0], 'c')
-        # self.assertAlmostEqual(clusters_meta["C1"][0][0][1], 0.6, 5)
-        # self.assertEqual(clusters_meta["C1"][0][1][0], 'b')
-        # self.assertAlmostEqual(clusters_meta["C1"][0][1][1], 0.4, 5)
+        self.assertEqual(len(clusters_meta), 2)
+        self.assertEqual(len(clusters_meta["C1"]), 3)
+        self.assertEqual(len(clusters_meta["C2"]), 3)
+        self.assertEqual(clusters_meta["C1"][0][0][0], 'b')
+        self.assertAlmostEqual(clusters_meta["C1"][0][0][1], 4/7, 5)
+        self.assertEqual(clusters_meta["C1"][0][1][0], 'c')
+        self.assertAlmostEqual(clusters_meta["C1"][0][1][1], 3/7, 5)
 
-        # self.assertEqual(2, len(clusters_meta["C1"][1]))
-        # self.assertEqual(2, clusters_meta["C1"][2].shape[1])
-        # self.assertEqual(
-        #     type(np.ndarray), type(clusters_meta["C1"][2].shape[1]))
-        # self.assertEqual(float, type(eps))
+        self.assertEqual(2, len(clusters_meta["C1"][1]))
+        self.assertEqual(2, clusters_meta["C1"][2].shape[1])
+        self.assertEqual(2, clusters_meta["C1"][2].shape[1])
+        self.assertEqual(float, type(eps))
 
     def test_example_not_clustered(self):
         self.data[-1] = [23, 23]
@@ -59,19 +56,17 @@ class TestAnnotateProjection(unittest.TestCase):
             self.annotations, self.data, clustering_algorithm=DBSCAN,
             eps=2, min_samples=3)
 
-        self.assertLessEqual(int(Orange.__version__.split(".")[1]), 22)
-        # TODO: uncomment when new Orange released, and remove version check
-        # self.assertListEqual(
-        #     list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])),
-        #     ["0", "0", "0", "0", "0", "1", "1", "1", "1", "-1"])
+        self.assertListEqual(
+            list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])),
+            ["C2"] * 5 + ["C1"] * 6 + ["?"])
 
-        # self.assertEqual(len(clusters_meta), 2)
-        # self.assertEqual(len(clusters_meta["C0"]), 3)
-        # self.assertEqual(len(clusters_meta["C1"]), 3)
-        # self.assertEqual(clusters_meta["C1"][0][0][0], 'c')
-        # self.assertAlmostEqual(clusters_meta["C1"][0][0][1], 0.75, 5)
-        # self.assertEqual(clusters_meta["C1"][0][1][0], 'b')
-        # self.assertAlmostEqual(clusters_meta["C1"][0][1][1], 0.25, 5)
+        self.assertEqual(len(clusters_meta), 2)
+        self.assertEqual(len(clusters_meta["C1"]), 3)
+        self.assertEqual(len(clusters_meta["C2"]), 3)
+        self.assertEqual(clusters_meta["C1"][0][0][0], 'c')
+        self.assertAlmostEqual(clusters_meta["C1"][0][0][1], 0.5, 5)
+        self.assertEqual(clusters_meta["C1"][0][1][0], 'b')
+        self.assertAlmostEqual(clusters_meta["C1"][0][1][1], 0.5, 5)
 
     def test_other_clustering(self):
         clusters, clusters_meta, locs = annotate_projection(
@@ -117,13 +112,11 @@ class TestAnnotateProjection(unittest.TestCase):
         ann = Table(Domain([]), np.empty((len(self.data), 0)))
         clusters, clusters_meta, eps = annotate_projection(ann, self.data)
 
-        self.assertLessEqual(int(Orange.__version__.split(".")[1]), 22)
-        # TODO: uncomment when new Orange released, and remove version check
-        # self.assertGreater(len(clusters), 0)
-        # self.assertGreater(len(clusters_meta), 0)
-        # self.assertEqual(0, len(clusters_meta["C1"][0]))
-        # self.assertGreater(len(clusters_meta["C1"][1]), 0)
-        # self.assertGreater(len(clusters_meta["C1"][2]), 0)
+        self.assertGreater(len(clusters), 0)
+        self.assertGreater(len(clusters_meta), 0)
+        self.assertEqual(0, len(clusters_meta["C1"][0]))
+        self.assertGreater(len(clusters_meta["C1"][1]), 0)
+        self.assertGreater(len(clusters_meta["C1"][2]), 0)
 
     def test_one_label(self):
         """
