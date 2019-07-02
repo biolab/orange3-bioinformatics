@@ -1,0 +1,23 @@
+parameters:
+  orange_version: 'released'
+
+steps:
+
+- script: python -m pip install --upgrade pip setuptools wheel numpy
+  displayName: 'Install build tools'
+
+- ${{ if in(parameters.orange_version, 'dev') }}:
+  - script: pip install https://github.com/biolab/orange3/archive/master.zip
+    displayName: 'Install dev version of Orange'
+    continueOnError: false
+
+- script: |
+    pip install -r requirements.txt
+    pip install PyQt5~=5.9.0
+    pip install sphinx recommonmark
+  displayName: 'Install requirements'
+  continueOnError: false
+
+- script: pip install -e .
+  displayName: 'Install Orange3-Bioinformatics'
+  continueOnError: false

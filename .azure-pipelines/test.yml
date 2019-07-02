@@ -1,0 +1,26 @@
+steps:
+
+- script: pip install pytest pytest-cov
+  displayName: 'Install testing tools'
+
+- script: catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" pytest orangecontrib/bioinformatics/tests --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
+  condition: in(variables['Agent.OS'], 'Linux')
+  displayName: 'Run pytest'
+
+- script: pytest orangecontrib/bioinformatics/tests --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
+  condition: in(variables['Agent.OS'], 'Darwin', 'Windows_NT')
+  displayName: 'Run pytest'
+
+#  - task: PublishCodeCoverageResults@1
+#    displayName: 'Publish code coverage'
+#    condition: succeededOrFailed()
+#    inputs:
+#      codeCoverageTool: Cobertura
+#      summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
+#      reportDirectory: '$(System.DefaultWorkingDirectory)/**/htmlcov'
+
+- task: PublishTestResults@2
+  condition: succeededOrFailed()
+  inputs:
+    testResultsFiles: '**/test-results.xml'
+    testRunTitle: '${{ parameters.platform }} - Python $(python.version)'
