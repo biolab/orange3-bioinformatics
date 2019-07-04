@@ -14,7 +14,8 @@ jobs:
     vmImage: 'macOS-10.14'
 
 # For now, testing on windows is broken because pypi package shapely fails to install on windows (no binary provided on pypi).
-# - template: .ci-templates/jobs.yml  # Template reference
-#   parameters:
-#     name: Windows
-#     vmImage: 'windows-2019'
+# current workaround is to use wheel from: https://download.lfd.uci.edu/pythonlibs/t4jqbe6o/Shapely-1.6.4.post2-cp37-cp37m-win_amd64.whl
+- template: .ci-templates/jobs.yml  # Template reference
+  parameters:
+    name: Windows
+    vmImage: 'windows-2019'
