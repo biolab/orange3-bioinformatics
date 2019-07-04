@@ -12,9 +12,10 @@ steps:
   condition: in(variables['Agent.OS'], 'Darwin', 'Windows_NT')
   displayName: 'Run pytest'
 
-# https://blog.codecov.io/2019/01/24/new-in-codecov-4-4-3/
-- script: bash <(curl https://codecov.io/bash) -t '$(codecov.token)' -f coverage.xml -F adder -F subtractor
+- script: codecov -f coverage.xml -F adder -F subtractor
   displayName: 'Upload codecov'
+  env:
+    CODECOV_TOKEN: $(codecov.token)
 
 
 #  - task: PublishCodeCoverageResults@1
