@@ -12,7 +12,7 @@ steps:
     continueOnError: false
 
 - script: |
-    pip install pip install https://download.lfd.uci.edu/pythonlibs/t4jqbe6o/Shapely-1.6.4.post2-cp37-cp37m-win_amd64.whl
+    pip install https://download.lfd.uci.edu/pythonlibs/t4jqbe6o/Shapely-1.6.4.post2-cp37-cp37m-win_amd64.whl
     pip install -r requirements.txt
     pip install PyQt5~=5.9.0
     pip install sphinx recommonmark
