@@ -1,7 +1,8 @@
 steps:
 
-- script: pip install pytest pytest-cov
+- script: pip install pytest pytest-cov coverage codecov
   displayName: 'Install testing tools'
+  continueOnError: false
 
 - script: catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" pytest orangecontrib/bioinformatics/tests --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
   condition: in(variables['Agent.OS'], 'Linux')
@@ -10,6 +11,11 @@ steps:
 - script: pytest orangecontrib/bioinformatics/tests --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
   condition: in(variables['Agent.OS'], 'Darwin', 'Windows_NT')
   displayName: 'Run pytest'
+
+# https://blog.codecov.io/2019/01/24/new-in-codecov-4-4-3/
+- script: bash <(curl https://codecov.io/bash) -t '$(codecov.token)' -f coverage.xml -F adder -F subtractor
+  displayName: 'Upload codecov'
+
 
 #  - task: PublishCodeCoverageResults@1
 #    displayName: 'Publish code coverage'
