@@ -239,6 +239,7 @@ class EventDelegate(QObject):
 class OWAnnotateProjectionGraph(OWScatterPlotBase):
     show_cluster_hull = Setting(True)
     n_cluster_labels = Setting(1)
+    show_ref_data = Setting(True)
 
     def __init__(self, scatter_widget, parent):
         super().__init__(scatter_widget, parent)
@@ -268,6 +269,8 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase):
         if self.scatterplot_item is not None:
             self.update_clusters()
             self.view_box.setAspectLocked(True, 1)
+            self.scatterplot_item.setVisible(self.show_ref_data)
+            self.reset_view()
 
     def update_clusters(self):
         self._update_cluster_hull()
@@ -406,6 +409,10 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             self._plot_box, self, "color_by_cluster",
             "Color points by cluster",
             callback=self.__color_by_cluster_changed)
+        gui.checkBox(
+            self._plot_box, self.graph, "show_ref_data",
+            "Show reference data",
+            callback=self.__show_ref_data_changed)
 
     def __add_annotation_controls(self):
         box = gui.vBox(self.controlArea, True)
@@ -432,6 +439,9 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     def __color_by_cluster_changed(self):
         self.controls.attr_color.setEnabled(not self.color_by_cluster)
         self.graph.update_colors()
+
+    def __show_ref_data_changed(self):
+        self.graph.update_coordinates()
 
     def __scoring_combo_changed(self):
         self.__invalidate_scores_annotations()
