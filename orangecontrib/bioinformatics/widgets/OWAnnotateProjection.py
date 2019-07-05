@@ -266,11 +266,14 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase):
     def update_coordinates(self):
         super().update_coordinates()
         if self.scatterplot_item is not None:
-            self.update_cluster_hull()
-            self.update_cluster_labels()
+            self.update_clusters()
             self.view_box.setAspectLocked(True, 1)
 
-    def update_cluster_hull(self):
+    def update_clusters(self):
+        self._update_cluster_hull()
+        self._update_cluster_labels()
+
+    def _update_cluster_hull(self):
         for item in self.cluster_hulls_items:
             self.plot_widget.removeItem(item)
         if not self.show_cluster_hull:
@@ -285,7 +288,7 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase):
             self.plot_widget.addItem(item)
             self.cluster_hulls_items.append(item)
 
-    def update_cluster_labels(self):
+    def _update_cluster_labels(self):
         for item in self.cluster_labels_items:
             self.plot_widget.removeItem(item)
         if not self.n_cluster_labels:
@@ -393,12 +396,12 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             self._effects_box, gui.hSlider, "Cluster labels:",
             master=self.graph, value="n_cluster_labels", minValue=0,
             maxValue=3, step=1,
-            createLabel=False, callback=self.graph.update_cluster_labels
+            createLabel=False, callback=self.graph.update_clusters
         )
         self._plot_box.children()[1].hide()  # Hide 'Show color regions'
         gui.checkBox(
             self._plot_box, self.graph, "show_cluster_hull",
-            "Show cluster hull", callback=self.graph.update_cluster_hull)
+            "Show cluster hull", callback=self.graph.update_clusters)
         gui.checkBox(
             self._plot_box, self, "color_by_cluster",
             "Color points by cluster",
@@ -481,8 +484,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             return
 
         # Remove cluster hulls and labels
-        self.graph.update_cluster_hull()
-        self.graph.update_cluster_labels()
+        self.graph.update_clusters()
 
         self.run_button.setText("Stop")
         result = Result(scores=self.scores,
@@ -504,8 +506,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             self.clusters = result.clusters
             if result.clusters.epsilon is not None:
                 self.epsilon = result.clusters.epsilon
-            self.graph.update_cluster_hull()
-            self.graph.update_cluster_labels()
+            self.graph.update_clusters()
             self.graph.update_colors()
             self.graph.reset_view()
 
