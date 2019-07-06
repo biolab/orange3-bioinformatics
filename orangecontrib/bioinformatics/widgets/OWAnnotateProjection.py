@@ -34,7 +34,6 @@ from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
 class Result(namespace):
     scores = None  # type: Optional[Table]
-    embedding = None  # type: Optional[Table]
     clusters = None  # type: Clusters
 
 
@@ -77,90 +76,8 @@ class Runner:
         state.set_partial_result(("scores", result))
 
     @staticmethod
-    def compute_tsne_embedding(data: Table, start: float, end: float,
-                               state: TaskState):
-        count, weights = (0, np.array([7, 1, 1, 5, 1, 23, 61, 1]) *
-                          (end - start) / 100)
-        tsne = prepare_tsne_obj(data, 30, False, 1)
-
-        def set_progress():
-            nonlocal start
-            nonlocal count
-            start += weights[count]
-            count += 1
-            state.set_progress_value(start)
-            return 0 if state.is_interruption_requested() else 1
-
-        pca_data = pca_preprocessing(data, 20, True)
-        if not set_progress():
-            return None
-
-        pp_data = tsne.preprocess(pca_data)
-        if not set_progress():
-            return None
-
-        init = tsne.compute_initialization(pp_data.X)
-        if not set_progress():
-            return None
-
-        affinities = tsne.compute_affinities(pp_data.X)
-        if not set_progress():
-            return None
-
-        tsne_embedding = tsne.prepare_embedding(affinities, init)
-        if not set_progress():
-            return None
-
-        def tsne_optimization(n_iter, **kwargs):
-            nonlocal tsne_embedding
-            step_size = 25
-            n_iter_done = 0
-            while n_iter_done < n_iter:
-                n_iter_done += step_size
-                tsne_embedding = tsne_embedding.optimize(
-                    n_iter=step_size, inplace=True, **kwargs)
-                step = n_iter_done / n_iter * weights[count]
-                state.set_progress_value(start + step)
-                if state.is_interruption_requested():
-                    return None
-
-        kwargs = {"exaggeration": tsne.early_exaggeration, "momentum": 0.5}
-        tsne_optimization(tsne.early_exaggeration_iter, **kwargs)
-        if not set_progress():
-            return None
-
-        kwargs = {"exaggeration": tsne.exaggeration, "momentum": 0.8}
-        tsne_optimization(tsne.n_iter, **kwargs)
-        if not set_progress():
-            return None
-
-        tsne_embedding = tsne.convert_embedding_to_model(
-            pp_data, tsne_embedding)
-        set_progress()
-        return tsne_embedding.embedding
-
-    @staticmethod
-    def compute_embedding(data: Table, projector: Optional[Projector],
-                          start: float, end: float,
-                          result: Result, state: TaskState):
-        if not data:
-            result.embedding = None
-        else:
-            state.set_status("Computing 2D projection...")
-            if projector is None:
-                # Use t-SNE by default
-                embedding = Runner.compute_tsne_embedding(
-                    data, start, end, state)
-            elif isinstance(projector, PCA):
-                embedding = projector(data)(data)[:, :2]
-            else:
-                raise NotImplementedError
-            result.embedding = embedding
-        state.set_partial_result(("embedding", result))
-
-    @staticmethod
-    def compute_clusters(result: Result, state: TaskState):
-        if not result.scores.table or not result.embedding:
+    def compute_clusters(embedding: Table, result: Result, state: TaskState):
+        if not result.scores.table or not embedding:
             result.clusters.table = None
             result.clusters.groups = None
         else:
@@ -169,18 +86,18 @@ class Runner:
             if result.clusters.epsilon is not None:
                 kwargs["eps"] = result.clusters.epsilon
             clusters = annotate_projection(
-                result.scores.table, result.embedding, **kwargs)
+                result.scores.table, embedding, **kwargs)
             result.clusters.table = clusters[0]
             result.clusters.groups = clusters[1]
             result.clusters.epsilon = clusters[2]
         state.set_partial_result(("clusters", result))
 
     @classmethod
-    def run(cls, data: Table, genes: Table, projector: Optional[Projector],
-            p_threshold: float, p_value_fun: str, scoring: str,
-            result: Result, state: TaskState):
+    def run(cls, data: Table, attr_x: ContinuousVariable,
+            attr_y: ContinuousVariable, genes: Table, p_threshold: float,
+            p_value_fun: str, scoring: str, result: Result, state: TaskState):
 
-        start, step, weights = 0, 0, np.array([25, 70, 5])
+        start, step, weights = 0, 0, np.array([80, 20])
 
         def set_progress():
             nonlocal start
@@ -197,21 +114,15 @@ class Runner:
         if not set_progress():
             return result
 
-        if not result.embedding:
-            end = start + weights[step]
-            cls.compute_embedding(data, projector, start, end, result, state)
-        if not set_progress():
-            return result
-
         if not result.clusters.table:
-            cls.compute_clusters(result, state)
+            embedding = data.transform(Domain([attr_x, attr_y]))
+            cls.compute_clusters(embedding, result, state)
         set_progress()
         return result
 
 
 class CenteredTextItem(pg.TextItem):
-    def __init__(self, view_box, x, y, text, tooltip, rgb):
-        bg_color = QColor(*rgb)  # TODO - remove rgb, or use it
+    def __init__(self, view_box, x, y, text, tooltip):
         bg_color = QColor(Qt.white)
         bg_color.setAlpha(200)
         color = QColor(Qt.black)
@@ -342,6 +253,8 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     graph = SettingProvider(OWAnnotateProjectionGraph)
     left_side_scrolling = True  # remove this line when https://github.com/biolab/orange3/pull/3863 is merged
 
+    attr_x = ContextSetting(None)
+    attr_y = ContextSetting(None)
     scoring_method = Setting(ScoringMethod.ExpRatio)
     statistical_test = Setting(StatisticalTest.Binomial)
     p_threshold = Setting(0.05)
@@ -414,6 +327,21 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             "Show reference data",
             callback=self.__show_ref_data_changed)
 
+    def __add_axis_controls(self):
+        common_options = dict(
+            labelWidth=50, orientation=Qt.Horizontal, sendSelectedValue=True,
+            valueType=str, contentsLength=14
+        )
+        box = gui.vBox(self.controlArea, True)
+        ord = (DomainModel.METAS, DomainModel.ATTRIBUTES, DomainModel.CLASSES)
+        mod = DomainModel(ord, valid_types=ContinuousVariable)
+        gui.comboBox(
+            box, self, "attr_x", label="Axis x:", model=mod,
+            callback=self.__axis_attr_changed, **common_options)
+        gui.comboBox(
+            box, self, "attr_y", label="Axis y:", model=mod,
+            callback=self.__axis_attr_changed, **common_options)
+
     def __add_annotation_controls(self):
         box = gui.vBox(self.controlArea, True)
         gui.comboBox(
@@ -442,6 +370,10 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
     def __show_ref_data_changed(self):
         self.graph.update_coordinates()
+
+    def __axis_attr_changed(self):
+        self.__parameter_changed()
+        self.setup_plot()
 
     def __scoring_combo_changed(self):
         self.__invalidate_scores_annotations()
@@ -509,9 +441,6 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         which, result = value
         if which == "scores":
             self.scores = result.scores
-        elif which == "embedding":
-            self.embedding = result.embedding
-            self.setup_plot()
         elif which == "clusters":
             self.clusters = result.clusters
             if result.clusters.epsilon is not None:
@@ -522,7 +451,6 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
     def on_done(self, result: Result):
         self.scores = result.scores
-        self.embedding = result.embedding
         self.clusters = result.clusters
         if result.clusters.epsilon is not None:
             self.epsilon = result.clusters.epsilon
@@ -639,23 +567,20 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
                 for key, (ann, lab, _) in self.clusters.groups.items()]
 
     def _get_projection_data(self):
-        if not self.scores.table or not self.embedding or not self.clusters.table:
+        if not self.scores.table or not self.clusters.table:
             return self.data
         n_sco = self.scores.table.X.shape[1]
-        n_emb = self.embedding.X.shape[1]
         n_clu = self.clusters.table.X.shape[1]
         domain = self.data.domain
         metas = chain(self.scores.table.domain.attributes,
-                      self.embedding.domain.attributes,
                       self.clusters.table.domain.attributes,
                       domain.metas)
         domain = Domain(domain.attributes, domain.class_vars, metas)
 
         augmented_data = self.data.transform(domain)
         augmented_data.metas[:, :n_sco] = self.scores.table.X
-        augmented_data.metas[:, n_sco:n_sco + n_emb] = self.embedding.X
-        ind = n_sco + n_emb + n_clu
-        augmented_data.metas[:, n_sco + n_emb: ind] = self.clusters.table.X
+        ind = n_sco + n_clu
+        augmented_data.metas[:, n_sco: ind] = self.clusters.table.X
         augmented_data.metas[:, ind:] = self.data.metas
         return augmented_data
 
@@ -673,7 +598,6 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     def clear(self):
         super().clear()
         self.cancel()
-        self.embedding = None
         self.__invalidate_scores()
         self.__invalidate_clusters()
 
