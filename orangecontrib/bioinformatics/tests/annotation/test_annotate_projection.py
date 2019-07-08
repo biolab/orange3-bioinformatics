@@ -7,7 +7,7 @@ from Orange.data import Domain, ContinuousVariable, Table, DiscreteVariable
 
 from orangecontrib.bioinformatics.annotation.annotate_projection import \
     annotate_projection, labels_locations, get_epsilon, compute_concave_hulls, \
-    assign_labels
+    assign_labels, cluster_additional_points
 
 
 class TestAnnotateProjection(unittest.TestCase):
@@ -171,3 +171,80 @@ class TestAnnotateProjection(unittest.TestCase):
         )
         self.assertEqual(0, len(labels_dict["C1"]))
         self.assertEqual(0, len(labels_dict["C3"]))
+
+    def test_cluster_additional_points_simple(self):
+        """
+        Test with the simple convex hull
+        """
+        hull = {"C1": np.array(
+            [[0., 0.], [0., 1.], [1., 1.], [1., 0.]]
+        )}
+        x, y = np.meshgrid(np.arange(-1., 2., 0.2), np.arange(-1, 2., 0.2))
+        points = Table(
+            Domain([ContinuousVariable("x"), ContinuousVariable("y")]),
+            np.concatenate((x.reshape(-1, 1), y.reshape(-1, 1)), axis=1)
+        )
+
+        clusters = cluster_additional_points(points, hull)
+        expected = [
+            0.0 if 0 < x < 1 and 0 < y < 1 else np.nan for x, y in points.X]
+        np.testing.assert_array_equal(clusters.X.flatten(), expected)
+
+    def test_cluster_additional_points_concave(self):
+        """
+        Test with the concave hull
+        """
+        hull = {"C1": np.array(
+            [[0., 0.], [0.3, 0.5], [0., 1.], [1., 1.], [0.7, 0.5],  [1., 0.]]
+        )}
+        p = [
+            [-1., -1],  # point that is totally out polygon
+            [0.2, 0.5],  # point outside the polygon, but close
+            [0.8, 0.5],  # point outside the polygon, but close
+            [0.5, 0.5],  # point in
+            [0.5, 0.7],  # point in
+            [0.5, 0.3],  # point in
+            [0.2, 0.9],  # point in
+            [0.2, 0.1],  # point in
+        ]
+        points = Table(
+            Domain([ContinuousVariable("x"), ContinuousVariable("y")]), p)
+
+        clusters = cluster_additional_points(points, hull)
+        expected = [np.nan] * 3 + [0.] * 5
+        np.testing.assert_array_equal(clusters.X.flatten(), expected)
+
+    def test_cluster_additional_points_more_clusters(self):
+        """
+        Test with more concave hulls
+        """
+        hull = {
+            "C1": np.array(
+                [[0., 0.], [0.3, 0.5], [0., 1.], [1., 1.], [0.7, 0.5],
+                 [1., 0.]]),
+            "C2": np.array(
+                [[0., 0.], [0., 1.], [-0.5, 0.7], [-1., 1.], [-1., 0.]]
+            )
+        }
+        p = [
+            [-1., -1],  # point that is totally out  of any polygon
+            [0.2, 0.5],  # point outside, but in concave part of C1
+            [0.8, 0.5],  # point outside, but in concave part of C1
+            [0.5, 0.5],  # point in C1
+            [0.5, 0.7],  # point in C1
+            [0.5, 0.3],  # point in C1
+            [0.2, 0.9],  # point in C1
+            [0.2, 0.1],  # point in C1
+            [-0.5, 0.1],  # point in C2
+            [-0.8, 0.1],  # point in C2
+            [-0.5, 0.8],  # point out, but in concave part of C2
+            [-0.6, 0.9],  # point out, but in concave part of C2
+        ]
+        points = Table(
+            Domain([ContinuousVariable("x"), ContinuousVariable("y")]), p)
+
+        clusters = cluster_additional_points(points, hull)
+        clusters = list(
+            map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0]))
+        expected = ["?"] * 3 + ["C1"] * 5 + ["C2"] * 2 + ["?"] * 2
+        np.testing.assert_array_equal(clusters, expected)
