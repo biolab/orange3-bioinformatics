@@ -384,3 +384,62 @@ def annotate_projection(annotations, coordinates,
         np.concatenate((clusters.X, item_annotations.X), axis=1))
 
     return clusters_ann, clusters_meta, eps
+
+
+def cluster_additional_points(coordinates, hulls):
+    """
+    This function receives additional points and assign them current existing
+    clusters based on current concave hull.
+
+    Parameters
+    ----------
+    coordinates : Orange.data.Table
+        Visualisation coordinates - embeddings
+    hulls : dict
+        Concave hull for each cluster
+
+    Returns
+    -------
+    Orange.data.Table
+        Cluster label for each point
+    """
+
+    def point_in_polygon_test(test_point, polygon_points):
+        """
+        This function uses the horizontal ray casting to find out if the point
+        is in the hull/polygon. For each point, it tests how many times the
+        horizontal ray from test_point to infinity crosses the polygon edge. If
+        it happens odd many times the point is in the polygon.
+        https://stackoverflow.com/a/2922778/3551700
+        """
+        test_x = test_point[0]
+        test_y = test_point[1]
+        # flipping bool from True to False is similar to counting odd numbers
+        # of intersections. If it will be True at the end odd number of
+        # intersections happened
+        is_inside = False
+
+        for (x1, y1), (x2, y2) in zip(
+                polygon_points, polygon_points[1:] + polygon_points[:1]):
+            # ray crosses the edge if test_y between both y from an edge
+            # and if intersection on the right of the test_x
+            if (y1 > test_y) != (y2 > test_y):
+                # compute the intersection between the horizontal ray and
+                # polygon edge
+                intersection_x = (x2 - x1) * (test_y - y1) / (y2 - y1) + x1
+                if test_x < intersection_x:
+                    is_inside = not is_inside
+        return is_inside
+
+    clusters = [None] * len(coordinates)
+    for cluster, hull in hulls.items():
+        for i, c in enumerate(coordinates.X):
+            if point_in_polygon_test(c, hull):
+                clusters[i] = cluster
+
+    # create the table
+    new_domain = Domain([DiscreteVariable(
+        "Clusters", values=list(hulls.keys()))])
+    return Table(
+        new_domain,
+        np.array(list(map(new_domain[0].to_val, clusters))).reshape(-1, 1))
