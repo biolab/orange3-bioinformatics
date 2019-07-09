@@ -46,7 +46,6 @@ from Orange.clustering import DBSCAN
 import numpy as np
 from Orange.data import Domain, DiscreteVariable, Table
 from scipy.spatial import distance
-import shapely.geometry as geometry
 from scipy.spatial import Delaunay
 from math import sqrt
 import pyclipper
@@ -249,50 +248,52 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
        [[x1, y1], [x2, y2], [x3, y3], ...]
     """
 
-    def get_shape(points, epsilon):
+    def get_shape(pts, eps):
         """
         Compute the shape (concave hull) of a set of a cluster.
         """
-        if len(points) < 4:
-            # When you have a triangle, there is no sense in computing the hull
-            return geometry.MultiPoint(list(points)).convex_hull
 
-        def add_edge(edges, i, j):
+        def add_edge(edges_list, i, j):
             """
             Add a line between the i-th and j-th points,
             if not in the list already. Remove the lines that are not outer
             edges - when (j, i) already in list means that two triangles
             has same edge what means it is not an outer edge
             """
-            if (j, i) in edges:
+            if (j, i) in edges_list:
                 # if both neighboring triangles are in shape, it's not a
                 # boundary edge
-                edges.remove((j, i))
+                edges_list.remove((j, i))
                 return
-            edges.add((i, j))
+            edges_list.add((i, j))
 
-        def edges_to_poygon(edges, points):
+        def edges_to_poygon(edges_list, points_list):
             """
             This function just connect edges in polygon
             """
             # sort based on first element of tuple to enable bisection search
-            edges = sorted(edges, key=lambda x: x[0])
-            start, next_point = edges[0]
-            polygon = [points[start], points[next_point]]
+            edges_list = sorted(edges_list, key=lambda x: x[0])
+            start, next_point = edges_list[0]
+            poly = [points_list[start], points_list[next_point]]
             while start != next_point:
-                ind = bisect(edges, (next_point, ))
-                next_point = edges[ind][1]
-                polygon.append(points[next_point])
-            return np.array(polygon)
+                ind = bisect(edges_list, (next_point,))
+                next_point = edges_list[ind][1]
+                poly.append(points_list[next_point])
+            return np.array(poly)
 
-        tri = Delaunay(points)
+        if len(pts) < 4:
+            # When you have a triangle, there is no sense in computing the hull
+            rng = list(range(3))
+            return edges_to_poygon(zip(rng, rng[1:] + rng[:1]), pts)
+
+        tri = Delaunay(pts)
         edges = set()
         # loop over triangles:
         # ia, ib, ic = indices of corner points of the triangle
         for ia, ib, ic in tri.vertices:
-            pa = points[ia]
-            pb = points[ib]
-            pc = points[ic]
+            pa = pts[ia]
+            pb = pts[ib]
+            pc = pts[ic]
 
             # Lengths of sides of triangle
             a = sqrt((pa[0] - pb[0]) ** 2 + (pa[1] - pb[1]) ** 2)
@@ -300,12 +301,12 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
             c = sqrt((pc[0] - pa[0]) ** 2 + (pc[1] - pa[1]) ** 2)
 
             # filter - longest edge of triangle smaller than epsilon
-            if max(a, b, c) <= epsilon:
+            if max(a, b, c) <= eps:
                 add_edge(edges, ia, ib)
                 add_edge(edges, ib, ic)
                 add_edge(edges, ic, ia)
 
-        polygon = edges_to_poygon(edges, points)
+        polygon = edges_to_poygon(edges, pts)
         return polygon
 
     hulls = {}
@@ -320,7 +321,7 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
             points = points[np.random.randint(points.shape[0], size=1000), :]
 
         # compute the concave hul
-        hull = get_shape(points, epsilon=epsilon * 2)
+        hull = get_shape(points, eps=epsilon * 2)
 
         # epsilon seems to be good parameter for lines to be smooth enough
         # selecting epsilon for the distance
@@ -479,8 +480,8 @@ def cluster_additional_points(coordinates, hulls):
 if __name__ == "__main__":
     # run hull creation at Iris data
     data = Table("iris")[:, 2:4]
-    clusters = Table(
+    clustered_data = Table(
         Domain([DiscreteVariable("cl", values=["1", "2", "3"])]),
         [[0]] * 50 + [[1]] * 50 + [[2]] * 50
     )
-    hulls = compute_concave_hulls(data, clusters, epsilon=0.5)
+    compute_concave_hulls(data, clustered_data, epsilon=0.5)
