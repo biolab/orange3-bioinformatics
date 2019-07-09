@@ -40,7 +40,7 @@ class Gene:
 
     # We deny __dict__ creation by defining __slots__ for memory optimization.
     # We expect a lot of instances of this class to be created.
-    __slots__ = GENE_INFO_TAGS + GENE_MATCHER_TAGS  # Note: slots are ordered.
+    __slots__ = GENE_INFO_TAGS + GENE_MATCHER_TAGS + ['homology_group_id']  # Note: slots are ordered.
 
     def __init__(self, input_name=None):
         """
@@ -55,6 +55,9 @@ class Gene:
     def __getattr__(self, attribute):
         if attribute not in self.__slots__:
             return ''
+
+    def __repr__(self):
+        return f'<Gene symbol={self.symbol}, entrez_id={self.gene_id}>'
 
     @property
     def possible_hits(self):
