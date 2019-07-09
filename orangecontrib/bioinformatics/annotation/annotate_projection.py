@@ -90,8 +90,8 @@ def cluster_data(coordinates, clustering_algorithm=DBSCAN, **kwargs):
 
     # create the table
     new_domain = Domain([DiscreteVariable(
-        "Clusters", values=[sorted(
-            "C{}".format(i) for i in range(1, len(sorted_clust_idx) + 1))])])
+        "Clusters", values=[
+            "C{}".format(i) for i in range(1, len(sorted_clust_idx) + 1)])])
     return Table(new_domain, new_clustering.reshape((-1, 1)))
 
 
@@ -386,7 +386,7 @@ def annotate_projection(annotations, coordinates,
     return clusters_ann, clusters_meta, eps
 
 
-def cluster_additional_points(coordinates, hulls):
+def cluster_additional_points(coordinates, hulls, cluster_attribute=None):
     """
     This function receives additional points and assign them current existing
     clusters based on current concave hull.
@@ -397,6 +397,9 @@ def cluster_additional_points(coordinates, hulls):
         Visualisation coordinates - embeddings
     hulls : dict
         Concave hull for each cluster
+    cluster_attribute : Orange.data.DiscreteVariable (optional)
+        A variable for clusters. If cluster_attribute is provided it will be
+        used in the creation of the resulting Table.
 
     Returns
     -------
@@ -438,9 +441,14 @@ def cluster_additional_points(coordinates, hulls):
             if point_in_polygon_test(c, hull):
                 clusters[i] = cluster
 
+    if cluster_attribute is not None:
+        assert all(
+            i in cluster_attribute.values for i in set(clusters) - {None}), \
+            "cluster_attribute does not have all required values."
     # create the table
     new_domain = Domain([DiscreteVariable(
-        "Clusters", values=sorted(list(hulls.keys())))])
+        "Clusters", values=sorted(list(hulls.keys())))
+                         if cluster_attribute is None else cluster_attribute])
     return Table(
         new_domain,
         np.array(list(map(new_domain[0].to_val, clusters))).reshape(-1, 1))

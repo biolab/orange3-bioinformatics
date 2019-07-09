@@ -214,37 +214,60 @@ class TestAnnotateProjection(unittest.TestCase):
         expected = [np.nan] * 3 + [0.] * 5
         np.testing.assert_array_equal(clusters.X.flatten(), expected)
 
+    points = [
+        [-1., -1],  # point that is totally out  of any polygon
+        [0.2, 0.5],  # point outside, but in concave part of C1
+        [0.8, 0.5],  # point outside, but in concave part of C1
+        [0.5, 0.5],  # point in C1
+        [0.5, 0.7],  # point in C1
+        [0.5, 0.3],  # point in C1
+        [0.2, 0.9],  # point in C1
+        [0.2, 0.1],  # point in C1
+        [-0.5, 0.1],  # point in C2
+        [-0.8, 0.1],  # point in C2
+        [-0.5, 0.8],  # point out, but in concave part of C2
+        [-0.6, 0.9],  # point out, but in concave part of C2
+    ]
+
+    hull = {
+        "C1": np.array(
+            [[0., 0.], [0.3, 0.5], [0., 1.], [1., 1.], [0.7, 0.5],
+             [1., 0.]]),
+        "C2": np.array(
+            [[0., 0.], [0., 1.], [-0.5, 0.7], [-1., 1.], [-1., 0.]]
+        )
+    }
+
     def test_cluster_additional_points_more_clusters(self):
         """
         Test with more concave hulls
         """
-        hull = {
-            "C1": np.array(
-                [[0., 0.], [0.3, 0.5], [0., 1.], [1., 1.], [0.7, 0.5],
-                 [1., 0.]]),
-            "C2": np.array(
-                [[0., 0.], [0., 1.], [-0.5, 0.7], [-1., 1.], [-1., 0.]]
-            )
-        }
-        p = [
-            [-1., -1],  # point that is totally out  of any polygon
-            [0.2, 0.5],  # point outside, but in concave part of C1
-            [0.8, 0.5],  # point outside, but in concave part of C1
-            [0.5, 0.5],  # point in C1
-            [0.5, 0.7],  # point in C1
-            [0.5, 0.3],  # point in C1
-            [0.2, 0.9],  # point in C1
-            [0.2, 0.1],  # point in C1
-            [-0.5, 0.1],  # point in C2
-            [-0.8, 0.1],  # point in C2
-            [-0.5, 0.8],  # point out, but in concave part of C2
-            [-0.6, 0.9],  # point out, but in concave part of C2
-        ]
-        points = Table(
-            Domain([ContinuousVariable("x"), ContinuousVariable("y")]), p)
 
-        clusters = cluster_additional_points(points, hull)
+        points_table = Table(
+            Domain([
+                ContinuousVariable("x"), ContinuousVariable("y")]), self.points)
+
+        clusters = cluster_additional_points(points_table, self.hull)
         clusters = list(
             map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0]))
         expected = ["?"] * 3 + ["C1"] * 5 + ["C2"] * 2 + ["?"] * 2
         np.testing.assert_array_equal(clusters, expected)
+
+    def test_cluster_additional_points_with_existing_domain(self):
+        """
+        Test with the concave hull
+        """
+        points = Table(
+            Domain([
+                ContinuousVariable("x"), ContinuousVariable("y")]), self.points)
+        attr = DiscreteVariable("Clusters", values=["C2", "C1"])
+
+        clusters = cluster_additional_points(
+            points, self.hull, cluster_attribute=attr)
+        cluster_map = list(
+            map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0]))
+        expected = ["?"] * 3 + ["C1"] * 5 + ["C2"] * 2 + ["?"] * 2
+        np.testing.assert_array_equal(cluster_map, expected)
+        self.assertEqual(attr, clusters.domain.attributes[0])
+        self.assertListEqual(
+            attr.values, clusters.domain.attributes[0].values)
