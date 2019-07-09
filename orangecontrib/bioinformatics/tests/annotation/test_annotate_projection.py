@@ -1,6 +1,5 @@
 import unittest
 
-import Orange
 import numpy as np
 from Orange.clustering import DBSCAN, KMeans
 from Orange.data import Domain, ContinuousVariable, Table, DiscreteVariable
@@ -107,6 +106,41 @@ class TestAnnotateProjection(unittest.TestCase):
         self.assertEqual(2, hulls["1"].shape[1])  # hull have x and y
         self.assertEqual(2, hulls["2"].shape[1])  # hull have x and y
         self.assertEqual(2, hulls["3"].shape[1])  # hull have x and y
+
+    def test_compute_concave_hulls_subsampling(self):
+        """
+        When more than 1000 points passed they are sub-sampled in order to
+        compute a concave hull
+        """
+        iris = Table("iris")
+        data = Table(  # here we pass 1500 points
+            Domain(iris.domain.attributes[2:4]),
+            np.repeat(iris.X[:, 2:4], 10, axis=0))
+        clusters = Table(
+            Domain([DiscreteVariable("cl", values=["1", "2", "3"])]),
+            [[0]] * 50 * 10 + [[1]] * 50 * 10 + [[2]] * 50 * 10
+        )
+        hulls = compute_concave_hulls(data, clusters, epsilon=0.5)
+
+        self.assertEqual(3, len(hulls))
+        self.assertEqual(2, hulls["1"].shape[1])  # hull have x and y
+        self.assertEqual(2, hulls["2"].shape[1])  # hull have x and y
+        self.assertEqual(2, hulls["3"].shape[1])  # hull have x and y
+
+    def test_compute_concave_hulls_triangle(self):
+        """
+        Concave hull must also work for tree points - it is a special case
+        """
+        data = Table(Domain([ContinuousVariable("x"), ContinuousVariable("y")]),
+                     np.array([[1, 1], [1, 2], [2, 1]]))
+        clusters = Table(
+            Domain([DiscreteVariable("cl", values=["1"])]),
+            [[0]] * 3,
+        )
+        hulls = compute_concave_hulls(data, clusters, epsilon=0.5)
+
+        self.assertEqual(1, len(hulls))
+        self.assertEqual(2, hulls["1"].shape[1])  # hull have x and y
 
     def test_empty_annotations(self):
         ann = Table(Domain([]), np.empty((len(self.data), 0)))
