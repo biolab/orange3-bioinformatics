@@ -90,8 +90,8 @@ def cluster_data(coordinates, clustering_algorithm=DBSCAN, **kwargs):
 
     # create the table
     new_domain = Domain([DiscreteVariable(
-        "Clusters", values=[
-            "C{}".format(i) for i in range(1, len(sorted_clust_idx) + 1)])])
+        "Clusters", values=[sorted(
+            "C{}".format(i) for i in range(1, len(sorted_clust_idx) + 1))])])
     return Table(new_domain, new_clustering.reshape((-1, 1)))
 
 
@@ -420,7 +420,8 @@ def cluster_additional_points(coordinates, hulls):
         is_inside = False
 
         for (x1, y1), (x2, y2) in zip(
-                polygon_points, polygon_points[1:] + polygon_points[:1]):
+                polygon_points, np.concatenate(
+                    (polygon_points[1:], polygon_points[:1]), axis=0)):
             # ray crosses the edge if test_y between both y from an edge
             # and if intersection on the right of the test_x
             if (y1 > test_y) != (y2 > test_y):
@@ -439,7 +440,7 @@ def cluster_additional_points(coordinates, hulls):
 
     # create the table
     new_domain = Domain([DiscreteVariable(
-        "Clusters", values=list(hulls.keys()))])
+        "Clusters", values=sorted(list(hulls.keys())))])
     return Table(
         new_domain,
         np.array(list(map(new_domain[0].to_val, clusters))).reshape(-1, 1))
