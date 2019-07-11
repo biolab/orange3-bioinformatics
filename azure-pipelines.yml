@@ -13,8 +13,6 @@ jobs:
     name: macOS
     vmImage: 'macOS-10.14'
 
-# For now, testing on windows is broken because pypi package shapely fails to install on windows (no binary provided on pypi).
-# current workaround is to use wheel from: https://download.lfd.uci.edu/pythonlibs/t4jqbe6o/Shapely-1.6.4.post2-cp37-cp37m-win_amd64.whl
 - template: .azure-pipelines/jobs.yml
   parameters:
     name: Windows

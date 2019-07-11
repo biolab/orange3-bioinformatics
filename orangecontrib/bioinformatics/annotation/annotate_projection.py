@@ -39,18 +39,16 @@ In case when user uses a DBSCAN algorithm and do not provide eps to the
 ...     clustering_algorithm=DBSCAN)
 
 """
-
-
+from bisect import bisect
 from collections import Counter
 
 from Orange.clustering import DBSCAN
 import numpy as np
 from Orange.data import Domain, DiscreteVariable, Table
 from scipy.spatial import distance
-import shapely.geometry as geometry
 from scipy.spatial import Delaunay
-from shapely.ops import cascaded_union, polygonize
 from math import sqrt
+import pyclipper
 
 
 def cluster_data(coordinates, clustering_algorithm=DBSCAN, **kwargs):
@@ -250,34 +248,52 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
        [[x1, y1], [x2, y2], [x3, y3], ...]
     """
 
-    def get_shape(points, epsilon):
+    def get_shape(pts, eps):
         """
         Compute the shape (concave hull) of a set of a cluster.
         """
-        if len(points) < 4:
-            # When you have a triangle, there is no sense in computing the hull
-            return geometry.MultiPoint(list(points)).convex_hull
 
-        def add_edge(edges, edge_points, coords, i, j):
+        def add_edge(edges_list, i, j):
             """
             Add a line between the i-th and j-th points,
-            if not in the list already
+            if not in the list already. Remove the lines that are not outer
+            edges - when (j, i) already in list means that two triangles
+            has same edge what means it is not an outer edge
             """
-            if (i, j) in edges or (j, i) in edges:
-                # already added
+            if (j, i) in edges_list:
+                # if both neighboring triangles are in shape, it's not a
+                # boundary edge
+                edges_list.remove((j, i))
                 return
-            edges.add((i, j))
-            edge_points.append(coords[[i, j]])
+            edges_list.add((i, j))
 
-        tri = Delaunay(points)
+        def edges_to_poygon(edges_list, points_list):
+            """
+            This function just connect edges in polygon
+            """
+            # sort based on first element of tuple to enable bisection search
+            edges_list = sorted(edges_list, key=lambda x: x[0])
+            start, next_point = edges_list[0]
+            poly = [points_list[start], points_list[next_point]]
+            while start != next_point:
+                ind = bisect(edges_list, (next_point,))
+                next_point = edges_list[ind][1]
+                poly.append(points_list[next_point])
+            return np.array(poly)
+
+        if len(pts) < 4:
+            # When you have a triangle, there is no sense in computing the hull
+            rng = list(range(3))
+            return edges_to_poygon(zip(rng, rng[1:] + rng[:1]), pts)
+
+        tri = Delaunay(pts)
         edges = set()
-        edge_points = []
         # loop over triangles:
         # ia, ib, ic = indices of corner points of the triangle
         for ia, ib, ic in tri.vertices:
-            pa = points[ia]
-            pb = points[ib]
-            pc = points[ic]
+            pa = pts[ia]
+            pb = pts[ib]
+            pc = pts[ic]
 
             # Lengths of sides of triangle
             a = sqrt((pa[0] - pb[0]) ** 2 + (pa[1] - pb[1]) ** 2)
@@ -285,14 +301,13 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
             c = sqrt((pc[0] - pa[0]) ** 2 + (pc[1] - pa[1]) ** 2)
 
             # filter - longest edge of triangle smaller than epsilon
-            if max(a, b, c) <= epsilon:
-                add_edge(edges, edge_points, points, ia, ib)
-                add_edge(edges, edge_points, points, ib, ic)
-                add_edge(edges, edge_points, points, ic, ia)
+            if max(a, b, c) <= eps:
+                add_edge(edges, ia, ib)
+                add_edge(edges, ib, ic)
+                add_edge(edges, ic, ia)
 
-        m = geometry.MultiLineString(edge_points)
-        triangles = list(polygonize(m))
-        return cascaded_union(triangles)
+        polygon = edges_to_poygon(edges, pts)
+        return polygon
 
     hulls = {}
     clusters_array = np.array(list(map(
@@ -305,16 +320,33 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
         if points.shape[0] > 1000:
             points = points[np.random.randint(points.shape[0], size=1000), :]
 
-        # epsilon * 2 seems to be good parameter for lines to be smooth enough
-        concave_hull = get_shape(points, epsilon=epsilon * 2)
-        # expand_and_smooth the curve - selecting epsilon for the distance
+        # compute the concave hul
+        hull = get_shape(points, eps=epsilon * 2)
+
+        # epsilon seems to be good parameter for lines to be smooth enough
+        # selecting epsilon for the distance
         # shows approximately what is DBSCAN neighbourhood
-        # this move the hull further away and then move it back to make it more
-        # smooth
-        concave_hull = concave_hull.buffer(3 * epsilon).buffer(-epsilon * 2)
+        # those line buffer the line for 3 * epsilon and move it back for
+        # 2 * epsilon. The it will make a hull more smooth.
 
-        hulls[cl] = np.array(list(map(list, concave_hull.exterior.coords.xy))).T
+        # pyclipper work with integer so points need to be scaled first to keep
+        # precision. It is undo with scal_from_clipper
+        scaling_factor = 1000
+        scaled_hull = pyclipper.scale_to_clipper(hull, scaling_factor)
 
+        # buffer the hull fro epsilon * 3
+        pco1 = pyclipper.PyclipperOffset()
+        pco1.AddPath(
+            scaled_hull, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+        im_solution = pco1.Execute(epsilon * scaling_factor * 3)
+        # buffer the hull fro epsilon * -2
+        pco2 = pyclipper.PyclipperOffset()
+        pco2.AddPath(
+            im_solution[0], pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+        solution = pyclipper.scale_from_clipper(
+            pco2.Execute(epsilon * scaling_factor * (-2)), scaling_factor)
+
+        hulls[cl] = np.array(solution).reshape(-1, 2)
     return hulls
 
 
@@ -443,3 +475,13 @@ def cluster_additional_points(coordinates, hulls):
     return Table(
         new_domain,
         np.array(list(map(new_domain[0].to_val, clusters))).reshape(-1, 1))
+
+
+if __name__ == "__main__":
+    # run hull creation at Iris data
+    data = Table("iris")[:, 2:4]
+    clustered_data = Table(
+        Domain([DiscreteVariable("cl", values=["1", "2", "3"])]),
+        [[0]] * 50 + [[1]] * 50 + [[2]] * 50
+    )
+    compute_concave_hulls(data, clustered_data, epsilon=0.5)
