@@ -418,7 +418,7 @@ def annotate_projection(annotations, coordinates,
     return clusters_ann, clusters_meta, eps
 
 
-def cluster_additional_points(coordinates, hulls):
+def cluster_additional_points(coordinates, hulls, cluster_attribute=None):
     """
     This function receives additional points and assign them current existing
     clusters based on current concave hull.
@@ -429,6 +429,9 @@ def cluster_additional_points(coordinates, hulls):
         Visualisation coordinates - embeddings
     hulls : dict
         Concave hull for each cluster
+    cluster_attribute : Orange.data.DiscreteVariable (optional)
+        A variable for clusters. If cluster_attribute is provided it will be
+        used in the creation of the resulting Table.
 
     Returns
     -------
@@ -452,7 +455,8 @@ def cluster_additional_points(coordinates, hulls):
         is_inside = False
 
         for (x1, y1), (x2, y2) in zip(
-                polygon_points, polygon_points[1:] + polygon_points[:1]):
+                polygon_points, np.concatenate(
+                    (polygon_points[1:], polygon_points[:1]), axis=0)):
             # ray crosses the edge if test_y between both y from an edge
             # and if intersection on the right of the test_x
             if (y1 > test_y) != (y2 > test_y):
@@ -469,9 +473,14 @@ def cluster_additional_points(coordinates, hulls):
             if point_in_polygon_test(c, hull):
                 clusters[i] = cluster
 
+    if cluster_attribute is not None:
+        assert all(
+            i in cluster_attribute.values for i in set(clusters) - {None}), \
+            "cluster_attribute does not have all required values."
     # create the table
     new_domain = Domain([DiscreteVariable(
-        "Clusters", values=list(hulls.keys()))])
+        "Clusters", values=sorted(list(hulls.keys())))
+                         if cluster_attribute is None else cluster_attribute])
     return Table(
         new_domain,
         np.array(list(map(new_domain[0].to_val, clusters))).reshape(-1, 1))
