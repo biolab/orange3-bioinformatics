@@ -189,7 +189,8 @@ def labels_locations(coordinates, clusters):
             map(clusters.domain.attributes[0].repr_val,
                 clusters.X[:, 0]))).flatten() == cl
         cl_coordinates = coordinates.X[mask, :]
-        x, y = np.mean(cl_coordinates, axis=0)
+        x, y = 1/2 * (
+                np.min(cl_coordinates, axis=0) + np.max(cl_coordinates, axis=0))
         locations[cl] = (x, y)
     return locations
 
