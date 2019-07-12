@@ -219,7 +219,8 @@ def get_epsilon(coordinates, k=10, skip=0.1):
         x = x[::i]
 
     d = distance.squareform(distance.pdist(x))
-    kth_point = np.argpartition(d, k+1, axis=1)[:, k+1]
+    k = min(k+1, len(coordinates) - 1)
+    kth_point = np.argpartition(d, k, axis=1)[:, k]
     # k+1 since first one is item itself
     kth_dist = np.sort(d[np.arange(0, len(kth_point)), kth_point])
 
