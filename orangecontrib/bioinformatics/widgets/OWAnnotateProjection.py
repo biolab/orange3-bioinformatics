@@ -12,6 +12,7 @@ import pyqtgraph as pg
 
 from Orange.data import Table, Domain, ContinuousVariable, DiscreteVariable
 from Orange.data.filter import FilterString, Values
+from Orange.data.util import array_equal
 from Orange.widgets import gui, report
 from Orange.widgets.settings import Setting, SettingProvider, ContextSetting
 from Orange.widgets.utils.colorpalette import ColorPaletteGenerator
@@ -433,6 +434,13 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         return self.reference_data.domain.attributes
 
     @property
+    def effective_data(self):
+        return self.reference_data.transform(
+            Domain(self.effective_variables,
+                   self.reference_data.domain.class_vars,
+                   self.reference_data.domain.metas))
+
+    @property
     def can_annotate(self):
         return self.reference_data and self.genes and \
                TAX_ID in self.reference_data.attributes and \
@@ -547,8 +555,19 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     @Inputs.data
     @check_sql_input
     def set_data(self, data):
+        attr_x, attr_y = self.attr_x, self.attr_y
+        data_existed = self.reference_data is not None
+        effective_data = self.effective_data if data_existed else None
         super().set_data(data)
         self.reference_data = self.data
+        if not (data_existed and self.reference_data is not None and
+                array_equal(effective_data.X, self.effective_data.X)):
+            self.clear()
+            self.__invalidate_scores()
+            self.__invalidate_clusters()
+        elif attr_x is not self.attr_x or attr_y is not self.attr_y:
+            self.clear()
+            self.__invalidate_clusters()
 
     def check_data(self):
         self.Warning.missing_tax_id.clear()
@@ -584,10 +603,8 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     @check_sql_input
     def set_secondary_data(self, data):
         self.secondary_data = data
-        self._invalidated = True
+        self.clear()
         self.__invalidate_clusters_secondary_table()
-        super().clear()
-        self.cancel()
 
     @Inputs.genes
     def set_genes(self, genes: Optional[Table]):
@@ -595,6 +612,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         self.__invalidate_scores_annotations()
         self.__invalidate_clusters()
         self.check_genes()
+        self.cancel()
 
     def check_genes(self):
         self.Warning.missing_tax_id_genes.clear()
@@ -824,8 +842,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     def clear(self):
         super().clear()
         self.cancel()
-        self.__invalidate_scores()
-        self.__invalidate_clusters()
+        self._invalidated = True
 
     def onDeleteWidget(self):
         self.shutdown()

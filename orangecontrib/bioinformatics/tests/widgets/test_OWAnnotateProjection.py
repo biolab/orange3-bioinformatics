@@ -289,7 +289,6 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         self.wait_until_stop_blocking()
         self.assertFalse(self.widget.Warning.missing_compute_value.is_shown())
 
-    @unittest.skip("Skip due to timeout")
     def test_tsne_output(self):
         owtsne = self.create_widget(OWtSNE)
         self.send_signal(
