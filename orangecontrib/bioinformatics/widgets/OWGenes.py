@@ -1,7 +1,8 @@
 """ Genes """
-import threading
 import sys
 import numpy as np
+
+from functools import lru_cache
 
 from AnyQt.QtWidgets import (
     QSplitter, QTableView,  QHeaderView, QAbstractItemView, QStyle
@@ -14,38 +15,50 @@ from AnyQt.QtGui import (
 )
 
 from Orange.widgets.gui import (
-    vBox, comboBox, ProgressBar, widgetBox, auto_commit, widgetLabel, checkBox,
+    vBox, comboBox, widgetBox, auto_commit, widgetLabel, checkBox,
     rubber, lineEdit, LinkRole, LinkStyledItemDelegate
 )
+
+from Orange.data import StringVariable, DiscreteVariable, Domain, Table, filter as table_filter
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.utils import itemmodels
 from Orange.widgets.settings import Setting, DomainContextHandler, ContextSetting
 from Orange.widgets.utils.signals import Output, Input
-from Orange.data import StringVariable, DiscreteVariable, Domain, Table, filter as table_filter
-
+from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
 )
-from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 from orangecontrib.bioinformatics.ncbi import taxonomy
-from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, NCBI_ID, GENE_MATCHER_HEADER, NCBI_DETAIL_LINK
+from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, owgenes_header, ENTREZ_ID, NCBI_DETAIL_LINK
 
-from functools import lru_cache
+
+def run_gene_matcher(gene_matcher: GeneMatcher, state: TaskState):
+    current_iter = 0
+    max_iter = len(gene_matcher.genes)
+
+    def callback():
+        nonlocal current_iter
+        current_iter += 1
+        state.set_progress_value(100 * (current_iter / max_iter))
+
+    state.set_status("Working ...")
+    gene_matcher._progress_callback = callback
+    gene_matcher.match_genes()
 
 
 class GeneInfoModel(itemmodels.PyTableModel):
     def __init__(self,  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.header_labels, self.gene_attributes = GENE_MATCHER_HEADER
+        self.header_labels, self.gene_attributes = owgenes_header
         self.setHorizontalHeaderLabels(self.header_labels)
 
         try:
-            # note: make sure ncbi_id is set in GENE_MATCHER_HEADER
-            self.entrez_column_index = self.gene_attributes.index('ncbi_id')
+            # note: make sure gene_id is set in owgenes_header
+            self.entrez_column_index = self.gene_attributes.index('gene_id')
         except ValueError as e:
-            raise ValueError("Make sure 'ncbi_id' is set in gene.GENE_MATCHER_HEADER")
+            raise ValueError("Make sure 'ncbi_id' is set in owgenes_header")
 
         self.genes = None
         self.table = None
@@ -61,7 +74,7 @@ class GeneInfoModel(itemmodels.PyTableModel):
 
     def initialize(self, list_of_genes):
         self.genes = list_of_genes
-        self.__table_from_genes([gene for gene in list_of_genes if gene.ncbi_id])
+        self.__table_from_genes([gene for gene in list_of_genes if gene.gene_id])
         self.update_model()
 
     def rowCount(self, parent=QModelIndex()):
@@ -143,7 +156,7 @@ class UnknownGeneInfoModel(itemmodels.PyListModel):
 
     def initialize(self, list_of_genes):
         self.genes = list_of_genes
-        self.wrap([', '.join([gene.input_name for gene in list_of_genes if not gene.ncbi_id])])
+        self.wrap([', '.join([gene.input_identifier for gene in list_of_genes if not gene.gene_id])])
 
     def data(self, index, role=Qt.DisplayRole):
         row = index.row()
@@ -161,7 +174,7 @@ class UnknownGeneInfoModel(itemmodels.PyListModel):
         return QAbstractTableModel.headerData(self, section, orientation, role)
 
 
-class OWGenes(OWWidget):
+class OWGenes(OWWidget, ConcurrentWidgetMixin):
     name = "Genes"
     description = "Tool for working with genes"
     icon = "../widgets/icons/OWGeneInfo.svg"
@@ -196,9 +209,11 @@ class OWGenes(OWWidget):
         return QSize(1280, 960)
 
     def __init__(self):
-        super().__init__()
+        OWWidget.__init__(self)
+        ConcurrentWidgetMixin.__init__(self)
+
         # ATTRIBUTES #
-        self.target_database = NCBI_ID
+        self.target_database = ENTREZ_ID
 
         # input data
         self.input_data = None
@@ -211,10 +226,6 @@ class OWGenes(OWWidget):
 
         # gene matcher
         self.gene_matcher = None
-
-        # threads
-        self.threadpool = QThreadPool(self)
-        self.workers = None
 
         # progress bar
         self.progress_bar = None
@@ -340,18 +351,7 @@ class OWGenes(OWWidget):
 
         self.info_box.setText(info_text)
 
-    def _progress_advance(self):
-        # GUI should be updated in main thread. That's why we are calling advance method here
-        if self.progress_bar:
-            self.progress_bar.advance()
-
-    def _handle_matcher_results(self):
-        assert threading.current_thread() == threading.main_thread()
-
-        if self.progress_bar:
-            self.progress_bar.finish()
-            self.setStatusMessage('')
-
+    def on_done(self, _):
         # update info box
         self._update_info_box()
 
@@ -406,31 +406,22 @@ class OWGenes(OWWidget):
 
     def _update_gene_matcher(self):
         self.gene_names_from_table()
-        self.gene_matcher = GeneMatcher(self.get_selected_organism(), case_insensitive=True)
+
+        self.gene_matcher = GeneMatcher(self.get_selected_organism(), auto_start=False)
         self.gene_matcher.genes = self.input_genes
-        self.gene_matcher.organism = self.get_selected_organism()
+        # self.gene_matcher.organism = self.get_selected_organism()
 
     def get_selected_organism(self):
         return self.organisms[self.selected_organism]
 
-    def match_genes(self):
-        if self.gene_matcher:
-            # init progress bar
-            self.progress_bar = ProgressBar(self, iterations=len(self.gene_matcher.genes))
-            # status message
-            self.setStatusMessage('Gene matcher running')
-
-            worker = Worker(self.gene_matcher.run_matcher, progress_callback=True)
-            worker.signals.progress.connect(self._progress_advance)
-            worker.signals.finished.connect(self._handle_matcher_results)
-
-            # move download process to worker thread
-            self.threadpool.start(worker)
+    def _run(self):
+        if self.gene_matcher is not None:
+            self.start(run_gene_matcher, self.gene_matcher)
 
     def on_input_option_change(self):
         self.__reset_widget_state()
         self._update_gene_matcher()
-        self.match_genes()
+        self._run()
 
     def gene_column_identifier(self):
         """
@@ -541,14 +532,14 @@ class OWGenes(OWWidget):
                 table = self.input_data.transform(domain)
 
                 for gene in self.gene_matcher.genes:
-                    if gene.input_name in table.domain:
+                    if gene.input_identifier in table.domain:
 
-                        table.domain[gene.input_name].attributes[self.target_database] = \
-                            str(gene.ncbi_id) if gene.ncbi_id else '?'
+                        table.domain[gene.input_identifier].attributes[self.target_database] = \
+                            str(gene.gene_id) if gene.gene_id else '?'
 
                         if self.replace_id_with_symbol:
                             try:
-                                table.domain[gene.input_name].name = str(gene.symbol)
+                                table.domain[gene.input_identifier].name = str(gene.symbol)
                             except AttributeError:
                                 # TODO: missing gene symbol, need to handle this?
                                 pass
@@ -591,7 +582,7 @@ class OWGenes(OWWidget):
             self.exclude_unmatched = len(self.gene_matcher.genes) != len(self.gene_matcher.get_known_genes())
 
     def get_target_ids(self):
-        return [str(gene.ncbi_id) if gene.ncbi_id else '?' for gene in self.gene_matcher.genes]
+        return [str(gene.gene_id) if gene.gene_id else '?' for gene in self.gene_matcher.genes]
 
 
 if __name__ == "__main__":

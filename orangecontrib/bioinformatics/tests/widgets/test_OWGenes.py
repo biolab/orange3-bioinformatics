@@ -1,10 +1,14 @@
 import unittest
 import os
 
-from orangecontrib.bioinformatics.ncbi.gene import GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, TAX_ID
-from orangecontrib.bioinformatics.widgets.OWGenes import OWGenes
 from Orange.widgets.tests.base import WidgetTest
 from Orange.data import Table
+
+
+from orangecontrib.bioinformatics.widgets.OWGenes import OWGenes
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN
+)
 
 
 class TestOWGenes(WidgetTest):
@@ -34,9 +38,10 @@ class TestOWGenes(WidgetTest):
         genes, _ = self.widget.input_data.get_column_view(self.widget.selected_gene_col)
         self.assertEqual(len(self.widget.input_genes), len(genes))
 
+        self.wait_until_stop_blocking()
         # wait for gene matcher to finish
-        self.widget.threadpool.waitForDone()
-        self.process_events()
+        # self.widget.threadpool.waitForDone()
+        # self.process_events()
 
         # gene matcher should map all of the marker names into corresponding Entrez ID
         self.gene_match_result = self.widget.gene_matcher.get_known_genes()
@@ -51,7 +56,7 @@ class TestOWGenes(WidgetTest):
 
         # test if genes in the output data is the same as known genes from gene matcher.
         ids, _ = out_data.get_column_view(self.target_db)
-        self.assertTrue((ids == [str(g.ncbi_id) for g in self.gene_match_result]).all())
+        self.assertTrue((ids == [str(g.gene_id) for g in self.gene_match_result]).all())
 
         # test if table on the output is properly annotated
         table_annotations = out_data.attributes

@@ -315,7 +315,7 @@ class Ontology:
             try:
                 self.alias_mapper.update([(alt_id, id)
                                           for alt_id in term.alt_id])
-                self.reverse_alias_mapper[id].union_update(term.alt_id)
+                self.reverse_alias_mapper[id].update(term.alt_id)
             except AttributeError:
                 pass
             if progress_callback and i in milestones:
@@ -502,10 +502,7 @@ class Annotations:
     :type ontology: :class:`Ontology`
 
     """
-
-    def __init__(self, organism, ontology=None, progress_callback=None):
-        self.ontology = ontology
-
+    def __init__(self, organism, ontology=None, progress_callback=None, filename=None):
         #: A dictionary mapping a gene (gene_id) to a set of all annotations of that gene.
         self.gene_annotations = defaultdict(list)
 
@@ -522,16 +519,17 @@ class Annotations:
         self.header = ''
         self.taxid = organism
 
-        self._ontology = None
+        self._ontology = ontology
 
-        try:
-            path = serverfiles.localpath_download(DOMAIN,
-                                                  FILENAME_ANNOTATION.format(organism),
-                                                  progress_callback=progress_callback)
-        except FileNotFoundError:
-            raise taxonomy.UnknownSpeciesIdentifier(organism)
+        if filename is None:
+            try:
+                filename = serverfiles.localpath_download(DOMAIN,
+                                                          FILENAME_ANNOTATION.format(organism),
+                                                          progress_callback=progress_callback)
+            except FileNotFoundError:
+                raise taxonomy.UnknownSpeciesIdentifier(organism)
 
-        self._parse_file(path)
+        self._parse_file(filename)
 
     @property
     def ontology(self):

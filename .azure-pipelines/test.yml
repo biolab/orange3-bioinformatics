@@ -4,11 +4,11 @@ steps:
   displayName: 'Install testing tools'
   continueOnError: false
 
-- script: catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" pytest orangecontrib/bioinformatics/tests --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
+- script: catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" pytest orangecontrib/bioinformatics/tests -vl -ra --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
   condition: in(variables['Agent.OS'], 'Linux')
   displayName: 'Run pytest'
 
-- script: pytest orangecontrib/bioinformatics/tests --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
+- script: pytest orangecontrib/bioinformatics/tests -vl -ra --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
   condition: in(variables['Agent.OS'], 'Darwin', 'Windows_NT')
   displayName: 'Run pytest'
 

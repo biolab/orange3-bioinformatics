@@ -1,5 +1,5 @@
 DOMAIN = "taxonomy"
-FILENAME = "ncbi-taxonomy.sqlite"
+FILENAME = "taxonomy.sqlite"
 TAXDUMP_URL = "http://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
 
 DEFAULT_ORGANISM = '9606'
@@ -12,7 +12,7 @@ COMMON_NAMES = (
     ("5476",   "Candida albicans"),
     ("3055",   "Chlamydomonas reinhardtii"),
     ("7955",   "Danio rerio"),
-    ("352472", "Dictyostelium discoideum AX4"),
+    ("44689", "Dictyostelium discoideum"),
     ("7227",   "Drosophila melanogaster"),
     ("562",    "Escherichia coli"),
     ("11103",  "Hepatitis C virus"),
@@ -39,7 +39,7 @@ SHORT_NAMES = {
     "5476":   ["thrush", "candidiasis", "candida"],
     "3055":   ["algae"],
     "7955":   ["zebrafish"],
-    "352472": ["dicty", "amoeba", "slime mold"],
+    "44689":  ["dicty", "amoeba", "slime mold"],
     "7227":   ["fly", "fruit fly", "vinegar fly"],
     "562":    ["ecoli", "coli", "bacterium"],
     "11103":  ["virus, hepatitis"],

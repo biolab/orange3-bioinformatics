@@ -9,7 +9,7 @@ class TestOWMarkerGenes(WidgetTest):
         self.widget = self.create_widget(OWMarkerGenes)
 
         self.cell_marker_db = 'CellMarker'
-        self.panglao_db = 'PanglaoDB'
+        self.panglao_db = 'Panglao'
 
     def test_data_not_empty(self):
         w = self.widget

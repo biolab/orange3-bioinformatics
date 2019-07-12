@@ -25,7 +25,7 @@ from Orange.widgets import gui
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
-from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids, common_taxid_to_name, taxname_to_taxid
+from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids, common_taxid_to_name, species_name_to_taxid
 from orangecontrib.bioinformatics.go.config import FILENAME_ANNOTATION, DOMAIN as gene_ontology_domain
 from orangecontrib.bioinformatics.geneset import filename
 from orangecontrib.bioinformatics.geneset.config import DOMAIN as gene_sets_domain
@@ -862,7 +862,7 @@ class FileUploadHelper(QDialog):
     def __parse_selection(self):
         try:
             domain = self.__get_selected_domain()
-            organism = taxname_to_taxid(self.supported_organisms[self.organism_selection.currentIndex()])
+            organism = species_name_to_taxid(self.supported_organisms[self.organism_selection.currentIndex()])
         except KeyError as e:
             raise e
 
