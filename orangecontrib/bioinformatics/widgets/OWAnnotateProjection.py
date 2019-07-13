@@ -358,6 +358,8 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         no_continuous_vars = Msg("Data has no continuous variables.")
         not_enough_inst = Msg("Not enough instances in Reference data.")
         proj_error = Msg("An error occurred while annotating data.\n{}")
+        sec_proj_error = Msg("An error occurred while projecting "
+                             "Secondary data.\n{}")
 
     def __init__(self):
         OWDataProjectionWidget.__init__(self)
@@ -682,6 +684,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
         self.Warning.missing_compute_value.clear()
         self.Warning.same_axis_features.clear()
+        self.Error.sec_proj_error.clear()
         if not self.data:
             self.valid_data = None
             return None
@@ -692,8 +695,12 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         if self.secondary_data and self.reference_data:
             if no_embedding_attrs():
                 self.Warning.missing_compute_value(self.attr_x, self.attr_y)
-            domain = self.reference_data.domain
-            self.data = self.secondary_data.transform(domain)
+            try:
+                domain = self.reference_data.domain
+                self.data = self.secondary_data.transform(domain)
+            except Exception as ex:
+                self.Error.sec_proj_error(ex)
+                return None
 
         x_data = self.get_column(self.attr_x, filter_valid=False)
         y_data = self.get_column(self.attr_y, filter_valid=False)
