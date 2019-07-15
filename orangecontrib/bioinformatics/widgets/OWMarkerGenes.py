@@ -193,7 +193,21 @@ class OWMarkerGenes(widget.OWWidget):
         self.group_index = -1
         self.group_cb = gui.comboBox(box, self, 'group_index')
         self.group_cb.activated[int].connect(self.set_group_index)
+
+        box = gui.widgetBox(self.controlArea, 'Filter options', margin=0)
+        self.filter_commit = False
+        gui.checkBox(box, self, "filter_commit",
+                            "Auto commit filter results")
+
         gui.rubber(self.controlArea)
+
+        self.clearButton = gui.button(
+            None, self, "Clear selection",
+            callback=self.clear_selection,
+            tooltip="Deselect all selected rows.",
+            autoDefault = False
+        )
+        self.buttonsArea.layout().insertWidget(0, self.clearButton)
 
         # TODO: to avoid this, marker genes table should have 'tax_id' column
         self.map_group_to_taxid = {'Human': '9606', 'Mouse': '10090'}
@@ -345,6 +359,10 @@ class OWMarkerGenes(widget.OWWidget):
                 selection, QItemSelectionModel.ClearAndSelect
             )
 
+    def clear_selection(self):
+        self.view.selectionModel().clearSelection()
+        self.commit()
+
     def handle_source_changed(self, source_index):
         self.set_db_source_index(source_index)
         self._load_data()
@@ -370,6 +388,8 @@ class OWMarkerGenes(widget.OWWidget):
         model = self.view.model()
         assert isinstance(model, SearchableTableModel)
         model.update_model(str(self.filter_text))
+        if self.filter_commit:
+            self.commit()
 
     def _setup(self):
         self.closeContext()
@@ -434,7 +454,7 @@ class OWMarkerGenes(widget.OWWidget):
 
         if rows:
             rows = model.mapToSourceRows(rows)
-            output = model.source[rows]
+            output = model._data[rows]
         else:
             output = model.source
 
