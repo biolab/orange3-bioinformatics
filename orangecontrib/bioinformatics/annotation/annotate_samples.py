@@ -287,6 +287,9 @@ class AnnotateSamples:
         """
         assert TAX_ID in data.attributes, "The input table needs to have a " \
                                           "tax_id attribute"
+        assert any(
+            "Entrez ID" in x.attributes for x in data.domain.attributes),\
+            "Input data do not contain gene expression data."
         tax_id = data.attributes[TAX_ID]
 
         # select function for p-value
