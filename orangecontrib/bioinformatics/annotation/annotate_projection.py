@@ -39,7 +39,7 @@ In case when user uses a DBSCAN algorithm and do not provide eps to the
 ...     clustering_algorithm=DBSCAN)
 
 """
-from bisect import bisect
+from bisect import bisect_left, bisect_right
 from collections import Counter
 
 from Orange.clustering import DBSCAN
@@ -229,6 +229,132 @@ def get_epsilon(coordinates, k=10, skip=0.1):
     return kth_dist[-int(np.round(len(kth_dist) * skip))]
 
 
+def _angle(v1, v2):
+    """
+    Compute clockwise angles between v1 and v2. Both vectors are
+    given as a tuple with two points ([x1, y1], [x2, y2]) such that
+    [x2, y2] of v1 == [x1, y1] of v2.
+    The angle is given in degrees between 0 and 2 * pi
+    """
+    v1, v2 = np.array(v1), np.array(v2)
+    x1, y1 = v1[0] - v1[1]
+    x2, y2 = v2[1] - v2[0]
+    dot = np.sum(x1 * x2 + y1 * y2)  # dot product
+    det = x1 * y2 - y1 * x1  # determinant
+    angle = np.arctan2(det, dot)  # atan2(y, x) or atan2(sin, cos)
+    return - angle if angle <= 0 else np.pi + np.pi - angle
+
+
+def _find_hull(edges_list, points_list, starting_edge):
+    """
+    This function return a single hull which starts and ends in
+    the starting_edge.
+
+    Parameters
+    edges_list : list
+        List of edges. Each edge is presented as a tuple of two indices which
+        tell the starting and ending note. The index correspond to location
+        of point in points_list. This list must be sorted in the ascending
+        order.
+    points_list : list
+        List of points location. Each point has x and y location.
+    starting_edge : int
+        The index of the list where hull starts.
+
+    Returns
+    -------
+    np.ndarray
+        The array with the hull/polygon points
+    list
+        List of booleans that indicates whether each point was used or not in
+        the resulting polygon.
+    """
+    firsts = [x[0] for x in edges_list]  # first elements for bisection
+    used_edges = [False] * len(edges_list)
+    used_edges[starting_edge] = True
+
+    # remember start and next point
+    # start point is required for stop condition
+    start, next_point = edges_list[starting_edge]
+
+    # remember current polygon around points
+    poly = [points_list[start], points_list[next_point]]
+
+    # we count number of steps to stop iteration in case it is locked
+    # in some dead cycle. It can be a result of some unexpected cases.
+    count = 0
+    while start != next_point and count < len(edges_list):
+        # find the index where the first value equal to next_point
+        # appear
+        ind_left = bisect_left(firsts, next_point)
+        # find the index next to the last value
+        ind_right = bisect_right(firsts, next_point)
+
+        # check if there are more edges available from the same point
+        if ind_right - ind_left > 1:
+            # select the most distant one in clockwise direction
+            # it is probably the point on the outer hull
+            # with this we prevent a hull to discover cycles inside
+            # a polygon
+            ang = -1
+            for i in range(ind_left, ind_right):
+                cur_ang = _angle(
+                    (poly[-2], poly[-1]),
+                    (poly[-1], points_list[edges_list[i][1]]))
+                if cur_ang > ang:
+                    ang = cur_ang
+                    ind_left = i
+        # save a next point of the polgon
+        used_edges[ind_left] = True
+        next_point = edges_list[ind_left][1]
+        poly.append(points_list[next_point])
+        count += 1
+    return np.array(poly), used_edges
+
+
+def edges_to_polygon(edges_list, points_list):
+    """
+    This function connect edges in polygons. It computes all possible hulls -
+    yes some clusters have more of them when they have a hole in the middle.
+    It then selects one that is outer hull.
+
+    Parameters
+    ----------
+    edges_list : list
+        List of edges. Each edge is presented as a tuple of two indices which
+        tell the starting and ending note. The index correspond to location
+        of point in points_list
+    points_list : list
+        List of points location. Each point has x and y location.
+
+    Returns
+    -------
+    np.ndarray
+        The array with the hull/polygon points.
+    """
+    # sort based on first element of tuple to enable bisection search
+    edges_list = sorted(edges_list, key=lambda x: x[0])
+    # need to use all edges
+    used = [False] * len(edges_list)
+
+    # it is possible that we will find more separate hulls -
+    # it happen in cases when a polygon has inner cycles
+    polygons = []
+    while not all(used):
+        i = used.index(False)
+        poly, new_used = _find_hull(
+            edges_list, points_list, i)
+        polygons.append(poly)
+        used = [u1 or u2 for u1, u2 in zip(used, new_used)]
+
+    # select polygon that is outside - the widest and the highest is the
+    # most outside
+    height_width = [np.sum(p.max(axis=0) - p.min(axis=0)) for p in polygons]
+    i = height_width.index(max(height_width))
+
+    return polygons[i]
+
+
 def compute_concave_hulls(coordinates, clusters, epsilon):
     """
     Function computes the points of the concave hull around points.
@@ -269,24 +395,10 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
                 return
             edges_list.add((i, j))
 
-        def edges_to_poygon(edges_list, points_list):
-            """
-            This function just connect edges in polygon
-            """
-            # sort based on first element of tuple to enable bisection search
-            edges_list = sorted(edges_list, key=lambda x: x[0])
-            start, next_point = edges_list[0]
-            poly = [points_list[start], points_list[next_point]]
-            while start != next_point:
-                ind = bisect(edges_list, (next_point,))
-                next_point = edges_list[ind][1]
-                poly.append(points_list[next_point])
-            return np.array(poly)
-
         if len(pts) < 4:
             # When you have a triangle, there is no sense in computing the hull
             rng = list(range(3))
-            return edges_to_poygon(zip(rng, rng[1:] + rng[:1]), pts)
+            return edges_to_polygon(zip(rng, rng[1:] + rng[:1]), pts)
 
         tri = Delaunay(pts)
         edges = set()
@@ -308,7 +420,7 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
                 add_edge(edges, ib, ic)
                 add_edge(edges, ic, ia)
 
-        polygon = edges_to_poygon(edges, pts)
+        polygon = edges_to_polygon(edges, pts)
         return polygon
 
     hulls = {}

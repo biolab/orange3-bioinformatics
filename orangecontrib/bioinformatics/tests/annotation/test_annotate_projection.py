@@ -6,7 +6,7 @@ from Orange.data import Domain, ContinuousVariable, Table, DiscreteVariable
 
 from orangecontrib.bioinformatics.annotation.annotate_projection import \
     annotate_projection, labels_locations, get_epsilon, compute_concave_hulls, \
-    assign_labels, cluster_additional_points
+    assign_labels, cluster_additional_points, _angle
 
 
 class TestAnnotateProjection(unittest.TestCase):
@@ -305,3 +305,34 @@ class TestAnnotateProjection(unittest.TestCase):
         self.assertEqual(attr, clusters.domain.attributes[0])
         self.assertListEqual(
             attr.values, clusters.domain.attributes[0].values)
+
+    def test_angle(self):
+        # test cases with first vector from x, y = [1, 0] to x, y = [0, 0]
+        # and second from x, y = [0, 0] to points in test_cases
+        v1 = ([1, 0], [0, 0])
+        v2_1 = [0, 0]
+        test_cases = [[1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1],
+                      [0, 1], [1, 1]]
+        real_angles = [np.pi * i / 4 for i in range(8)]
+        computed_angles = [
+            _angle(v1, (v2_1, x)) for x in test_cases]
+        np.testing.assert_array_almost_equal(computed_angles, real_angles)
+
+        # test cases with first vector from x, y = [2, 2] to x, y = [1, 2]
+        # and second from x, y = [1, 2] to points in test_cases
+        v1 = ([2, 2], [1, 2])
+        v2_1 = np.array([1, 2])
+        test_cases = np.array([[1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1],
+                               [0, 1], [1, 1]]) + v2_1
+        real_angles = [np.pi * i / 4 for i in range(8)]
+        computed_angles = [
+            _angle(v1, (v2_1, x)) for x in test_cases]
+        np.testing.assert_array_almost_equal(computed_angles, real_angles)
+
+        # some more complex cases
+        self.assertAlmostEqual(
+            _angle(([-2, 1], [0, 0]), ([0, 0], [1, 2])), np.pi / 2)
+        self.assertAlmostEqual(
+            _angle(([-4, 1], [-2, 0]), ([-2, 0], [-1, 2])), np.pi / 2)
+        self.assertAlmostEqual(
+            _angle(([-4, 3], [-2, 2]), ([-2, 2], [-1, 4])), np.pi / 2)
