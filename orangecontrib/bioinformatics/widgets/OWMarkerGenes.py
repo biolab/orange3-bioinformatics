@@ -84,12 +84,14 @@ class SearchableTableModel(TableModel):
             partial(defaultdict, partial(defaultdict, lambda: None)),
         )(self._roleData)
         self.set_column_links()
+        self.source = data
 
     def set_column_links(self):
         domain = self._data.domain
         ref_col = domain.metas.index(
             domain[HeaderLabels[HeaderIndex.REFERENCE]]
         )
+
         font = QFont()
         font.setUnderline(True)
         color = QColor(Qt.blue)
@@ -171,6 +173,7 @@ class OWMarkerGenes(widget.OWWidget):
     selected_db_source: str = settings.Setting('')
     filter_text: str = settings.Setting('')
     header_state: bytes = settings.Setting(b'')
+    auto_commit = settings.Setting(True)
 
     settingsHandler = MarkerGroupContextHandler()
     selected_genes: List[tuple] = settings.ContextSetting([])
@@ -183,7 +186,8 @@ class OWMarkerGenes(widget.OWWidget):
         self._timer = QTimer()
         self._timer.timeout.connect(self._filter_table)
         self._timer.setSingleShot(True)
-
+        self.info.set_input_summary(self.info.NoInput)
+        self.info.set_output_summary(self.info.NoInput)
         box = gui.widgetBox(self.controlArea, 'Database', margin=0)
         self.db_source_index = -1
         self.db_source_cb = gui.comboBox(box, self, 'db_source_index')
@@ -194,21 +198,20 @@ class OWMarkerGenes(widget.OWWidget):
         self.group_cb = gui.comboBox(box, self, 'group_index')
         self.group_cb.activated[int].connect(self.set_group_index)
 
-        box = gui.widgetBox(self.controlArea, 'Filter options', margin=0)
-        self.filter_commit = False
-        gui.checkBox(box, self, "filter_commit",
-                            "Auto commit filter results")
-
         gui.rubber(self.controlArea)
 
-        self.clearButton = gui.button(
-            None, self, "Clear selection",
-            callback=self.clear_selection,
-            tooltip="Deselect all selected rows.",
-            autoDefault = False
-        )
-        self.buttonsArea.layout().insertWidget(0, self.clearButton)
+        gui.button(
+            self.controlArea, self, "Select all", callback=self.select_all,
+            tooltip="Select all genes", autoDefault=False)
 
+        gui.button(
+            self.controlArea, self, "Clear selection",
+            callback=self.select_all,
+            tooltip="Deselect all selected rows.",
+            autoDefault=False
+        )
+        gui.auto_commit(self.controlArea, self, "auto_commit", "Commit",
+                        "Commit Automatically")
         # TODO: to avoid this, marker genes table should have 'tax_id' column
         self.map_group_to_taxid = {'Human': '9606', 'Mouse': '10090'}
 
@@ -363,6 +366,10 @@ class OWMarkerGenes(widget.OWWidget):
         self.view.selectionModel().clearSelection()
         self.commit()
 
+    def select_all(self):
+        self.view.selectAll()
+        self.commit()
+
     def handle_source_changed(self, source_index):
         self.set_db_source_index(source_index)
         self._load_data()
@@ -388,8 +395,15 @@ class OWMarkerGenes(widget.OWWidget):
         model = self.view.model()
         assert isinstance(model, SearchableTableModel)
         model.update_model(str(self.filter_text))
-        if self.filter_commit:
-            self.commit()
+        # if self.filter_commit:
+        self.commit()
+        self.update_data_info()
+
+    def update_data_info(self):
+        filtered_data = len(self.view.model().source)
+        all_data = len(self.view.model()._data)
+        self.info.set_input_summary(f"Shown : {str(filtered_data)}/{str(all_data)}")
+        self.info.set_output_summary("Selected: "+str(len(self.selected_genes)))
 
     def _setup(self):
         self.closeContext()
@@ -425,9 +439,13 @@ class OWMarkerGenes(widget.OWWidget):
         self.set_selection()
 
         self.commit()
+        if len(self.selected_genes) < 1:
+            self.select_all()
 
     def _on_selection_changed(self):
+
         self.commit()
+        self.update_data_info()
 
     def selected_rows(self):
         """ Return row index for selected genes
