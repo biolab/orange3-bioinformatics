@@ -470,11 +470,12 @@ class OWMarkerGenes(widget.OWWidget):
         assert isinstance(model, SearchableTableModel)
         rows = [mi.row() for mi in self.view.selectionModel().selectedRows(0)]
 
-        if rows:
+        if rows and len(rows) != len(model.source):
             rows = model.mapToSourceRows(rows)
-            output = model._data[rows]
+            output = model.source[rows]
         else:
             output = model.source
+            self.view.selectAll()
 
         gene_id = self.view.selectionModel().selectedRows(HeaderIndex.GENE)
         cell_type = self.view.selectionModel().selectedRows(
