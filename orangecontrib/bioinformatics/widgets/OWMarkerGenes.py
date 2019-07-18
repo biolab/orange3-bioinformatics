@@ -139,6 +139,12 @@ class SearchableTableModel(TableModel):
         self.wrap(self._data[self.filter_table(filter_pattern).any(axis=1), :])
         self.set_column_links()
 
+    def __len__(self):
+        return len(self._data)
+
+    def get_source_length(self):
+        return  len(self.source)
+
 
 class MarkerGroupContextHandler(settings.ContextHandler):
     def __init__(self):
@@ -187,7 +193,7 @@ class OWMarkerGenes(widget.OWWidget):
         self._timer.setSingleShot(True)
         self.info.set_input_summary(self.info.NoInput)
         self.info.set_output_summary(self.info.NoInput)
-        self.clearAll = False
+        self.output = None
         box = gui.widgetBox(self.controlArea, 'Database', margin=0)
         self.db_source_index = -1
         self.db_source_cb = gui.comboBox(box, self, 'db_source_index')
@@ -363,20 +369,23 @@ class OWMarkerGenes(widget.OWWidget):
             )
 
     def clear_selection(self):
-        self.clearAll = True
         self.view.reset()
         self.view.selectionModel().clear()
-
+        self.output = None
         self.commit()
         self.update_data_info()
 
     def select_all(self):
         self.view.selectAll()
+        self.update_model()
         self.commit()
 
     def handle_source_changed(self, source_index):
         self.set_db_source_index(source_index)
         self._load_data()
+        self._setup()
+        self.update_model()
+        self.select_all()
 
     def set_db_source_index(self, source_index):
         self.closeContext()
@@ -388,6 +397,8 @@ class OWMarkerGenes(widget.OWWidget):
         self.group_index = group_index
         self.selected_group = self.group_cb.itemText(group_index)
         self._setup()
+        self.update_model()
+        self.select_all()
 
     def call_filter_timer(self, search_string):
         self._timer.stop()
@@ -399,13 +410,13 @@ class OWMarkerGenes(widget.OWWidget):
         model = self.view.model()
         assert isinstance(model, SearchableTableModel)
         model.update_model(str(self.filter_text))
+        self.update_model()
         self.commit()
         self.update_data_info()
 
     def update_data_info(self):
-        filtered_data = len(self.view.model().source)
-        all_data = len(self.view.model()._data)
-        self.info.set_input_summary(f"Shown : {str(filtered_data)}/{str(all_data)}")
+        model = self.view.model()
+        self.info.set_input_summary(f"Shown : {str(model.get_source_length())}/{str(len(model))}")
         self.info.set_output_summary(f"Selected: {str(len(self.selected_genes))}")
 
     def _setup(self):
@@ -441,12 +452,13 @@ class OWMarkerGenes(widget.OWWidget):
         self.view.hideColumn(HeaderIndex.URL)
         self.set_selection()
 
+        self.update_model()
         self.commit()
         if len(self.selected_genes) < 1:
             self.select_all()
 
     def _on_selection_changed(self):
-
+        self.update_model()
         self.commit()
         self.update_data_info()
 
@@ -469,14 +481,16 @@ class OWMarkerGenes(widget.OWWidget):
         ]
 
     def commit(self):
+        self.Outputs.genes.send(self.output)
+
+    def update_model(self):
         model = self.view.model()
         assert isinstance(model, SearchableTableModel)
         rows = [mi.row() for mi in self.view.selectionModel().selectedRows(0)]
 
-        if (rows and len(rows) != len(model.source)) or self.clearAll:
+        if rows and len(rows) != len(model.source):
             rows = model.mapToSourceRows(rows)
             output = model.source[rows]
-            self.clearAll = False
         else:
             output = model.source
             self.view.selectAll()
@@ -502,14 +516,15 @@ class OWMarkerGenes(widget.OWWidget):
         output.attributes[GENE_ID_COLUMN] = HeaderLabels[HeaderIndex.GENE]
         output.name = 'Marker Genes'
 
-        self.Outputs.genes.send(output)
+        self.output = output
+
 
     def closeEvent(self, event):
         self.header_state = bytes(self.view.header().saveState())
         super().closeEvent(event)
 
     def sizeHint(self):
-        return super().sizeHint().expandedTo(QSize(600, 500))
+        return super().sizeHint().expandedTo(QSize(750, 500))
 
 
 def main(argv=None):
