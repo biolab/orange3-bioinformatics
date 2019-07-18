@@ -84,7 +84,6 @@ class SearchableTableModel(TableModel):
             partial(defaultdict, partial(defaultdict, lambda: None)),
         )(self._roleData)
         self.set_column_links()
-        self.source = data
 
     def set_column_links(self):
         domain = self._data.domain
@@ -188,6 +187,7 @@ class OWMarkerGenes(widget.OWWidget):
         self._timer.setSingleShot(True)
         self.info.set_input_summary(self.info.NoInput)
         self.info.set_output_summary(self.info.NoInput)
+        self.clearAll = False
         box = gui.widgetBox(self.controlArea, 'Database', margin=0)
         self.db_source_index = -1
         self.db_source_cb = gui.comboBox(box, self, 'db_source_index')
@@ -206,7 +206,7 @@ class OWMarkerGenes(widget.OWWidget):
 
         gui.button(
             self.controlArea, self, "Clear selection",
-            callback=self.select_all,
+            callback=self.clear_selection,
             tooltip="Deselect all selected rows.",
             autoDefault=False
         )
@@ -363,8 +363,12 @@ class OWMarkerGenes(widget.OWWidget):
             )
 
     def clear_selection(self):
-        self.view.selectionModel().clearSelection()
+        self.clearAll = True
+        self.view.reset()
+        self.view.selectionModel().clear()
+
         self.commit()
+        self.update_data_info()
 
     def select_all(self):
         self.view.selectAll()
@@ -395,7 +399,6 @@ class OWMarkerGenes(widget.OWWidget):
         model = self.view.model()
         assert isinstance(model, SearchableTableModel)
         model.update_model(str(self.filter_text))
-        # if self.filter_commit:
         self.commit()
         self.update_data_info()
 
@@ -403,7 +406,7 @@ class OWMarkerGenes(widget.OWWidget):
         filtered_data = len(self.view.model().source)
         all_data = len(self.view.model()._data)
         self.info.set_input_summary(f"Shown : {str(filtered_data)}/{str(all_data)}")
-        self.info.set_output_summary("Selected: "+str(len(self.selected_genes)))
+        self.info.set_output_summary(f"Selected: {str(len(self.selected_genes))}")
 
     def _setup(self):
         self.closeContext()
@@ -470,9 +473,10 @@ class OWMarkerGenes(widget.OWWidget):
         assert isinstance(model, SearchableTableModel)
         rows = [mi.row() for mi in self.view.selectionModel().selectedRows(0)]
 
-        if rows and len(rows) != len(model.source):
+        if (rows and len(rows) != len(model.source)) or self.clearAll:
             rows = model.mapToSourceRows(rows)
             output = model.source[rows]
+            self.clearAll = False
         else:
             output = model.source
             self.view.selectAll()
