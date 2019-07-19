@@ -6,7 +6,7 @@ marker genes.
 
 **Inputs**
 - Reference Data: Data set with gene expression values.
-- Secondary Data Subset: Subset of instances (optional).
+- Secondary Data: Subset of instances (optional).
 - Genes: Marker genes.
 
 **Outputs**
@@ -69,7 +69,7 @@ the report.
 7. The main view shows you data clustered data items. Each cluster
 is surrounded by a hull and has assigned *Cell type* labels shown.
 
-## Example
+## Examples
 
 In this example *Single Cell Datasets* widget provides *Bone marrow
 mononuclear cells with AML (sample)* gene expression dataset and *t-SNE*
@@ -82,3 +82,18 @@ Clusters labels show annotation with the most common label in the
 cluster.
 
 ![](images/annotate_projection/annotator-example.png)
+
+The second example shows how to use *Secondary Data* input
+of the widget. We load data with two *Single Cell Datasets* widgets.
+First widget loads *Cell cycle in mESC (Fluidigm)* data which are used
+as primary data. The second widget loads
+*Cell cycle in mESC (QuartzSeq)* dataset for secondary data input.
+After data are loaded, we normalize them with the
+*Single Cell Preprocess* widget and map the reference data to
+two-dimensional space with the t-SNE projection. Projecting the
+secondary data is not required since the Annotator widget projects
+them in the reference space. The Annotator window shows the mapping of
+secondary data (colored points) to clusters generated on the reference
+data.
+
+![](images/annotate_projection/annotator-example2.png)
