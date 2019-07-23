@@ -3,7 +3,7 @@ import sys
 import numpy as np
 
 
-from typing import List
+from typing import Set
 from collections import defaultdict
 from functools import partial
 
@@ -139,11 +139,8 @@ class SearchableTableModel(TableModel):
         self.wrap(self._data[self.filter_table(filter_pattern).any(axis=1), :])
         self.set_column_links()
 
-    def __len__(self):
+    def data_length(self):
         return len(self._data)
-
-    def get_source_length(self):
-        return  len(self.source)
 
 
 class MarkerGroupContextHandler(settings.ContextHandler):
@@ -181,19 +178,20 @@ class OWMarkerGenes(widget.OWWidget):
     auto_commit = settings.Setting(True)
 
     settingsHandler = MarkerGroupContextHandler()
-    selected_genes: List[tuple] = settings.ContextSetting([])
+    selected_genes: Set[tuple] = settings.ContextSetting(set())
 
     def __init__(self):
         super().__init__()
         self._data = None
         self._available_db_sources = None
+        self.output = None
 
         self._timer = QTimer()
         self._timer.timeout.connect(self._filter_table)
         self._timer.setSingleShot(True)
         self.info.set_input_summary(self.info.NoInput)
         self.info.set_output_summary(self.info.NoInput)
-        self.output = None
+
         box = gui.widgetBox(self.controlArea, 'Database', margin=0)
         self.db_source_index = -1
         self.db_source_cb = gui.comboBox(box, self, 'db_source_index')
@@ -372,6 +370,7 @@ class OWMarkerGenes(widget.OWWidget):
         self.view.reset()
         self.view.selectionModel().clear()
         self.output = None
+        self.selected_genes = set()
         self.commit()
         self.update_data_info()
 
@@ -379,13 +378,12 @@ class OWMarkerGenes(widget.OWWidget):
         self.view.selectAll()
         self.update_model()
         self.commit()
+        self.update_data_info()
 
     def handle_source_changed(self, source_index):
         self.set_db_source_index(source_index)
         self._load_data()
-        self._setup()
-        self.update_model()
-        self.select_all()
+        self.clear_selection()
 
     def set_db_source_index(self, source_index):
         self.closeContext()
@@ -397,8 +395,6 @@ class OWMarkerGenes(widget.OWWidget):
         self.group_index = group_index
         self.selected_group = self.group_cb.itemText(group_index)
         self._setup()
-        self.update_model()
-        self.select_all()
 
     def call_filter_timer(self, search_string):
         self._timer.stop()
@@ -410,13 +406,12 @@ class OWMarkerGenes(widget.OWWidget):
         model = self.view.model()
         assert isinstance(model, SearchableTableModel)
         model.update_model(str(self.filter_text))
-        self.update_model()
-        self.commit()
+        self.set_selection()
         self.update_data_info()
 
     def update_data_info(self):
         model = self.view.model()
-        self.info.set_input_summary(f"Shown : {str(model.get_source_length())}/{str(len(model))}")
+        self.info.set_input_summary(f"Shown : {str(len(model.source))}/{str(model.data_length())}")
         self.info.set_output_summary(f"Selected: {str(len(self.selected_genes))}")
 
     def _setup(self):
@@ -450,14 +445,8 @@ class OWMarkerGenes(widget.OWWidget):
         self.openContext(self.selected_group)
         self.call_filter_timer(self.filter_text)
         self.view.hideColumn(HeaderIndex.URL)
-        self.set_selection()
 
-        self.update_model()
-        self.commit()
-        if len(self.selected_genes) < 1:
-            self.select_all()
-
-    def _on_selection_changed(self):
+    def _on_selection_changed(self, *args):
         self.update_model()
         self.commit()
         self.update_data_info()
@@ -465,10 +454,11 @@ class OWMarkerGenes(widget.OWWidget):
     def selected_rows(self):
         """ Return row index for selected genes
         """
+        model = self.view.model()
+
         if not self.selected_genes:
             return []
 
-        model = self.view.model()
         return [
             row_index
             for row_index in range(model.rowCount())
@@ -493,18 +483,18 @@ class OWMarkerGenes(widget.OWWidget):
             output = model.source[rows]
         else:
             output = model.source
+            self.view.selectionModel().selectionChanged.disconnect(self._on_selection_changed)
             self.view.selectAll()
+            self.view.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
         gene_id = self.view.selectionModel().selectedRows(HeaderIndex.GENE)
-        cell_type = self.view.selectionModel().selectedRows(
-            HeaderIndex.CELL_TYPE
-        )
+        cell_type = self.view.selectionModel().selectedRows(HeaderIndex.CELL_TYPE)
         ref = self.view.selectionModel().selectedRows(HeaderIndex.REFERENCE)
 
-        self.selected_genes = [
+        self.selected_genes = {
             (entrez.data(), cell.data(), ref.data())
             for entrez, cell, ref in zip(gene_id, cell_type, ref)
-        ]
+        }
 
         # always false for marker genes data tables in single cell
         output.attributes[GENE_AS_ATTRIBUTE_NAME] = False
