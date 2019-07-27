@@ -1,0 +1,43 @@
+parameters:
+  name: ''
+  vmImage: ''
+
+jobs:
+
+- job: ${{ parameters.name }}_released
+  pool:
+    vmImage: ${{ parameters.vmImage }}
+  strategy:
+    matrix:
+      Python37:
+        python.version: '3.7'
+  steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(python.version)'
+        architecture: 'x64'
+
+    - template: install_addon.yml
+      parameters:
+          orange_version: 'released'
+
+    - template: test.yml
+    - template: build.yml
+
+# this job will only run if build with stable (released) Orange fails.
+- job: ${{ parameters.name }}_dev
+  dependsOn: ${{ parameters.name }}_released
+  condition: failed()
+
+  pool:
+    vmImage: ${{ parameters.vmImage }}
+  strategy:
+    matrix:
+      Python37:
+        python.version: '3.7'
+  steps:
+    - template: install_addon.yml
+      parameters:
+        orange_version: 'dev'
+
+    - template: test.yml

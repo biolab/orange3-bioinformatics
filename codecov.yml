@@ -8,3 +8,7 @@ coverage:
     project:
       default:
 target: auto
+
+codecov:
+  ci:
+    - dev.azure.com

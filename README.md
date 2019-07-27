@@ -1,8 +1,29 @@
 Orange3-bioinformatics
 =======================
-[![Build Status](https://travis-ci.org/biolab/orange3-bioinformatics.svg?branch=master)](https://travis-ci.org/biolab/orange3-bioinformatics)
-[![codecov](https://codecov.io/gh/biolab/orange3-bioinformatics/branch/master/graph/badge.svg)](https://codecov.io/gh/biolab/orange3-bioinformatics)
 
+<a href="https://dev.azure.com/orange-biolab/orange3-bioinformatics/">
+  <img src="https://dev.azure.com/orange-biolab/orange3-bioinformatics/_apis/build/status/biolab.orange3-bioinformatics?branchName=master" />
+</a>
+
+<a href='https://orange3-bioinformatics.readthedocs.io/en/latest/?badge=latest'>
+    <img src='https://readthedocs.org/projects/orange3-bioinformatics/badge/?version=latest' alt='Documentation Status' />
+</a>
+
+<a href="https://codecov.io/gh/biolab/orange3-bioinformatics">
+  <img src="https://codecov.io/gh/biolab/orange3-bioinformatics/branch/master/graph/badge.svg" />
+</a>
+
+<a href="https://pypi.org/project/Orange3-Bioinformatics/">
+  <img alt="PyPI" src="https://img.shields.io/pypi/v/orange3-bioinformatics.svg" />
+</a>
+
+<a href="https://anaconda.org/conda-forge/orange3-bioinformatics">
+  <img alt="Conda" src="https://img.shields.io/conda/v/conda-forge/orange3-bioinformatics.svg" />
+</a>
+
+<a href="https://pypi.org/project/Orange3-Bioinformatics/">
+  <img alt="PyPI - License" src="https://img.shields.io/pypi/l/orange3-bioinformatics.svg" />
+</a>
 
 
 Orange Bioinformatics extends Orange, a data mining software

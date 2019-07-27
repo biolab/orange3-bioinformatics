@@ -1,0 +1,19 @@
+steps:
+  - script: cd doc && make htmlhelp && cd ..
+    displayName: 'Build docs'
+    continueOnError: false
+
+  - script: python setup.py sdist
+    displayName: 'Build dist file'
+    continueOnError: false
+
+  - task: CopyFiles@2
+    condition: eq(variables['Agent.JobStatus'], 'Succeeded')
+    inputs:
+      contents: dist/**
+      targetFolder: $(Build.ArtifactStagingDirectory)
+
+  - task: PublishBuildArtifacts@1
+    condition: eq(variables['Agent.JobStatus'], 'Succeeded')
+    inputs:
+      pathtoPublish: $(Build.ArtifactStagingDirectory)
