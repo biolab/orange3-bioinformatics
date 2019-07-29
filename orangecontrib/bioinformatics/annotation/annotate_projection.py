@@ -119,9 +119,9 @@ def assign_labels(clusters, annotations, labels_per_cluster):
     clusters_unique = set(clusters.domain[0].values)
 
     if len(annotations.domain) == 0:
-        return {cl: [] for cl in clusters_unique}, \
-               Table(Domain([DiscreteVariable("Annotation", values=[])]),
-                     np.ones((len(clusters), 1)) * np.nan)
+        return {}, Table(
+            Domain([DiscreteVariable("Annotation", values=[])]),
+            np.ones((len(clusters), 1)) * np.nan)
 
     labels = np.array(list(map(str, annotations.domain.attributes)))
 
@@ -147,9 +147,12 @@ def assign_labels(clusters, annotations, labels_per_cluster):
         labels_cl_filtered = labels_cl[~(labels_cl == "")]
 
         counts = Counter(labels_cl_filtered)
-        annotations_clusters[cl] = [
-            (l, c / len(labels_cl))
-            for l, c in counts.most_common(labels_per_cluster)]
+        common_labels = counts.most_common(labels_per_cluster)
+
+        if len(common_labels) > 0:
+            annotations_clusters[cl] = [
+                (l, c / len(labels_cl))
+                for l, c in common_labels]
 
     # pack item annotations to Table
     nan_mask = items_annotations == ""
@@ -464,6 +467,31 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
     return hulls
 
 
+def _filter_clusters(clusters, clusters_meta):
+    """
+    Function removes clusters that does not has any labels
+    """
+    clust_map = {c: i for i, c in enumerate(
+        c for c in clusters.domain["Clusters"].values if c in clusters_meta)}
+
+    # change cluster indices
+    clust_idx = np.zeros(clusters.X.shape) * np.nan
+    for i, cl in enumerate(
+            map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])):
+        clust_idx[i, 0] = clust_map.get(cl, np.nan)
+    new_clusters = Table(
+        Domain([
+            DiscreteVariable(
+                "Clusters",
+                values=clusters.domain["Clusters"].values[:len(clust_map)])]),
+        clust_idx
+    )
+    # change cluster names in metas
+    new_clusters_meta = {
+        "C{}".format(clust_map[cl] + 1): v for cl, v in clusters_meta.items()}
+    return new_clusters, new_clusters_meta
+
+
 def annotate_projection(annotations, coordinates,
                         clustering_algorithm=DBSCAN,
                         labels_per_cluster=3, **kwargs):
@@ -520,9 +548,14 @@ def annotate_projection(annotations, coordinates,
     # crate the dictionary with annotations, labels locations, and hulls for
     # each cluster
     clusters_meta = {}
+    # note clusters without labels are not added to the dictionary
     for cl in annotations_cl.keys():
         clusters_meta[cl] = (
             annotations_cl[cl], labels_loc[cl], concave_hull[cl])
+
+    # we do not want to color clusters that does not have labels so we
+    # remove clusters without labels from the table
+    clusters, clusters_meta = _filter_clusters(clusters, clusters_meta)
 
     # add the labels to the cluster table
     clusters_ann = Table(
