@@ -3,11 +3,13 @@ parameters:
 
 steps:
 
-- script: python -m pip install --upgrade pip setuptools wheel numpy
+- script: |
+    python -m pip install --upgrade pip setuptools wheel numpy==1.16.4
   displayName: 'Install build tools'
 
 - ${{ if in(parameters.orange_version, 'dev') }}:
-  - script: pip install https://github.com/biolab/orange3/archive/master.zip
+  - script: |
+      pip install https://github.com/biolab/orange3/archive/master.zip
     displayName: 'Install dev version of Orange'
     continueOnError: false
 
@@ -18,6 +20,7 @@ steps:
   displayName: 'Install requirements'
   continueOnError: false
 
-- script: pip install -e .
+- script: |
+    pip install -e .
   displayName: 'Install Orange3-Bioinformatics'
   continueOnError: false
