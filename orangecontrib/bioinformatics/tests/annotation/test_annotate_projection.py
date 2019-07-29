@@ -6,7 +6,7 @@ from Orange.data import Domain, ContinuousVariable, Table, DiscreteVariable
 
 from orangecontrib.bioinformatics.annotation.annotate_projection import \
     annotate_projection, labels_locations, get_epsilon, compute_concave_hulls, \
-    assign_labels, cluster_additional_points, _angle
+    assign_labels, cluster_additional_points, _angle, _filter_clusters
 
 
 class TestAnnotateProjection(unittest.TestCase):
@@ -146,11 +146,8 @@ class TestAnnotateProjection(unittest.TestCase):
         ann = Table(Domain([]), np.empty((len(self.data), 0)))
         clusters, clusters_meta, eps = annotate_projection(ann, self.data)
 
-        self.assertGreater(len(clusters), 0)
-        self.assertGreater(len(clusters_meta), 0)
-        self.assertEqual(0, len(clusters_meta["C1"][0]))
-        self.assertGreater(len(clusters_meta["C1"][1]), 0)
-        self.assertGreater(len(clusters_meta["C1"][2]), 0)
+        self.assertGreaterEqual(len(clusters), 0)
+        self.assertEqual(len(clusters_meta), 0)
 
     def test_one_label(self):
         """
@@ -203,8 +200,8 @@ class TestAnnotateProjection(unittest.TestCase):
             ['?'] * len(self.annotations),
             transformed_labels
         )
-        self.assertEqual(0, len(labels_dict["C1"]))
-        self.assertEqual(0, len(labels_dict["C3"]))
+        self.assertFalse("C1" in labels_dict)
+        self.assertFalse("C3" in labels_dict)
 
     def test_cluster_additional_points_simple(self):
         """
@@ -336,3 +333,55 @@ class TestAnnotateProjection(unittest.TestCase):
             _angle(([-4, 1], [-2, 0]), ([-2, 0], [-1, 2])), np.pi / 2)
         self.assertAlmostEqual(
             _angle(([-4, 3], [-2, 2]), ([-2, 2], [-1, 4])), np.pi / 2)
+
+    def test_cluster_filtering(self):
+        """
+        Cluster filtering was introduced in order to remove clusters that
+        does not have any labels.
+        """
+        def assert_dict_same(d1, d2):
+            self.assertTrue(len(d1) == len(d2) and sorted(d1) == sorted(d2))
+
+        clusters = Table(Domain(
+            [DiscreteVariable("Clusters", values=["C1", "C2"])]),
+            [[0]] * 6 + [[1]] * 5)
+        metas = {"C1": "test1", "C2": "test 2"}
+
+        new_clusters, new_metas = _filter_clusters(clusters, metas)
+
+        # check old table unchanged
+        self.assertEqual(11, len(clusters))
+        self.assertListEqual(["C1", "C2"], clusters.domain["Clusters"].values)
+        np.testing.assert_array_equal(
+            np.array([[0]] * 6 + [[1]] * 5), clusters.X)
+        assert_dict_same(metas, {"C1": "test1", "C2": "test 2"})
+
+        # new clusters should be same in this case
+        self.assertEqual(11, len(new_clusters))
+        self.assertListEqual(
+            ["C1", "C2"], new_clusters.domain["Clusters"].values)
+        np.testing.assert_array_equal(
+            np.array([[0]] * 6 + [[1]] * 5), new_clusters.X)
+        assert_dict_same(new_metas, {"C1": "test1", "C2": "test 2"})
+
+        clusters = Table(Domain(
+            [DiscreteVariable("Clusters", values=["C1", "C2"])]),
+            [[0]] * 6 + [[1]] * 5)
+        metas = {"C1": "test1"}
+
+        new_clusters, new_metas = _filter_clusters(clusters, metas)
+
+        # check old table unchanged
+        self.assertEqual(11, len(clusters))
+        self.assertListEqual(["C1", "C2"], clusters.domain["Clusters"].values)
+        np.testing.assert_array_equal(
+            np.array([[0]] * 6 + [[1]] * 5), clusters.X)
+        assert_dict_same(metas, {"C1": "test1"})
+
+        # new clusters should be same in this case
+        self.assertEqual(11, len(new_clusters))
+        self.assertListEqual(
+            ["C1"], new_clusters.domain["Clusters"].values)
+        np.testing.assert_array_equal(
+            np.array([[0]] * 6 + [[np.nan]] * 5), new_clusters.X)
+        assert_dict_same(new_metas, {"C1": "test1"})
