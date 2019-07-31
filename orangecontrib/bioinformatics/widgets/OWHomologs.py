@@ -19,8 +19,8 @@ from Orange.data import *
 
 
 
-class OWHomology(widget.OWWidget):
-    name = "Homology"
+class OWHomologs(widget.OWWidget):
+    name = "Homologs"
     icon = 'icons/OWHomologs.svg'
     priority = 170
 
@@ -31,7 +31,7 @@ class OWHomology(widget.OWWidget):
         data = widget.Input("Data", Table)
 
     class Warning(widget.OWWidget.Warning):
-        no_genes = Msg("Missing genes table on input.")
+        no_genes = Msg(ERROR_ON_MISSING_ANNOTATION)
         missing_tax_id = Msg(ERROR_ON_MISSING_TAX_ID)
         mising_gene_as_attribute_name = Msg(ERROR_ON_MISSING_ANNOTATION)
         missing_gene_id = Msg(ERROR_ON_MISSING_GENE_ID)

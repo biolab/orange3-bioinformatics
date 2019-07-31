@@ -14,6 +14,7 @@ def _from_data_to_gene(line):
     return gene
 def match_by_rows(data, organism):
     genes, _ = data.get_column_view(data.attributes[GENE_ID_COLUMN])
+
     homology = HomoloGene()
     gm = GeneMatcher(data.attributes[TAX_ID])
 
@@ -35,7 +36,7 @@ def match_by_rows(data, organism):
     data = data[mask]
 
     for gene in data:
-        gene._metas[1]= matches[int(gene._metas[1])]
+        gene[data.attributes[GENE_ID_COLUMN]] = matches[int(str(gene[data.attributes[GENE_ID_COLUMN]]))]
     return data
 
 
