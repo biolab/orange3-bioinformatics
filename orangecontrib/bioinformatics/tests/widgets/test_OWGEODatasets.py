@@ -1,7 +1,7 @@
 import unittest
 
-from orangecontrib.bioinformatics.ncbi.gene import OrangeTableAnnotations
 from orangecontrib.bioinformatics.widgets.OWGEODatasets import OWGEODatasets
+from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 from Orange.widgets.tests.base import WidgetTest
 from Orange.data import Table
 
@@ -33,13 +33,13 @@ class TestOWGEODatasets(WidgetTest):
         table_annotations = output_data.attributes
 
         self.assertTrue(len(table_annotations) > 0)
-        self.assertTrue(OrangeTableAnnotations.tax_id in table_annotations)
-        self.assertTrue(OrangeTableAnnotations.gene_as_attribute_name in table_annotations)
+        self.assertTrue(TableAnnotation.tax_id in table_annotations)
+        self.assertTrue(TableAnnotation.gene_as_attr_name in table_annotations)
 
         # by default genes are in columns not in rows
-        self.assertTrue(OrangeTableAnnotations.gene_id_attribute in table_annotations)
+        self.assertTrue(TableAnnotation.gene_id_attribute in table_annotations)
         # check if taxonomy is correct
-        self.assertTrue(table_annotations[OrangeTableAnnotations.tax_id] == self.test_organism)
+        self.assertTrue(table_annotations[TableAnnotation.tax_id] == self.test_organism)
 
 
 if __name__ == '__main__':
