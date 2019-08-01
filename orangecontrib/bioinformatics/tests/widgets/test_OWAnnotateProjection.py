@@ -185,7 +185,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         self.widget.run_button.click()
         self.assertEqual(self.widget.run_button.text(), "Resume")
 
-    def test_plot_once(self):
+    def test_plot_once(self, timeout=20000):
         self.widget.setup_plot = Mock()
         self.widget.commit = Mock()
         self.send_signal(self.widget.Inputs.genes, self.genes)
@@ -203,7 +203,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         self.widget.setup_plot.assert_called_once()
         self.widget.commit.assert_called_once()
 
-    def test_saved_selection(self):
+    def test_saved_selection(self, timeout=20000):
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
         self.wait_until_stop_blocking()
@@ -221,7 +221,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         np.testing.assert_equal(self.widget.graph.selection,
                                 widget.graph.selection)
 
-    def test_outputs(self):
+    def test_outputs(self, timeout=20000):
         self.send_signal(self.widget.Inputs.genes, self.genes)
         super().test_outputs()
 
@@ -241,7 +241,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
                        self.widget.graph.scatterplot_item.data['brush']]
         self.assertTrue(any(is_not_grey))
 
-    def test_attr_label_metas(self):
+    def test_attr_label_metas(self, timeout=20000):
         self.send_signal(self.widget.Inputs.data, self.data)
         self.wait_until_stop_blocking()
         simulate.combobox_activate_item(self.widget.controls.attr_label,
@@ -265,11 +265,11 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
                 self.assertNotIn(var, controls.attr_size.model())
                 self.assertIn(var, controls.attr_shape.model())
 
-    def test_subset_data_color(self):
+    def test_subset_data_color(self, timeout=20000):
         self.assertRaises(AttributeError,
                           lambda: self.widget.Inputs.data_subset)
 
-    def test_sparse_data(self):
+    def test_sparse_data(self, timeout=20000):
         table = Table("iris").to_sparse()
         self.send_signal(self.widget.Inputs.data, table)
 
@@ -293,7 +293,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         owtsne = self.create_widget(OWtSNE)
         self.send_signal(
             owtsne.Inputs.data, self.reference_data, widget=owtsne)
-        self.wait_until_stop_blocking(widget=owtsne, wait=10000)
+        self.wait_until_stop_blocking(widget=owtsne, wait=20000)
         tsne_output = self.get_output(owtsne.Outputs.annotated_data, owtsne)
 
         self.send_signal(self.widget.Inputs.genes, self.genes)
