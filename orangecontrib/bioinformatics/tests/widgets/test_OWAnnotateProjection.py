@@ -155,9 +155,9 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
 
     def test_output_data(self):
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_stop_blocking(wait=test_timeout_setting)
         self.send_signal(self.widget.Inputs.genes, self.genes)
-        self.wait_until_stop_blocking()
+        self.wait_until_stop_blocking(wait=test_timeout_setting)
         output = self.get_output(self.widget.Outputs.annotated_data)
         n_metas = len(self.data.domain.metas)
         self.assertGreater(len(output.domain.metas), n_metas + 4)
@@ -178,7 +178,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
         self.assertEqual(self.widget.run_button.text(), "Stop")
-        self.wait_until_stop_blocking()
+        self.wait_until_stop_blocking(wait=test_timeout_setting)
         self.assertEqual(self.widget.run_button.text(), "Start")
 
     def test_button_toggle(self):
