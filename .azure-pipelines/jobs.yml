@@ -11,11 +11,21 @@ jobs:
     matrix:
       Python37:
         python.version: '3.7'
+
   steps:
-    - task: UsePythonVersion@0
-      inputs:
-        versionSpec: '$(python.version)'
-        architecture: 'x64'
+    # use conda python on linux. Temporary fix. https://github.com/microsoft/azure-pipelines-image-generation/issues/1083
+    - ${{ if in(parameters.name, 'Linux') }}:
+      - task: CondaEnvironment@1
+        inputs:
+          packageSpecs: 'python=3.7'
+          installOptions: '-c conda-forge'
+          updateConda: false
+        displayName: Install python and activate conda environment
+
+    - ${{ if in(parameters.name, 'macOS', 'Windows') }}:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '$(python.version)'
 
     - template: install_addon.yml
       parameters:
@@ -35,7 +45,22 @@ jobs:
     matrix:
       Python37:
         python.version: '3.7'
+
   steps:
+    # use conda python on linux. Temporary fix. https://github.com/microsoft/azure-pipelines-image-generation/issues/1083
+    - ${{ if in(parameters.name, 'Linux') }}:
+      - task: CondaEnvironment@1
+        inputs:
+          packageSpecs: 'python=3.7'
+          installOptions: '-c conda-forge'
+          updateConda: false
+        displayName: Install python and activate conda environment
+
+    - ${{ if in(parameters.name, 'macOS', 'Windows') }}:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '$(python.version)'
+
     - template: install_addon.yml
       parameters:
         orange_version: 'dev'

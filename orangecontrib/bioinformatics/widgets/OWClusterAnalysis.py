@@ -30,7 +30,7 @@ from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_t
 from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSetsSelection, GeneScoringWidget
 from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, DISPLAY_GENE_SETS_COUNT
 from orangecontrib.bioinformatics.geneset.utils import GeneSetException
-from orangecontrib.bioinformatics.ncbi.gene.config import NCBI_ID
+from orangecontrib.bioinformatics.ncbi.gene.config import ENTREZ_ID
 
 
 class ClusterAnalysisContextHandler(PerfectDomainContextHandler):
@@ -602,7 +602,7 @@ class OWClusterAnalysis(OWWidget):
 
     def gene_scores_output(self, selected_clusters):
 
-        metas = [StringVariable('Gene'), StringVariable(NCBI_ID),
+        metas = [StringVariable('Gene'), StringVariable(ENTREZ_ID),
                  StringVariable('Rank'), ContinuousVariable('Statistic score'),
                  ContinuousVariable('P-value'), ContinuousVariable('FDR')]
 
@@ -635,7 +635,7 @@ class OWClusterAnalysis(OWWidget):
         out_data = Table(domain, data)
         out_data.attributes[TAX_ID] = self.tax_id
         out_data.attributes[GENE_AS_ATTRIBUTE_NAME] = False
-        out_data.attributes[GENE_ID_COLUMN] = NCBI_ID
+        out_data.attributes[GENE_ID_COLUMN] = ENTREZ_ID
         self.Outputs.gene_scores.send(out_data)
 
     def gene_set_scores_output(self, selected_clusters):

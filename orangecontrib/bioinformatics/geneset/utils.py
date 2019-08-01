@@ -221,10 +221,10 @@ class GeneSets(set):
 
         """
 
-        with open(file_path, 'a') as gmt_file:
-            for gene_set in self:
-                genes = map(str, gene_set.genes)
-                line = '\t'.join([gene_set.gs_id, gene_set.gmt_description()] + list(genes))
+        with open(file_path, 'w') as gmt_file:
+            for gene_set in sorted(self):
+                genes = sorted(map(str, gene_set.genes), key=lambda x: int(x))
+                line = '\t'.join([gene_set.gs_id, gene_set.gmt_description()] + genes)
                 gmt_file.write(line + '\n')
 
     @staticmethod

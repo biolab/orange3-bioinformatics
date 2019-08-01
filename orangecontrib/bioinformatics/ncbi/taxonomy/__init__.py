@@ -22,11 +22,12 @@ def common_taxid_to_name(tax_id):
 
     :rtype: :class:`str`
     """
-
+    if str(tax_id) == '352472':
+        tax_id = '44689'
     return COMMON_NAMES_MAPPING[str(tax_id)]
 
 
-def taxname_to_taxid(organism_name):
+def species_name_to_taxid(organism_name):
     """ Return taxonomy ID for a taxonomy name.
 
     :param organism_name: Official organism name, e.g., 'Homo sapiens'

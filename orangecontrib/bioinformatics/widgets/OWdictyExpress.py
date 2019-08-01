@@ -20,7 +20,7 @@ from orangecontrib.bioinformatics.resolwe.utils import etc_to_table
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_ATTRIBUTE, GENE_ID_COLUMN
 )
-from orangecontrib.bioinformatics.ncbi.gene import NCBI_ID, GeneMatcher
+from orangecontrib.bioinformatics.ncbi.gene import ENTREZ_ID, GeneMatcher
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 
 
@@ -72,7 +72,7 @@ class OWdictyExpress(OWWidget):
         super().__init__()
 
         self.res = None
-        self.orgnism = 352472
+        self.organism = '44689'
         self.server = 'https://dictyexpress.research.bcm.edu'
         self.headerLabels = [x[1] for x in Labels]
         self.searchString = ""
@@ -252,27 +252,26 @@ class OWdictyExpress(OWWidget):
         data.name = table_name
 
         # match genes
-        gene_matcher = GeneMatcher(str(self.orgnism))
+        gene_matcher = GeneMatcher(str(self.organism))
 
         if not bool(self.gene_as_attr_name):
             if 'Gene' in data.domain:
                 gene_column = data.domain['Gene']
                 gene_names = data.get_column_view(gene_column)[0]
                 gene_matcher.genes = gene_names
-                gene_matcher.run_matcher()
 
-                domain_ids = Domain([], metas=[StringVariable(NCBI_ID)])
-                data_ids = [[str(gene.ncbi_id) if gene.ncbi_id else '?'] for gene in gene_matcher.genes]
+                domain_ids = Domain([], metas=[StringVariable(ENTREZ_ID)])
+                data_ids = [[str(gene.gene_id) if gene.gene_id else '?'] for gene in gene_matcher.genes]
                 table_ids = Table(domain_ids, data_ids)
                 data = Table.concatenate([data, table_ids])
 
-            data.attributes[GENE_ID_COLUMN] = NCBI_ID
+            data.attributes[GENE_ID_COLUMN] = ENTREZ_ID
         else:
             gene_matcher.match_table_attributes(data)
-            data.attributes[GENE_ID_ATTRIBUTE] = NCBI_ID
+            data.attributes[GENE_ID_ATTRIBUTE] = ENTREZ_ID
 
         # add table attributes
-        data.attributes[TAX_ID] = str(self.orgnism)
+        data.attributes[TAX_ID] = str(self.organism)
         data.attributes[GENE_AS_ATTRIBUTE_NAME] = bool(self.gene_as_attr_name)
 
         # reset cache indicators

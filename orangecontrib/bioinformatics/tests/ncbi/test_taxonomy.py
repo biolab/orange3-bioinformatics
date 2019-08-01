@@ -6,16 +6,16 @@ from orangecontrib.bioinformatics.ncbi import taxonomy
 class TestTaxonomy(unittest.TestCase):
 
     human = '9606'
-    dicty = '352472'
+    dicty = '44689'
 
     def test_common_taxonomy(self):
         self.assertGreater(len(taxonomy.common_taxids()), 0)
 
         self.assertEqual(taxonomy.name(self.human), 'Homo sapiens')
-        self.assertEqual(taxonomy.name(self.dicty), 'Dictyostelium discoideum AX4')
+        self.assertEqual(taxonomy.name(self.dicty), 'Dictyostelium discoideum')
 
-        self.assertEqual(taxonomy.taxname_to_taxid('Homo sapiens'), self.human)
-        self.assertEqual(taxonomy.taxname_to_taxid('Dictyostelium discoideum AX4'), self.dicty)
+        self.assertEqual(taxonomy.species_name_to_taxid('Homo sapiens'), self.human)
+        self.assertEqual(taxonomy.species_name_to_taxid('Dictyostelium discoideum'), self.dicty)
 
         self.assertGreater(len(taxonomy.shortname(self.human)), 0)
         self.assertGreater(len(taxonomy.shortname(self.dicty)), 0)

@@ -5,10 +5,24 @@ import Orange.data
 
 from operator import itemgetter
 from typing import Sequence, Tuple
+from types import SimpleNamespace
 
-from Orange.widgets.widget import OWWidget, Msg
 
-# Data hints variables
+class TableAnnotation(SimpleNamespace):
+    """ Data Table hints """
+
+    # Organism in data table
+    tax_id: str = 'taxonomy_id'
+
+    # This indicates position of genes in data table
+    gene_as_attr_name: str = 'gene_as_attribute_name'
+
+    # This indicates a column name (if genes are in rows)
+    gene_id_column: str = 'gene_id_column'
+
+    # This indicates attribute name (if genes are in columns)
+    gene_id_attribute: str = 'gene_id_attribute'
+
 
 # species
 TAX_ID = 'taxonomy_id'

@@ -5,7 +5,8 @@ import serverfiles
 
 from orangecontrib.bioinformatics.utils import local_cache
 
-server_url = "http://orange.biolab.si/serverfiles-bio2/"
+version = 'v1'
+server_url = f'https://download.biolab.si/datasets/bioinformatics/{version}/'
 
 
 class ServerFiles(serverfiles.ServerFiles):
@@ -14,7 +15,7 @@ class ServerFiles(serverfiles.ServerFiles):
         serverfiles.ServerFiles.__init__(self, server)
 
 
-PATH = os.path.join(local_cache, 'serverfiles-bio')
+PATH = os.path.join(local_cache, 'serverfiles', version)
 LOCALFILES = serverfiles.LocalFiles(PATH, serverfiles=ServerFiles())
 
 

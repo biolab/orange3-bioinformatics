@@ -1,116 +1,55 @@
 """ Mutant Phenotypes """
-import os
-import shutil
-import pickle
+import json
 
-from urllib.request import urlopen
 from collections import defaultdict
 from functools import reduce
 
-from orangecontrib.bioinformatics.dicty.config import DOMAIN, PHENOTYPES_FILENAME
 from orangecontrib.bioinformatics.utils import serverfiles
+
+DOMAIN = 'dictybase'
+PHENOTYPES_FILENAME = 'mutant_phenotypes.json'
 
 
 class DictyMutant:
+    __slots__ = ('name', 'descriptor', 'genes', 'phenotypes', 'mutant_types')
 
-    def __init__(self, mutant_entry):  # type: (str) -> None
+    def __init__(self, mutant_entry: dict) -> None:
         """ A single Dictyostelium discoideum mutant from the Dictybase.
 
         :param mutant_entry: A single mutant entry from `curated mutants file
             <http://dictybase.org/db/cgi-bin/dictyBase/download/download.pl?area=mutant_phenotypes&ID=all-mutants.txt>`_.
         
         """
-
-        mutant = mutant_entry.split("\t")
-
         # dictyBase ID
-        self.name = mutant[0]
+        self.name = mutant_entry.get('systematic_name', None)
 
         # dictyBase strain descriptor
-        self.descriptor = mutant[1]
+        self.descriptor = mutant_entry.get('strain_descriptor', None)
 
         # all associated genes
-        self.genes = mutant[2].split(" | ")
+        self.genes = mutant_entry.get('associated_genes', [])
 
         # all associated phenotypes
-        self.phenotypes = mutant[3].split(" | ")
+        self.phenotypes = mutant_entry.get('phenotypes', [])
 
-        self.null = False
-        self.overexp = False
-        self.multiple = False
-        self.develop = False
-        self.other = False
+        self.mutant_types = mutant_entry.get('mutant_types', None)
+
+    def __repr__(self):
+        return f'<dictyBase ID={self.name}, strain descriptor={self.descriptor}>'
 
 
 class DictyMutants:
     DEFAULT_DATABASE_PATH = serverfiles.localpath(DOMAIN)  # use a default local folder for storing the genesets
 
-    def __init__(self, local_database_path=None):
+    def __init__(self, file_path=None):
         """  A collection of Dictybase mutants as a dictionary of :obj:`DictyMutant` objects.
-
-        :param local_database_path: A path for storing D. dictyostelium mutants objects. If `None` then
-                                    a default database path is used.
         """
+        if file_path is None:
+            file_path = serverfiles.localpath_download(DOMAIN, PHENOTYPES_FILENAME)
 
-        self.local_database_path = local_database_path \
-            if local_database_path is not None else self.DEFAULT_DATABASE_PATH
-
-        if not os.path.exists(self.local_database_path):
-            os.mkdir(self.local_database_path)
-
-        self._mutants = pickle.load(open(serverfiles.localpath_download(DOMAIN, PHENOTYPES_FILENAME), "rb"))
-
-    def update_file(self, name):
-        url = "http://dictybase.org/db/cgi-bin/dictyBase/download/download.pl?area=mutant_phenotypes&ID="
-        filename = os.path.join(self.local_database_path, name)
-        temp_file = os.path.join(self.local_database_path, name + "_temp")
-        stream = urlopen(url + name)
-
-        with open(temp_file, "wb") as file:
-            shutil.copyfileobj(stream, file)
-
-        os.rename(temp_file, filename)
-        return filename
-
-    def load_mutants(self, file):
-        data = open(file)
-        data.readline()  # remove data_header
-        data = data.read()
-        return data.splitlines()
-
-    def download_mutants(self):
-        all_mutants = self.load_mutants(self.update_file("all-mutants.txt"))
-        null_mutants = self.load_mutants(
-            self.update_file("null-mutants.txt"))
-        overexp_mutants = self.load_mutants(
-            self.update_file("overexpression-mutants.txt"))
-        multiple_mutants = self.load_mutants(
-            self.update_file("multiple-mutants.txt"))
-        develop_mutants = self.load_mutants(
-            self.update_file("developmental-mutants.txt"))
-        other_mutants = self.load_mutants(
-            self.update_file("other-mutants.txt"))
-
-        _mutants = [DictyMutant(mutant) for mutant in all_mutants]
-
-        the_nulls = set([DictyMutant(line).name for line in null_mutants])
-        the_overexps = set([DictyMutant(line).name for line in overexp_mutants])
-        the_multiples = set([DictyMutant(line).name for line in multiple_mutants])
-        the_develops = set([DictyMutant(line).name for line in develop_mutants])
-        the_others = set([DictyMutant(line).name for line in other_mutants])
-
-        for mutant in _mutants:
-            if mutant.name in the_nulls: mutant.null = True
-            if mutant.name in the_overexps: mutant.overexp = True
-            if mutant.name in the_multiples: mutant.multiple = True
-            if mutant.name in the_develops: mutant.develop = True
-            if mutant.name in the_others: mutant.other = True
-
-        final_mutants = {x: x for x in _mutants}
-        return final_mutants
-
-    def pickle_data(self):
-        return pickle.dumps(self.download_mutants(), -1)
+        with open(file_path, 'r') as fp:
+            _mutants = [DictyMutant(mutant) for mutant in json.load(fp)]
+            self._mutants = {m: m for m in _mutants}
 
     @classmethod
     def get_instance(cls):
@@ -193,10 +132,6 @@ def phenotype_mutants():
     """ Return a dictionary { phenotype: set(mutant_objects for mutant), ... }.
     """
     return DictyMutants.get_instance().phenotype_mutants()
-
-
-def download_mutants():
-    return DictyMutants.get_instance().pickle_data()
 
 
 if __name__ == "__main__":
