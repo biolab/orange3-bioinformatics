@@ -1,30 +1,29 @@
 """ NCBI GeneInformation module """
-import sqlite3
 import json
+import sqlite3
+import contextlib
 
-from typing import List, Optional, Tuple
-from types import SimpleNamespace
+from typing import List, Optional, Tuple, Dict, Union
 
 from Orange.data import StringVariable, Domain, Table
 
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
+from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 from orangecontrib.bioinformatics.ncbi.gene.config import (
-    gene_info_attributes, _select_gene_info_columns, owgenes_header, ENTREZ_ID, DOMAIN, NCBI_DETAIL_LINK
+    gene_info_attributes,
+    _select_gene_info_columns,
+    owgenes_header,
+    ENTREZ_ID,
+    DOMAIN,
+    NCBI_DETAIL_LINK,
 )
-
-
-class OrangeTableAnnotations(SimpleNamespace):
-    tax_id: str = 'taxonomy_id'
-    gene_id_column: str = 'gene_id_column'
-    gene_id_attribute: str = 'gene_id_attribute'
-    gene_as_attribute_name: str = 'gene_as_attribute_name'
 
 
 class Gene:
     """ Base Gene class. """
 
-    __slots__ = gene_info_attributes + ('homology_group_id', 'input_identifier')
+    __slots__ = gene_info_attributes + ('input_identifier',)
 
     def __init__(self, input_identifier=None):
         self.input_identifier = input_identifier
@@ -34,15 +33,13 @@ class Gene:
             return None
 
     def __repr__(self):
-        return (
-            f'<Gene symbol={self.symbol}, tax_id={self.tax_id}, gene_id={self.gene_id}>'
-        )
+        return f'<Gene symbol={self.symbol}, tax_id={self.tax_id}, gene_id={self.gene_id}>'
 
     def load_attributes(self, values: Tuple[str, ...], attributes: Tuple[str, ...] = gene_info_attributes):
         for attr, val in zip(attributes, values):
-            setattr(self, attr, json.loads(val) if attr in ('synonyms', 'db_refs') else val)
+            setattr(self, attr, json.loads(val) if attr in ('synonyms', 'db_refs', 'homologs') else val)
 
-    def to_list(self):
+    def to_list(self) -> List[str]:
         _, header_tags = owgenes_header
 
         def parse_attribute(tag):
@@ -51,11 +48,7 @@ class Gene:
             if isinstance(gene_attr, dict):
                 # note: db_refs are stored as dicts
                 gene_attr = (
-                    ', '.join(
-                        '{}: {}'.format(key, val) for (key, val) in gene_attr.items()
-                    )
-                    if gene_attr
-                    else ' '
+                    ', '.join('{}: {}'.format(key, val) for (key, val) in gene_attr.items()) if gene_attr else ' '
                 )
             elif isinstance(gene_attr, list):
                 # note: synonyms are stored as lists
@@ -64,6 +57,17 @@ class Gene:
             return gene_attr
 
         return [parse_attribute(tag) for tag in header_tags]
+
+    def homolog_genes(self, taxonomy_id: Optional[str] = None) -> Union[Dict[str, str], str, None]:
+        """ Returns gene homologs.
+
+        :param taxonomy_id: target organism (optional).
+        :return:
+        """
+        if not taxonomy_id or not self.homologs:
+            return None
+
+        return self.homologs.get(taxonomy_id, None)
 
 
 class GeneMatcher:
@@ -136,11 +140,7 @@ class GeneMatcher:
 
         for gene in genes:
             db_refs = (
-                ', '.join(
-                    '{}: {}'.format(key, val) for (key, val) in gene.db_refs.items()
-                )
-                if gene.db_refs
-                else ''
+                ', '.join('{}: {}'.format(key, val) for (key, val) in gene.db_refs.items()) if gene.db_refs else ''
             )
             synonyms = ', '.join(gene.synonyms) if gene.synonyms else ''
 
@@ -167,14 +167,14 @@ class GeneMatcher:
 
         table = Table(domain, data_x)
         table.name = 'Gene Matcher Results'
-        table.attributes[OrangeTableAnnotations.tax_id] = self.tax_id
-        table.attributes[OrangeTableAnnotations.gene_as_attribute_name] = False
-        table.attributes[OrangeTableAnnotations.gene_id_column] = ENTREZ_ID
+        table.attributes[TableAnnotation.tax_id] = self.tax_id
+        table.attributes[TableAnnotation.gene_as_attr_name] = False
+        table.attributes[TableAnnotation.gene_id_column] = ENTREZ_ID
         return table
 
-    def match_table_column(self, data_table: Table,
-                           column_name: str,
-                           target_column: Optional[StringVariable] = None) -> Table:
+    def match_table_column(
+        self, data_table: Table, column_name: str, target_column: Optional[StringVariable] = None
+    ) -> Table:
         """ Helper function for gene name matching in data table.
 
         :param data_table: data table
@@ -244,42 +244,46 @@ class GeneMatcher:
         """
 
     def _match(self):
-        connection = sqlite3.connect(self.gene_db_path)
-        # connection.set_trace_callback(print)
-        cursor = connection.cursor()
         synonyms, db_refs = 4, 5
 
-        for gene in self.genes:
+        with contextlib.closing(sqlite3.connect(self.gene_db_path)) as con:
+            with con as cursor:
+                for gene in self.genes:
 
-            if self._progress_callback:
-                self._progress_callback()
+                    if self._progress_callback:
+                        self._progress_callback()
 
-            search_param = gene.input_identifier.lower()
+                    search_param = gene.input_identifier.lower()
 
-            if search_param:
-                match_statement = '{gene_id symbol locus_tag symbol_from_nomenclature_authority}:^"' + search_param + '"'
-                match = cursor.execute(self._query_exact(), (match_statement,) + tuple([search_param]*4)).fetchall()
-                # if unique match
-                if len(match) == 1:
-                    gene.load_attributes(match[0])
-                    continue
+                    if search_param:
+                        match_statement = (
+                            '{gene_id symbol locus_tag symbol_from_nomenclature_authority}:^"' + search_param + '"'
+                        )
+                        match = cursor.execute(
+                            self._query_exact(), (match_statement,) + tuple([search_param] * 4)
+                        ).fetchall()
+                        # if unique match
+                        if len(match) == 1:
+                            gene.load_attributes(match[0])
+                            continue
 
-                match = cursor.execute(self._query(), (f'synonyms:"{search_param}"',)).fetchall()
-                synonym_matched_rows = [m for m in match if search_param in [x.lower() for x in json.loads(m[synonyms])]]
-                # if unique match
-                if len(synonym_matched_rows) == 1:
-                    gene.load_attributes(synonym_matched_rows[0])
-                    continue
+                        match = cursor.execute(self._query(), (f'synonyms:"{search_param}"',)).fetchall()
+                        synonym_matched_rows = [
+                            m for m in match if search_param in [x.lower() for x in json.loads(m[synonyms])]
+                        ]
+                        # if unique match
+                        if len(synonym_matched_rows) == 1:
+                            gene.load_attributes(synonym_matched_rows[0])
+                            continue
 
-                match = cursor.execute(self._query(), (f'db_refs:"{search_param}"',)).fetchall()
-                db_ref_matched_rows = [m for m in match if search_param in [x.lower() for x in json.loads(m[db_refs]).values()]]
-                # if unique match
-                if len(db_ref_matched_rows) == 1:
-                    gene.load_attributes(db_ref_matched_rows[0])
-                    continue
-
-        cursor.close()
-        connection.close()
+                        match = cursor.execute(self._query(), (f'db_refs:"{search_param}"',)).fetchall()
+                        db_ref_matched_rows = [
+                            m for m in match if search_param in [x.lower() for x in json.loads(m[db_refs]).values()]
+                        ]
+                        # if unique match
+                        if len(db_ref_matched_rows) == 1:
+                            gene.load_attributes(db_ref_matched_rows[0])
+                            continue
 
 
 class GeneInfo(dict):
@@ -310,27 +314,32 @@ class GeneInfo(dict):
         return serverfiles.localpath_download(DOMAIN, f'{self.tax_id}.sqlite')
 
 
+def load_gene_summary(tax_d: str, genes: List[Union[str, Gene]]) -> List[Gene]:
+    gene_db_path = serverfiles.localpath_download(DOMAIN, f'{tax_d}.sqlite')
+
+    # filter NoneTypes
+    genes = [g for g in genes if g]
+
+    with contextlib.closing(sqlite3.connect(gene_db_path)) as con:
+        with con as cur:
+            if all(isinstance(g, Gene) for g in genes):
+                gene_ids = [g.gene_id for g in genes]
+            else:
+                gene_ids = genes
+
+            genes = []
+            for gene_info in cur.execute(f'SELECT * FROM gene_info WHERE gene_id in ({",".join(gene_ids)})').fetchall():
+                gene = Gene()
+                gene.load_attributes(gene_info)
+                genes.append(gene)
+            return genes
+
+
 if __name__ == "__main__":
     gm = GeneMatcher('9606')
-    gm.genes = ['CD4', '614535', 'HB-1Y', 'ENSG00000205426', "2'-PDE"]
+    gm.genes = ['CD4', '614535', 'ENSG00000205426', "2'-PDE", 'HB-1Y']
     print(list(zip(gm.genes, [g.input_identifier for g in gm.genes])))
 
-    # import Orange
-    #
-    # data = Orange.data.Table("brown-selected")
-    # gi = list(GeneInfo('4932').values())
-    #
-    # gm = GeneMatcher('4932')
-    # gm.genes = [str(ex["gene"]) for ex in data]
-    #
-    # print(gm.genes[0].to_list())
-
-    # print(gm.genes)
-    # gm.load_gene_info()
-    # print(gm.genes)
-    #
-    # print(gm.to_data_table())
-    #
-    # gi = GeneInfo('9606')
-    # print(gi.keys())
-    # print(gi['107080645'].species)
+    homologs = [g.homolog_genes(taxonomy_id='10090') for g in gm.genes]
+    homologs = load_gene_summary('10090', homologs)
+    print(homologs)

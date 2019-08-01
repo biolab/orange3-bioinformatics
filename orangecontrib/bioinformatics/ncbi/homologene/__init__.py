@@ -33,7 +33,6 @@ class HomoloGene:
     def find_homolog(self, gene_id: str, organism: str):
         """ Find homolog gene in organism. If the homolog does not exist, return None. """
         homology_group = self._homologs.get(str(gene_id), Gene()).homology_group_id
-
         homologs = [gene for gene in self._homologs_by_group.get(homology_group, []) if gene.tax_id == organism]
         if len(homologs) == 1:
             return homologs[0]
@@ -43,20 +42,19 @@ class HomoloGene:
 
 
 if __name__ == "__main__":
-
     import Orange
-    from orangecontrib.bioinformatics.ncbi.gene import GeneInfo, GeneMatcher
+    from orangecontrib.bioinformatics.ncbi.gene import GeneInfo, GeneMatcher, load_gene_summary
 
     homology = HomoloGene()
-    data = Orange.data.Table("brown-selected")
-    gene_info = list(GeneInfo('4932').values())
-    genes = [str(ex["gene"]) for ex in data]
-
     gm = GeneMatcher('4932')
-    gm.genes = genes
-    gm.run_matcher()
 
-    for gene in gm.genes:
-        mapped_gene = homology.find_homolog(str(gene.gene_id), '9606')
-        print(f'{gene} ----> {mapped_gene}')
+    data = Orange.data.Table("brown-selected")
+    genes, _ = data.get_column_view('gene')
+
+    gm.genes = genes
+    homologs = [homology.find_homolog(str(gene.gene_id), '9606') for gene in gm.genes]
+    homologs = load_gene_summary('9606', homologs)
+
+    for gene, homolog in zip(gm.genes, homologs):
+        print(f'{gene} ----> {homolog}')
 
