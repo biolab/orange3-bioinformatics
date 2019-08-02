@@ -3,7 +3,7 @@ import sys
 import numpy as np
 
 
-from typing import  Optional, DefaultDict, Any
+from typing import Optional, DefaultDict, Any
 from types import SimpleNamespace as namespace
 from collections import defaultdict, OrderedDict
 from functools import lru_cache
@@ -17,12 +17,7 @@ from AnyQt.QtWidgets import (
     QTreeWidgetItem,
     QAbstractScrollArea,
 )
-from AnyQt.QtCore import (
-    Qt,
-    QSize,
-    QVariant,
-    QModelIndex
-)
+from AnyQt.QtCore import Qt, QSize, QVariant, QModelIndex
 from AnyQt.QtGui import QFont, QColor
 
 from Orange.widgets.gui import (
@@ -35,14 +30,14 @@ from Orange.widgets.gui import (
     lineEdit,
     LinkRole,
     LinkStyledItemDelegate,
-    IndicatorItemDelegate
+    IndicatorItemDelegate,
 )
 
+from Orange.data import Table
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.utils import itemmodels
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output
-from Orange.data import Table
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 
 from orangecontrib.bioinformatics.geo import local_files
@@ -75,23 +70,20 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         super().__init__(*args, **kwargs)
 
         self.setHorizontalHeaderLabels(
-            [
-                '',
-                'ID',
-                'PubMedID',
-                'Organism',
-                'Samples',
-                'Features',
-                'Genes',
-                'Subsets',
-                'Title',
-            ]
+            ['', 'ID', 'PubMedID', 'Organism', 'Samples', 'Features', 'Genes', 'Subsets', 'Title']
         )
 
-        self.indicator_col = 0
-        self.gds_id_col = 1
-        self.organism_col = 3
-        self.pubmedid_col = 2
+        (
+            self.indicator_col,
+            self.gds_id_col,
+            self.pubmed_id_col,
+            self.organism_col,
+            self.samples_col,
+            self.features_col,
+            self.genes_col,
+            self.subsets_col,
+            self.title_col,
+        ) = range(9)
 
         self.info = None
         self.table = None
@@ -139,6 +131,23 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         self.table = np.asarray([__gds_to_row(gds) for gds in info.values()])
         self.show_table()
 
+    def _argsortData(self, data: np.ndarray, order):
+        # is there any better solution?
+        column = self._AbstractSortTableModel__sortColumn
+
+        if column == self.gds_id_col:
+            data = np.char.replace(data, 'GDS', '')
+            data = data.astype(int)
+
+        if column in (self.samples_col, self.features_col, self.genes_col, self.subsets_col, self.pubmed_id_col):
+            data[data == ''] = '0'
+            data = data.astype(int)
+
+        indices = np.argsort(data, kind='mergesort')
+        if order == Qt.DescendingOrder:
+            indices = indices[::-1]
+        return indices
+
     def columnCount(self, parent=QModelIndex()):
         return 0 if parent.isValid() else self._table.shape[1]
 
@@ -149,13 +158,18 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         self._roleData.clear()
         self.endResetModel()
 
-    def data(self, index, role, _str=str,
+    def data(
+        self,
+        index,
+        role,
+        _str=str,
         _Qt_DisplayRole=Qt.DisplayRole,
         _Qt_EditRole=Qt.EditRole,
         _Qt_FontRole=Qt.FontRole,
         _Qt_ForegroundRole=Qt.ForegroundRole,
         _LinkRolee=LinkRole,
-        _recognizedRoles=frozenset([Qt.DisplayRole, Qt.EditRole, Qt.FontRole, Qt.ForegroundRole, LinkRole]),):
+        _recognizedRoles=frozenset([Qt.DisplayRole, Qt.EditRole, Qt.FontRole, Qt.ForegroundRole, LinkRole]),
+    ):
 
         if role not in _recognizedRoles:
             return None
@@ -176,7 +190,7 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         elif role == Qt.ToolTipRole:
             return QVariant(str(value))
 
-        if col == self.pubmedid_col:
+        if col == self.pubmed_id_col:
             if role == _Qt_ForegroundRole:
                 return self.color
             elif role == _Qt_FontRole:
@@ -246,11 +260,9 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         # Main Area
 
         # Filter widget
-        self.filter = lineEdit(self.mainArea, self,
-                               'search_pattern',
-                               'Filter:',
-                               callbackOnType=True,
-                               callback=self._apply_filter)
+        self.filter = lineEdit(
+            self.mainArea, self, 'search_pattern', 'Filter:', callbackOnType=True, callback=self._apply_filter
+        )
         self.mainArea.layout().addWidget(self.filter)
 
         splitter_vertical = QSplitter(Qt.Vertical, self.mainArea)
@@ -279,23 +291,18 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
         v_header = self.table_view.verticalHeader()
         option = self.table_view.viewOptions()
-        size = self.table_view.style().sizeFromContents(
-            QStyle.CT_ItemViewItem, option, QSize(20, 20), self.table_view
-        )
+        size = self.table_view.style().sizeFromContents(QStyle.CT_ItemViewItem, option, QSize(20, 20), self.table_view)
 
         v_header.setDefaultSectionSize(size.height() + 2)
         v_header.setMinimumSectionSize(5)
 
         # set item delegates
         self.table_view.setItemDelegateForColumn(
-            self.table_model.pubmedid_col, LinkStyledItemDelegate(self.table_view)
+            self.table_model.pubmed_id_col, LinkStyledItemDelegate(self.table_view)
         )
+        self.table_view.setItemDelegateForColumn(self.table_model.gds_id_col, LinkStyledItemDelegate(self.table_view))
         self.table_view.setItemDelegateForColumn(
-            self.table_model.gds_id_col, LinkStyledItemDelegate(self.table_view)
-        )
-        self.table_view.setItemDelegateForColumn(
-            self.table_model.indicator_col,
-            IndicatorItemDelegate(self.table_view, role=Qt.DisplayRole),
+            self.table_model.indicator_col, IndicatorItemDelegate(self.table_view, role=Qt.DisplayRole)
         )
 
         splitter_horizontal = QSplitter(Qt.Horizontal, splitter_vertical)
@@ -309,9 +316,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         # Sample Annotations Widget
         box = widgetBox(splitter_horizontal, 'Sample Annotations')
         self.annotations_widget = QTreeWidget(box)
-        self.annotations_widget.setHeaderLabels(
-            ['Type (Sample annotations)', 'Sample count']
-        )
+        self.annotations_widget.setHeaderLabels(['Type (Sample annotations)', 'Sample count'])
         self.annotations_widget.setRootIsDecorated(True)
         box.layout().addWidget(self.annotations_widget)
         self._annotations_updating = False
@@ -331,9 +336,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.splitter_settings = [bytes(sp.saveState()) for sp in self.splitters]
 
     def _set_description_widget(self):
-        self.description_widget.setText(
-            self.selected_gds.get('description', 'Description not available.')
-        )
+        self.description_widget.setText(self.selected_gds.get('description', 'Description not available.'))
 
     def _set_annotations_widget(self, gds):
         self._annotations_updating = True
@@ -373,9 +376,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
     def _handle_selection_changed(self):
         if self.table_model.table is not None:
-            selection = self.table_view.selectionModel().selectedRows(
-                self.table_model.gds_id_col
-            )
+            selection = self.table_view.selectionModel().selectedRows(self.table_model.gds_id_col)
             selected_gds_name = selection[0].data() if len(selection) > 0 else None
 
             if selected_gds_name:
@@ -397,10 +398,9 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     def _run(self):
         if self.selected_gds is not None:
             self.gds_data = None
-            self.start(run_download_task,
-                       self.selected_gds.get('name'),
-                       self.get_selected_samples(),
-                       self.genes_as_rows)
+            self.start(
+                run_download_task, self.selected_gds.get('name'), self.get_selected_samples(), self.genes_as_rows
+            )
 
     def on_gds_selection_changed(self):
         self._handle_selection_changed()
@@ -422,9 +422,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
     def update_info(self):
         all_gds = len(self.table_model.info)
-        text = "{} datasets\n{} datasets cached\n".format(
-            all_gds, len(local_files.listfiles())
-        )
+        text = "{} datasets\n{} datasets cached\n".format(all_gds, len(local_files.listfiles()))
         filtered = self.table_view.model().rowCount()
         if all_gds != filtered:
             text += "{} after filtering".format(filtered)
@@ -514,20 +512,17 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.report_name("Sample annotations")
         subsets = defaultdict(list)
         for subset in self.selected_gds['subsets']:
-            subsets[subset['type']].append(
-                (subset['description'], len(subset['sample_id']))
-            )
+            subsets[subset['type']].append((subset['description'], len(subset['sample_id'])))
         self.report_html += "<ul>"
         for _type in subsets:
             self.report_html += "<b>" + _type + ":</b></br>"
             for desc, count in subsets[_type]:
-                self.report_html += 9 * "&nbsp" + "<b>{}:</b> {}</br>".format(
-                    desc, count
-                )
+                self.report_html += 9 * "&nbsp" + "<b>{}:</b> {}</br>".format(desc, count)
         self.report_html += "</ul>"
 
 
 if __name__ == "__main__":
+
     def main_test():
         from AnyQt.QtWidgets import QApplication
 
@@ -538,6 +533,5 @@ if __name__ == "__main__":
         r = app.exec_()
         w.saveSettings()
         return r
-
 
     sys.exit(main_test())
