@@ -8,15 +8,19 @@ from Orange.widgets.widget import Msg
 
 from Orange.widgets.settings import Setting, DomainContextHandler
 
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, \
-            GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, \
-    ERROR_ON_MISSING_ANNOTATION, ERROR_ON_MISSING_GENE_ID, ERROR_ON_MISSING_TAX_ID
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID,
+    GENE_AS_ATTRIBUTE_NAME,
+    GENE_ID_COLUMN,
+    ERROR_ON_MISSING_ANNOTATION,
+    ERROR_ON_MISSING_GENE_ID,
+    ERROR_ON_MISSING_TAX_ID,
+)
 
-from orangecontrib.bioinformatics.ncbi.homologene import match_by_rows
 from orangecontrib.bioinformatics.ncbi.taxonomy import COMMON_NAMES
+from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, load_gene_summary
 
 from Orange.data import *
-
 
 
 class OWHomologs(widget.OWWidget):
@@ -35,6 +39,7 @@ class OWHomologs(widget.OWWidget):
         missing_tax_id = Msg(ERROR_ON_MISSING_TAX_ID)
         mising_gene_as_attribute_name = Msg(ERROR_ON_MISSING_ANNOTATION)
         missing_gene_id = Msg(ERROR_ON_MISSING_GENE_ID)
+
     want_main_area = False
 
     auto_commit = Setting(True)
@@ -60,8 +65,7 @@ class OWHomologs(widget.OWWidget):
         self.organism.addItems(self.ids.values())
         self.organism.activated[int].connect(self.organisms)
 
-        gui.auto_commit(self.controlArea, self, "auto_commit", "Commit",
-                        "Commit Automatically")
+        gui.auto_commit(self.controlArea, self, "auto_commit", "Commit", "Commit Automatically")
 
         self.info.set_input_summary(self.info.NoInput)
         self.info.set_output_summary(self.info.NoInput)
@@ -92,8 +96,7 @@ class OWHomologs(widget.OWWidget):
             self.organism.addItems(self.ids.values())
         else:
             try:
-                self.organism_id = list(self.ids.values()).index(
-                                                    self.selected_organism)
+                self.organism_id = list(self.ids.values()).index(self.selected_organism)
             except ValueError:
                 self.organism_id = -1
 
@@ -102,14 +105,22 @@ class OWHomologs(widget.OWWidget):
             self.organism.addItems(self.ids.values())
 
             if self.organism_id != -1:
-                self.selected_organism = list(self.ids.values()
-                                              )[self.organism_id]
+                self.selected_organism = list(self.ids.values())[self.organism_id]
 
-        self.info_gene_type.setText("Organism: "+self.taxonomy)
-        self.info_gene.setText("Number of genes: "+str(len(data)))
+        self.info_gene_type.setText("Organism: " + self.taxonomy)
+        self.info_gene.setText("Number of genes: " + str(len(data)))
         self.info.set_input_summary(f"{str(len(data))}")
 
         self.commit()
+
+    def find_homologs(self, genes, organism):
+        gm = GeneMatcher(organism)
+        gm.genes = genes
+
+        homologs = [g.homolog_genes(taxonomy_id=self.target_organism) for g in gm.genes]
+        homologs = load_gene_summary(self.target_organism, homologs)
+
+        return homologs
 
     def organisms(self, id):
         self.organism_id = id
@@ -117,8 +128,35 @@ class OWHomologs(widget.OWWidget):
         self.commit()
 
     def commit(self):
-        self.output = match_by_rows(self.data,
-                                    list(self.ids.keys())[self.organism_id])
+        self.target_organism = list(self.ids.keys())[self.organism_id]
+
+        if self.data.attributes[GENE_AS_ATTRIBUTE_NAME]:
+            pass
+        else:
+            genes, _ = self.data.get_column_view(self.data.attributes[GENE_ID_COLUMN])
+
+            homologs = self.find_homologs(genes, self.data.attributes[TAX_ID])
+            homolog = StringVariable("Homolog")
+            homolog_id = StringVariable("Homolog ID")
+            domain = Domain(
+                self.data.domain.attributes, self.data.domain.class_vars, self.data.domain.metas + (homolog, homolog_id)
+            )
+
+            table = self.data.transform(domain)
+            col, _ = table.get_column_view(homolog)
+            col[:] = [g.symbol if g else "?" for g in homologs]
+            col, _ = table.get_column_view(homolog_id)
+            col[:] = [g.gene_id if g else "?" for g in homologs]
+
+            # note: filter out rows with unknown homologs
+            table = table[table.get_column_view(homolog_id)[0] != "?"]
+
+            self.output = table
+
+        if self.output:
+            self.info.set_output_summary(f"{len(self.output)}")
+        else:
+            self.info.set_output_summary(f"{0}")
         self.Outputs.genes.send(self.output)
 
     def closeEvent(self, event):
@@ -132,7 +170,7 @@ def main(argv=None):
     from AnyQt.QtWidgets import QApplication
 
     app = QApplication(argv or sys.argv)
-    w = OWHomology()
+    w = OWHomologs()
     w.show()
     w.activateWindow()
     rv = app.exec_()

@@ -12,32 +12,6 @@ def _from_data_to_gene(line):
     for attr, val in zip(['homology_group_id', 'tax_id', 'gene_id'], line.strip().split('\t')):
         setattr(gene, attr, val)
     return gene
-def match_by_rows(data, organism):
-    genes, _ = data.get_column_view(data.attributes[GENE_ID_COLUMN])
-
-    homology = HomoloGene()
-    gm = GeneMatcher(data.attributes[TAX_ID])
-
-    gm.genes = genes
-
-    gm.run_matcher()
-    matches = {}
-    mask = []
-    for gene in gm.genes:
-
-        mapped = False
-        mapped_gene = homology.find_homolog(str(gene.gene_id), organism)
-        if mapped_gene:
-            mapped_gene.ncbi_id = mapped_gene.gene_id
-            mapped_gene.load_ncbi_info()
-            mapped = True
-        mask.append(mapped)
-            matches[gene.gene_id] = mapped_gene.gene_id
-    data = data[mask]
-
-    for gene in data:
-        gene[data.attributes[GENE_ID_COLUMN]] = matches[int(str(gene[data.attributes[GENE_ID_COLUMN]]))]
-    return data
 
 
 class HomoloGene:
@@ -74,8 +48,7 @@ if __name__ == "__main__":
     homology = HomoloGene()
 
     gm = GeneMatcher('4932')
-    genes, _ = data.get_column_view('gene')
-    data = Orange.data.Table("brown-selected")
+    genes = Orange.data.Table("brown-selected")
 
     gm.genes = genes
     homologs = [homology.find_homolog(str(gene.gene_id), '9606') for gene in gm.genes]
