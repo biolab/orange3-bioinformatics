@@ -87,7 +87,8 @@ class GEODatasetsModel(itemmodels.PyTableModel):
 
         self.info = None
         self.table = None
-        self.filter_mask = None
+        self._sort_column = self.gds_id_col
+        self._sort_order = Qt.AscendingOrder
 
         self.font = QFont()
         self.font.setUnderline(True)
@@ -132,8 +133,9 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         self.show_table()
 
     def _argsortData(self, data: np.ndarray, order):
-        # is there any better solution?
-        column = self._AbstractSortTableModel__sortColumn
+        # store order choice.
+        self._sort_column = column = self.sortColumn()
+        self._sort_order = self.sortOrder()
 
         if column == self.gds_id_col:
             data = np.char.replace(data, 'GDS', '')
@@ -150,13 +152,6 @@ class GEODatasetsModel(itemmodels.PyTableModel):
 
     def columnCount(self, parent=QModelIndex()):
         return 0 if parent.isValid() else self._table.shape[1]
-
-    def clear(self):
-        self.beginResetModel()
-        self._table = np.array([[]])
-        self.resetSorting()
-        self._roleData.clear()
-        self.endResetModel()
 
     def data(
         self,
@@ -211,10 +206,21 @@ class GEODatasetsModel(itemmodels.PyTableModel):
             selection = selection & match_result
         return selection
 
+    def update_cache_indicator(self):
+        self.table[:, 0] = [' ' if is_cached(gid) else '' for gid in self.table[:, self.gds_id_col]]
+
     def show_table(self, filter_pattern=''):
         # clear cache if model changes
         self._row_instance.cache_clear()
         self.wrap(self.table[self.filter_table(filter_pattern).any(axis=1), :])
+        self.sort(self._sort_column, self._sort_order)
+
+    def wrap(self, table):
+        self.beginResetModel()
+        self._table = table
+        self._roleData = self._RoleData()
+        self.resetSorting()
+        self.endResetModel()
 
 
 class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
@@ -330,7 +336,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.table_view.selectionModel().selectionChanged.connect(self.on_gds_selection_changed)
         self._apply_filter()
 
-        self._run()
+        self.commit()
 
     def _splitter_moved(self, *args):
         self.splitter_settings = [bytes(sp.saveState()) for sp in self.splitters]
@@ -404,7 +410,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
     def on_gds_selection_changed(self):
         self._handle_selection_changed()
-        self._run()
+        self.commit()
 
     def on_annotation_selection_changed(self):
         if self._annotations_updating:
@@ -418,7 +424,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
                 if 'key' in child.__dict__:
                     self.gdsSelectionStates[child.key] = child.checkState(0)
 
-        self._run()
+        self.commit()
 
     def update_info(self):
         all_gds = len(self.table_model.info)
@@ -474,16 +480,17 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         return _samples
 
     def commit(self):
-        self.Outputs.gds_data.send(self.gds_data)
+        self._run()
 
     def on_done(self, result: Result):
         assert isinstance(result.gds_dataset, Table)
         self.gds_data = result.gds_dataset
-        self.commit()
 
         if self.gds_info:
-            self.table_model.initialize(self.gds_info)
+            self.table_model.update_cache_indicator()
             self._apply_filter()
+
+        self.Outputs.gds_data.send(self.gds_data)
 
     def on_partial_result(self, result: Any) -> None:
         pass
