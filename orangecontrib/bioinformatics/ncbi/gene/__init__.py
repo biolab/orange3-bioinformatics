@@ -318,21 +318,22 @@ def load_gene_summary(tax_d: str, genes: List[Union[str, Gene]]) -> List[Gene]:
     gene_db_path = serverfiles.localpath_download(DOMAIN, f'{tax_d}.sqlite')
 
     # filter NoneTypes
-    genes = [g for g in genes if g]
+    _genes = [g for g in genes if g]
 
     with contextlib.closing(sqlite3.connect(gene_db_path)) as con:
         with con as cur:
-            if all(isinstance(g, Gene) for g in genes):
-                gene_ids = [g.gene_id for g in genes]
+            if all(isinstance(g, Gene) for g in _genes):
+                gene_ids = [g.gene_id for g in _genes]
             else:
-                gene_ids = genes
+                gene_ids = _genes
 
-            genes = []
+            gene_map = {}
             for gene_info in cur.execute(f'SELECT * FROM gene_info WHERE gene_id in ({",".join(gene_ids)})').fetchall():
                 gene = Gene()
                 gene.load_attributes(gene_info)
-                genes.append(gene)
-            return genes
+                gene_map[gene.gene_id] = gene
+
+            return [gene_map.get(gid, None) for gid in genes]
 
 
 if __name__ == "__main__":
