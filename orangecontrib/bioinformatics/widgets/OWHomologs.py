@@ -106,6 +106,7 @@ class OWHomologs(widget.OWWidget):
             self.organism.addItems(self.taxonomy_ids.values())
 
             if self.organism_id != -1:
+                self.organism.setCurrentIndex(self.organism_id)
                 self.selected_organism = list(self.taxonomy_ids.values())[self.organism_id]
 
         self.info_gene_type.setText("Organism: " + self.taxonomy)
