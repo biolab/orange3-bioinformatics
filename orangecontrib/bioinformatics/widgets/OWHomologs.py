@@ -6,12 +6,10 @@ from AnyQt.QtCore import QSize
 from Orange.widgets import widget, gui
 from Orange.widgets.widget import Msg
 
-from Orange.widgets.settings import Setting, DomainContextHandler
+from Orange.widgets.settings import Setting
 
+from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 from orangecontrib.bioinformatics.widgets.utils.data import (
-    TAX_ID,
-    GENE_AS_ATTRIBUTE_NAME,
-    GENE_ID_COLUMN,
     ERROR_ON_MISSING_ANNOTATION,
     ERROR_ON_MISSING_GENE_ID,
     ERROR_ON_MISSING_TAX_ID,
@@ -44,11 +42,10 @@ class OWHomologs(widget.OWWidget):
 
     auto_commit = Setting(True)
     selected_organism: str = Setting('')
-    settingsHandler = DomainContextHandler()
 
     def __init__(self):
         super().__init__()
-        self.ids = dict(COMMON_NAMES)
+        self.taxonomy_ids = dict(COMMON_NAMES)
         info_box = gui.vBox(self.controlArea, "Info")
         self.info_gene_type = gui.widgetLabel(info_box, 'No data on input.')
         self.info_gene_type.setWordWrap(True)
@@ -62,7 +59,7 @@ class OWHomologs(widget.OWWidget):
 
         self.organism_id = -1
         self.organism = gui.comboBox(self.controlArea, self, 'organism_id')
-        self.organism.addItems(self.ids.values())
+        self.organism.addItems(self.taxonomy_ids.values())
         self.organism.activated[int].connect(self.organisms)
 
         gui.auto_commit(self.controlArea, self, "auto_commit", "Commit", "Commit Automatically")
@@ -73,39 +70,43 @@ class OWHomologs(widget.OWWidget):
     @Inputs.data
     def set_data(self, data):
         self.Warning.no_genes.clear()
-        self.ids = dict(COMMON_NAMES)
+        self.taxonomy_ids = dict(COMMON_NAMES)
         self.data = data
 
         if self.data:
-            if GENE_AS_ATTRIBUTE_NAME not in self.data.attributes:
+            if TableAnnotation.gene_as_attr_name not in self.data.attributes:
                 self.Warning.mising_gene_as_attribute_name()
-            if TAX_ID not in self.data.attributes:
+                return
+            if TableAnnotation.tax_id not in self.data.attributes:
                 self.Warning.missing_tax_id()
-            if GENE_ID_COLUMN not in self.data.attributes:
+                return
+            if TableAnnotation.gene_id_column not in self.data.attributes:
                 self.Warning.missing_tax_id_genes()
-            if self.data.attributes[GENE_ID_COLUMN] not in self.data.domain:
+                return
+            if self.data.attributes[TableAnnotation.gene_id_column] not in self.data.domain:
                 self.Warning.missing_gene_id()
+                return
         else:
             self.Warning.no_genes()
             return
 
-        self.taxonomy = self.ids[data.attributes[TAX_ID]]
+        self.taxonomy = self.taxonomy_ids[data.attributes[TableAnnotation.tax_id]]
         if self.taxonomy == self.selected_organism:
-            del self.ids[data.attributes[TAX_ID]]
+            del self.taxonomy_ids[data.attributes[TableAnnotation.tax_id]]
             self.organism.clear()
-            self.organism.addItems(self.ids.values())
+            self.organism.addItems(self.taxonomy_ids.values())
         else:
             try:
-                self.organism_id = list(self.ids.values()).index(self.selected_organism)
+                self.organism_id = list(self.taxonomy_ids.values()).index(self.selected_organism)
             except ValueError:
                 self.organism_id = -1
 
-            del self.ids[data.attributes[TAX_ID]]
+            del self.taxonomy_ids[data.attributes[TableAnnotation.tax_id]]
             self.organism.clear()
-            self.organism.addItems(self.ids.values())
+            self.organism.addItems(self.taxonomy_ids.values())
 
             if self.organism_id != -1:
-                self.selected_organism = list(self.ids.values())[self.organism_id]
+                self.selected_organism = list(self.taxonomy_ids.values())[self.organism_id]
 
         self.info_gene_type.setText("Organism: " + self.taxonomy)
         self.info_gene.setText("Number of genes: " + str(len(data)))
@@ -128,16 +129,39 @@ class OWHomologs(widget.OWWidget):
         self.commit()
 
     def commit(self):
-        self.target_organism = list(self.ids.keys())[self.organism_id]
+        HOMOLOG_SYMBOL = "Homolog"
+        HOMOLOG_ID = "Homolog ID"
+        out_table = None
+        self.target_organism = list(self.taxonomy_ids.keys())[self.organism_id]
 
-        if self.data.attributes[GENE_AS_ATTRIBUTE_NAME]:
-            pass
+        if self.data.attributes[TableAnnotation.gene_as_attr_name]:
+            domain = self.data.domain.copy()
+            table = self.data.transform(domain)
+
+            gene_loc = table.attributes[TableAnnotation.gene_id_attribute]
+            genes = [str(attr.attributes.get(gene_loc, None)) for attr in table.domain.attributes]
+            homologs = self.find_homologs(genes, table.attributes[TableAnnotation.tax_id])
+
+            for homolog, col in zip(homologs, table.domain.attributes):
+                if homolog:
+                    col.attributes[HOMOLOG_SYMBOL] = homolog.symbol
+                    col.attributes[HOMOLOG_ID] = homolog.gene_id
+
+            table = table.from_table(
+                Domain(
+                    [col for col in table.domain.attributes if HOMOLOG_ID in col.attributes],
+                    table.domain.class_vars,
+                    table.domain.metas,
+                ),
+                table,
+            )
+            out_table = table if len(table.domain.attributes) > 0 else None
         else:
-            genes, _ = self.data.get_column_view(self.data.attributes[GENE_ID_COLUMN])
+            genes, _ = self.data.get_column_view(self.data.attributes[TableAnnotation.gene_id_column])
 
-            homologs = self.find_homologs(genes, self.data.attributes[TAX_ID])
-            homolog = StringVariable("Homolog")
-            homolog_id = StringVariable("Homolog ID")
+            homologs = self.find_homologs(genes, self.data.attributes[TableAnnotation.tax_id])
+            homolog = StringVariable(HOMOLOG_SYMBOL)
+            homolog_id = StringVariable(HOMOLOG_ID)
             domain = Domain(
                 self.data.domain.attributes, self.data.domain.class_vars, self.data.domain.metas + (homolog, homolog_id)
             )
@@ -151,13 +175,13 @@ class OWHomologs(widget.OWWidget):
             # note: filter out rows with unknown homologs
             table = table[table.get_column_view(homolog_id)[0] != "?"]
 
-            self.output = table
+            out_table = table if len(table) > 0 else None
 
-        if self.output:
-            self.info.set_output_summary(f"{len(self.output)}")
+        if out_table:
+            self.info.set_output_summary(f"{len(out_table)}")
         else:
             self.info.set_output_summary(f"{0}")
-        self.Outputs.genes.send(self.output)
+        self.Outputs.genes.send(out_table)
 
     def closeEvent(self, event):
         super().closeEvent(event)
