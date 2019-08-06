@@ -1,12 +1,13 @@
 """ OWMarkerGenes """
 import sys
 
+from typing import List, Optional,Union
 from AnyQt.QtCore import QSize
 
 from Orange.widgets import widget, gui
 from Orange.widgets.widget import Msg
-
 from Orange.widgets.settings import Setting
+from Orange.data import Table, Domain, StringVariable
 
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 from orangecontrib.bioinformatics.widgets.utils.data import (
@@ -15,10 +16,12 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
     ERROR_ON_MISSING_TAX_ID,
 )
 
-from orangecontrib.bioinformatics.ncbi.taxonomy import COMMON_NAMES
-from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, load_gene_summary
+from orangecontrib.bioinformatics.ncbi.taxonomy import COMMON_NAMES_MAPPING, common_taxid_to_name, species_name_to_taxid
+from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, load_gene_summary, Gene
 
-from Orange.data import *
+
+HOMOLOG_SYMBOL = "Homolog"
+HOMOLOG_ID = "Homolog ID"
 
 
 class OWHomologs(widget.OWWidget):
@@ -37,6 +40,7 @@ class OWHomologs(widget.OWWidget):
         missing_tax_id = Msg(ERROR_ON_MISSING_TAX_ID)
         mising_gene_as_attribute_name = Msg(ERROR_ON_MISSING_ANNOTATION)
         missing_gene_id = Msg(ERROR_ON_MISSING_GENE_ID)
+        mising_gene_id_attribute = Msg(ERROR_ON_MISSING_ANNOTATION)
 
     want_main_area = False
 
@@ -45,7 +49,12 @@ class OWHomologs(widget.OWWidget):
 
     def __init__(self):
         super().__init__()
-        self.taxonomy_ids = dict(COMMON_NAMES)
+        self.taxonomy_names: List[str] = list(COMMON_NAMES_MAPPING.values())
+        self.taxonomy_ids: List[str] = list(COMMON_NAMES_MAPPING.keys())
+        self.source_tax: Optional[str] = None
+        self.target_tax: Optional[str] = None
+        self.data: Optional[Table] = None
+
         info_box = gui.vBox(self.controlArea, "Info")
         self.info_gene_type = gui.widgetLabel(info_box, 'No data on input.')
         self.info_gene_type.setWordWrap(True)
@@ -53,14 +62,11 @@ class OWHomologs(widget.OWWidget):
         self.info_gene.setWordWrap(True)
         info_box.setMinimumWidth(200)
         gui.separator(self.controlArea)
-        self.taxonomy = None
-        self.data = None
-        self.output = None
 
-        self.organism_id = -1
-        self.organism = gui.comboBox(self.controlArea, self, 'organism_id')
-        self.organism.addItems(self.taxonomy_ids.values())
-        self.organism.activated[int].connect(self.organisms)
+        self.combo_box_id = -1
+        self.target_organism = gui.comboBox(self.controlArea, self, 'combo_box_id')
+        self.target_organism.addItems(self.taxonomy_names)
+        self.target_organism.activated[int].connect(self.target_organism_change)
 
         gui.auto_commit(self.controlArea, self, "auto_commit", "Commit", "Commit Automatically")
 
@@ -68,72 +74,74 @@ class OWHomologs(widget.OWWidget):
         self.info.set_output_summary(self.info.NoInput)
 
     @Inputs.data
-    def set_data(self, data):
+    def set_data(self, data: Table) -> None:
         self.Warning.no_genes.clear()
-        self.taxonomy_ids = dict(COMMON_NAMES)
         self.data = data
-
+        print(self.data.attributes)
         if self.data:
             if TableAnnotation.gene_as_attr_name not in self.data.attributes:
                 self.Warning.mising_gene_as_attribute_name()
                 return
-            if TableAnnotation.tax_id not in self.data.attributes:
-                self.Warning.missing_tax_id()
-                return
-            if TableAnnotation.gene_id_column not in self.data.attributes:
-                self.Warning.missing_tax_id_genes()
-                return
-            if self.data.attributes[TableAnnotation.gene_id_column] not in self.data.domain:
-                self.Warning.missing_gene_id()
-                return
+            if self.data.attributes[TableAnnotation.gene_as_attr_name]:
+                if TableAnnotation.gene_id_attribute not in self.data.attributes:
+                    self.Warning.mising_gene_id_attribute()
+                    return
+
+            else:
+                if TableAnnotation.tax_id not in self.data.attributes:
+                    self.Warning.missing_tax_id()
+                    return
+                if TableAnnotation.gene_id_column not in self.data.attributes:
+                    self.Warning.mising_gene_as_attribute_name()
+                    return
+                if self.data.attributes[TableAnnotation.gene_id_column] not in self.data.domain:
+                    self.Warning.missing_gene_id()
+                    return
         else:
             self.Warning.no_genes()
             return
 
-        self.taxonomy = self.taxonomy_ids[data.attributes[TableAnnotation.tax_id]]
-        if self.taxonomy == self.selected_organism:
-            del self.taxonomy_ids[data.attributes[TableAnnotation.tax_id]]
-            self.organism.clear()
-            self.organism.addItems(self.taxonomy_ids.values())
+        self.source_tax = data.attributes[TableAnnotation.tax_id]
+        taxonomy = common_taxid_to_name(self.source_tax)
+        self.target_organism.clear()
+        self.target_organism.addItems([tax_name for tax_name in self.taxonomy_names if tax_name != taxonomy])
+
+        if taxonomy == self.selected_organism:
+            self.combo_box_id = -1
         else:
             try:
-                self.organism_id = list(self.taxonomy_ids.values()).index(self.selected_organism)
+                self.combo_box_id = self.taxonomy_names.index(self.selected_organism)
             except ValueError:
-                self.organism_id = -1
+                self.combo_box_id = -1
 
-            del self.taxonomy_ids[data.attributes[TableAnnotation.tax_id]]
-            self.organism.clear()
-            self.organism.addItems(self.taxonomy_ids.values())
+            if self.combo_box_id != -1:
+                self.target_organism.setCurrentIndex(self.combo_box_id)
+                self.selected_organism = self.taxonomy_names[self.combo_box_id]
+                self.target_tax = species_name_to_taxid(self.selected_organism)
 
-            if self.organism_id != -1:
-                self.organism.setCurrentIndex(self.organism_id)
-                self.selected_organism = list(self.taxonomy_ids.values())[self.organism_id]
-
-        self.info_gene_type.setText("Organism: " + self.taxonomy)
-        self.info_gene.setText("Number of genes: " + str(len(data)))
+        self.info_gene_type.setText(f"Organism: {taxonomy}")
+        self.info_gene.setText(f"Number of genes: {str(len(data))}")
         self.info.set_input_summary(f"{str(len(data))}")
 
         self.commit()
 
-    def find_homologs(self, genes, organism):
-        gm = GeneMatcher(organism)
+    def find_homologs(self, genes: Union[str,List[Gene]]) -> List[Optional[Gene]]:
+        gm = GeneMatcher(self.source_tax)
         gm.genes = genes
 
-        homologs = [g.homolog_genes(taxonomy_id=self.target_organism) for g in gm.genes]
-        homologs = load_gene_summary(self.target_organism, homologs)
+        homologs = [g.homolog_genes(taxonomy_id=self.target_tax) for g in gm.genes]
+        homologs = load_gene_summary(self.target_tax, homologs)
 
         return homologs
 
-    def organisms(self, id):
-        self.organism_id = id
-        self.selected_organism = self.organism.itemText(id)
+    def target_organism_change(self, combo_box_id: int) -> None:
+        self.combo_box_id = combo_box_id
+        self.selected_organism = self.target_organism.itemText(combo_box_id)
+        self.target_tax = species_name_to_taxid(self.selected_organism)
+
         self.commit()
 
     def commit(self):
-        HOMOLOG_SYMBOL = "Homolog"
-        HOMOLOG_ID = "Homolog ID"
-        out_table = None
-        self.target_organism = list(self.taxonomy_ids.keys())[self.organism_id]
 
         if self.data.attributes[TableAnnotation.gene_as_attr_name]:
             domain = self.data.domain.copy()
@@ -141,7 +149,7 @@ class OWHomologs(widget.OWWidget):
 
             gene_loc = table.attributes[TableAnnotation.gene_id_attribute]
             genes = [str(attr.attributes.get(gene_loc, None)) for attr in table.domain.attributes]
-            homologs = self.find_homologs(genes, table.attributes[TableAnnotation.tax_id])
+            homologs = self.find_homologs(genes)
 
             for homolog, col in zip(homologs, table.domain.attributes):
                 if homolog:
@@ -160,7 +168,7 @@ class OWHomologs(widget.OWWidget):
         else:
             genes, _ = self.data.get_column_view(self.data.attributes[TableAnnotation.gene_id_column])
 
-            homologs = self.find_homologs(genes, self.data.attributes[TableAnnotation.tax_id])
+            homologs = self.find_homologs(genes)
             homolog = StringVariable(HOMOLOG_SYMBOL)
             homolog_id = StringVariable(HOMOLOG_ID)
             domain = Domain(
@@ -178,10 +186,8 @@ class OWHomologs(widget.OWWidget):
 
             out_table = table if len(table) > 0 else None
 
-        if out_table:
-            self.info.set_output_summary(f"{len(out_table)}")
-        else:
-            self.info.set_output_summary(f"{0}")
+        self.info.set_output_summary(f"{len(out_table) if out_table else 0}")
+
         self.Outputs.genes.send(out_table)
 
     def closeEvent(self, event):
