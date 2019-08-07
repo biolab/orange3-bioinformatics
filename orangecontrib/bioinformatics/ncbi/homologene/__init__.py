@@ -1,9 +1,9 @@
-
 from functools import reduce
+
 from collections import defaultdict
 from typing import List, Dict
-
 from orangecontrib.bioinformatics.utils import serverfiles
+
 from orangecontrib.bioinformatics.ncbi.gene import Gene
 
 
@@ -27,8 +27,8 @@ class HomoloGene:
         def _helper(groups, gene):
             groups[gene.homology_group_id].append(gene)
             return groups
-
         self._homologs_by_group: Dict[str, List[Gene]] = reduce(_helper, self._homologs.values(), defaultdict(list))
+
 
     def find_homolog(self, gene_id: str, organism: str):
         """ Find homolog gene in organism. If the homolog does not exist, return None. """
@@ -42,14 +42,13 @@ class HomoloGene:
 
 
 if __name__ == "__main__":
-    import Orange
     from orangecontrib.bioinformatics.ncbi.gene import GeneInfo, GeneMatcher, load_gene_summary
+    import Orange
 
     homology = HomoloGene()
-    gm = GeneMatcher('4932')
 
-    data = Orange.data.Table("brown-selected")
-    genes, _ = data.get_column_view('gene')
+    gm = GeneMatcher('4932')
+    genes = Orange.data.Table("brown-selected")
 
     gm.genes = genes
     homologs = [homology.find_homolog(str(gene.gene_id), '9606') for gene in gm.genes]
@@ -57,4 +56,3 @@ if __name__ == "__main__":
 
     for gene, homolog in zip(gm.genes, homologs):
         print(f'{gene} ----> {homolog}')
-
