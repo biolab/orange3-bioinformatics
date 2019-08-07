@@ -77,7 +77,6 @@ class OWHomologs(widget.OWWidget):
     def set_data(self, data: Table) -> None:
         self.Warning.no_genes.clear()
         self.data = data
-        print(self.data.attributes)
         if self.data:
             if TableAnnotation.gene_as_attr_name not in self.data.attributes:
                 self.Warning.mising_gene_as_attribute_name()

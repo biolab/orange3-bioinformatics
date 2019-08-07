@@ -29,7 +29,7 @@ class TestOWMHomologs(WidgetTest):
         self.genes_rows = Table(domain, data_row)
         self.genes_rows.attributes = attributes_rows
 
-        domain_columns = Domain([ContinuousVariable(name) for name, id in data_row], (), [])
+        domain_columns = Domain([ContinuousVariable(name) for name, id in data_row])
         for col, id in zip(domain_columns.attributes, data_row):
             col.attributes["Entrez ID"] = id[1]
 
