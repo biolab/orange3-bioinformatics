@@ -36,7 +36,7 @@ class OWHomologs(widget.OWWidget):
         data = widget.Input("Data", Table)
 
     class Warning(widget.OWWidget.Warning):
-        no_genes = Msg(ERROR_ON_MISSING_ANNOTATION)
+        no_genes = Msg("Missing data on input.")
         missing_tax_id = Msg(ERROR_ON_MISSING_TAX_ID)
         mising_gene_as_attribute_name = Msg(ERROR_ON_MISSING_ANNOTATION)
         missing_gene_id = Msg(ERROR_ON_MISSING_GENE_ID)
@@ -77,6 +77,7 @@ class OWHomologs(widget.OWWidget):
     def set_data(self, data: Table) -> None:
         self.Warning.no_genes.clear()
         self.data = data
+
         if self.data:
             if TableAnnotation.gene_as_attr_name not in self.data.attributes:
                 self.Warning.mising_gene_as_attribute_name()
@@ -98,6 +99,11 @@ class OWHomologs(widget.OWWidget):
                     return
         else:
             self.Warning.no_genes()
+            self.info.set_input_summary("0")
+            self.info_gene.clear()
+            self.info_gene_type.setText("No data on input.")
+            self.Outputs.genes.send(None)
+
             return
 
         self.source_tax = data.attributes[TableAnnotation.tax_id]
@@ -125,8 +131,10 @@ class OWHomologs(widget.OWWidget):
                 self.target_tax = species_name_to_taxid(self.selected_organism)
 
         self.info_gene_type.setText(f"Organism: {taxonomy}")
-        self.info_gene.setText(f"Number of genes: {str(len(data))}")
-        self.info.set_input_summary(f"{str(len(data))}")
+        data_len = len(data.domain.attributes) if self.data.attributes[
+            TableAnnotation.gene_as_attr_name] else len(data)
+        self.info_gene.setText(f"Number of genes: {data_len}")
+        self.info.set_input_summary(f"{data_len}")
 
         self.commit()
 
