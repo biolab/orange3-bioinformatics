@@ -108,6 +108,8 @@ class OWHomologs(widget.OWWidget):
 
         if taxonomy == self.selected_organism:
             self.combo_box_id = -1
+            self.selected_organism = self.taxonomy_names[0]
+            self.target_tax = species_name_to_taxid(self.selected_organism)
         else:
             try:
                 self.combo_box_id = self.taxonomy_names.index(self.selected_organism)
@@ -118,6 +120,10 @@ class OWHomologs(widget.OWWidget):
                 self.target_organism.setCurrentIndex(self.combo_box_id)
                 self.selected_organism = self.taxonomy_names[self.combo_box_id]
                 self.target_tax = species_name_to_taxid(self.selected_organism)
+            else:
+                self.target_organism.setCurrentIndex(0)
+                self.selected_organism = self.taxonomy_names[0]
+                self.target_tax = species_name_to_taxid(self.selected_organism)
 
         self.info_gene_type.setText(f"Organism: {taxonomy}")
         self.info_gene.setText(f"Number of genes: {str(len(data))}")
@@ -125,7 +131,7 @@ class OWHomologs(widget.OWWidget):
 
         self.commit()
 
-    def find_homologs(self, genes: Union[str,List[Gene]]) -> List[Optional[Gene]]:
+    def find_homologs(self, genes: List[Union[str, Gene]]) -> List[Optional[Gene]]:
         gm = GeneMatcher(self.source_tax)
         gm.genes = genes
 
