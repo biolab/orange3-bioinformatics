@@ -2,7 +2,10 @@
 import sys
 import os
 import threading
+import json
 
+
+from datetime import datetime
 from collections import namedtuple, OrderedDict
 from datetime import datetime as d_time
 from functools import partial
@@ -31,10 +34,50 @@ from orangecontrib.bioinformatics.geneset import filename
 from orangecontrib.bioinformatics.geneset.config import DOMAIN as gene_sets_domain
 
 
-from server_update import SOURCE_SERVER, SOURCE_USER, INFO_FILE_SCHEMA, create_info_file, create_folder
-
 # File states
 AVAILABLE, CURRENT, OUTDATED, DEPRECATED, USER_FILE = range(5)
+# File sources
+SOURCE_SERVER = 'server_file'  # files on the serverfiles-bio repository
+SOURCE_USER = 'user_file'      # user defined files
+INFO_FILE_SCHEMA = {
+    'domain': None,
+    'filename': None,
+    'source': None,
+    'title': None,
+    'tags': [],
+    'size': None,
+    'datetime': None
+    # used only if files are compressed
+    # 'uncompressed': None,
+    # 'compression': None,
+}
+
+
+def file_size_bytes(file_path):
+    """ returns file size in bytes """
+    return os.stat(file_path).st_size
+
+
+def create_info_file(file_path, **kwargs):
+    info_dict = OrderedDict(INFO_FILE_SCHEMA)
+
+    info_dict.update(**kwargs)
+    info_dict['datetime'] = '{0:%Y-%m-%d %H:%M:%S.%f}'.format(datetime.today())
+    info_dict['size'] = file_size_bytes(file_path)
+
+    with open(file_path + '.info', 'wt') as f:
+        json.dump(info_dict, f)
+
+
+def create_folder(path):
+    try:
+        os.makedirs(path)
+    except OSError:
+        if os.path.exists(path):
+            pass
+        else:
+            # There was an error on creation, so make sure we know about it
+            raise
 
 
 class UpdateOptionsItemDelegate(QStyledItemDelegate):
