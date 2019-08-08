@@ -7,6 +7,34 @@ from Orange.data import Table
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, GeneInfo, Gene, ENTREZ_ID
 
 
+class TestGene(unittest.TestCase):
+
+    def test_load_attributes(self):
+        g = Gene()
+        g.load_attributes(('Human', '9606', '920', 'CD4'), attributes=('species', 'tax_id', 'gene_id', 'symbol'))
+        self.assertEqual(g.species, 'Human')
+        self.assertEqual(g.tax_id, '9606')
+        self.assertEqual(g.gene_id, '920')
+        self.assertEqual(g.symbol, 'CD4')
+        self.assertEqual(str(g), '<Gene symbol=CD4, tax_id=9606, gene_id=920>')
+
+        self.assertIsNone(g.input_identifier)
+        self.assertIsNone(g.synonyms)
+
+    def test_homologs(self):
+        gm = GeneMatcher('9606')
+        gm.genes = ['920']
+        g = gm.genes[0]
+
+        self.assertIsNotNone(g.homologs)
+        self.assertTrue(len(g.homologs))
+        self.assertIn('10090', g.homologs)
+        self.assertEqual(g.homology_group_id, '513')
+
+        self.assertEqual(g.homolog_genes('10090'), '12504')
+        self.assertIsNone(g.homolog_genes('Unknown_taxonomy'))
+
+
 class TestGeneMatcher(unittest.TestCase):
 
     def test_synonym_multiple_matches(self):
