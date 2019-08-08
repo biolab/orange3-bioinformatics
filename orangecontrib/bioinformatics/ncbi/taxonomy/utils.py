@@ -14,7 +14,7 @@ from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.ncbi.taxonomy.config import DOMAIN, FILENAME, TAXDUMP_URL
 
 
-def namedtuple_repr_pretty(self, p, cycle):
+def namedtuple_repr_pretty(self, p, cycle):  # pragma: no cover
     name = type(self).__name__
     if cycle:
         p.text("{0}(...)".format("name"))
@@ -261,7 +261,7 @@ class TaxonomyDB(collections.Mapping):
         return self[tax_id].synonyms
 
     @classmethod
-    def initialize(cls, db_filename, taxdump=None):
+    def initialize(cls, db_filename, taxdump=None):  # pragma: no cover
 
         tempd = None
         if taxdump is None:
@@ -276,7 +276,7 @@ class TaxonomyDB(collections.Mapping):
                 shutil.rmtree(tempd)
 
     @classmethod
-    def download(cls, download_dir):
+    def download(cls, download_dir):  # pragma: no cover
         """
         Download the taxonomy archive from the ncbi ftp server.
 
@@ -292,7 +292,7 @@ class TaxonomyDB(collections.Mapping):
             shutil.copyfileobj(stream, f)
 
     @classmethod
-    def init_db(cls, dbfilename, taxdump):
+    def init_db(cls, dbfilename, taxdump):  # pragma: no cover
 
         con = sqlite3.connect(dbfilename)
         cursor = con.cursor()

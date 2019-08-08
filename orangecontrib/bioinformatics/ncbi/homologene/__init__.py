@@ -29,7 +29,6 @@ class HomoloGene:
             return groups
         self._homologs_by_group: Dict[str, List[Gene]] = reduce(_helper, self._homologs.values(), defaultdict(list))
 
-
     def find_homolog(self, gene_id: str, organism: str):
         """ Find homolog gene in organism. If the homolog does not exist, return None. """
         homology_group = self._homologs.get(str(gene_id), Gene()).homology_group_id
