@@ -214,7 +214,7 @@ class GeneMatcher:
 
             for gene in self.genes:
                 if gene.gene_id:
-                    data_table.domain[gene.input_name].attributes[ENTREZ_ID] = gene.gene_id
+                    data_table.domain[gene.input_identifier].attributes[ENTREZ_ID] = gene.gene_id
 
     def match_genes(self):
         self._match()
