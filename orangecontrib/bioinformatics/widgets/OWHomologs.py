@@ -70,8 +70,8 @@ class OWHomologs(widget.OWWidget):
 
         gui.auto_commit(self.controlArea, self, "auto_commit", "Commit", "Commit Automatically")
 
-        self.info.set_input_summary(self.info.NoInput)
-        self.info.set_output_summary(self.info.NoInput)
+        self.info.set_input_summary("0")
+        self.info.set_output_summary("0")
 
     @Inputs.data
     def set_data(self, data: Table) -> None:
@@ -99,6 +99,7 @@ class OWHomologs(widget.OWWidget):
                     return
         else:
             self.info.set_input_summary("0")
+            self.info.set_output_summary("0")
             self.info_gene.clear()
             self.info_gene_type.setText("No data on input.")
             self.Outputs.genes.send(None)
