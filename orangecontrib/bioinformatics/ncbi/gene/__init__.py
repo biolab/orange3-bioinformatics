@@ -58,15 +58,12 @@ class Gene:
 
         return [parse_attribute(tag) for tag in header_tags]
 
-    def homolog_genes(self, taxonomy_id: Optional[str] = None) -> Union[Dict[str, str], str, None]:
+    def homolog_gene(self, taxonomy_id: str) -> Union[Dict[str, str], str, None]:
         """ Returns gene homologs.
 
-        :param taxonomy_id: target organism (optional).
+        :param taxonomy_id: target organism.
         :return:
         """
-        if not taxonomy_id or not self.homologs:
-            return None
-
         return self.homologs.get(taxonomy_id, None)
 
 
@@ -341,6 +338,6 @@ if __name__ == "__main__":
     gm.genes = ['CD4', '614535', 'ENSG00000205426', "2'-PDE", 'HB-1Y']
     print(list(zip(gm.genes, [g.input_identifier for g in gm.genes])))
 
-    homologs = [g.homolog_genes(taxonomy_id='10090') for g in gm.genes]
+    homologs = [g.homolog_gene(taxonomy_id='10090') for g in gm.genes]
     homologs = load_gene_summary('10090', homologs)
     print(homologs)

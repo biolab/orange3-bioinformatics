@@ -142,7 +142,7 @@ class OWHomologs(widget.OWWidget):
         gm = GeneMatcher(self.source_tax)
         gm.genes = genes
 
-        homologs = [g.homolog_genes(taxonomy_id=self.target_tax) for g in gm.genes]
+        homologs = [g.homolog_gene(taxonomy_id=self.target_tax) for g in gm.genes]
         homologs = load_gene_summary(self.target_tax, homologs)
 
         return homologs

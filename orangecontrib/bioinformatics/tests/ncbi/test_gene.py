@@ -31,8 +31,8 @@ class TestGene(unittest.TestCase):
         self.assertIn('10090', g.homologs)
         self.assertEqual(g.homology_group_id, '513')
 
-        self.assertEqual(g.homolog_genes('10090'), '12504')
-        self.assertIsNone(g.homolog_genes('Unknown_taxonomy'))
+        self.assertEqual(g.homolog_gene('10090'), '12504')
+        self.assertIsNone(g.homolog_gene('Unknown_taxonomy'))
 
 
 class TestGeneMatcher(unittest.TestCase):
