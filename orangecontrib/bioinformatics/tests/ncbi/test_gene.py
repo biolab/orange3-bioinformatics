@@ -1,6 +1,10 @@
 import unittest
 
-from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, GeneInfo, Gene
+from os.path import normpath, basename
+
+
+from Orange.data import Table
+from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, GeneInfo, Gene, ENTREZ_ID
 
 
 class TestGeneMatcher(unittest.TestCase):
@@ -31,6 +35,31 @@ class TestGeneMatcher(unittest.TestCase):
             self.assertIsNotNone(gene.tax_id)
             self.assertIsNotNone(gene.species)
             self.assertIsNotNone(gene.gene_id)
+
+    def test_taxonomy_change(self):
+        gm = GeneMatcher('4932')
+        self.assertEqual(gm.tax_id, '4932')
+        self.assertEqual(basename(normpath(gm.gene_db_path)), '4932.sqlite')
+
+        gm.tax_id = '9606'
+        self.assertEqual(gm.tax_id, '9606')
+        self.assertEqual(basename(normpath(gm.gene_db_path)), '9606.sqlite')
+
+    def test_match_table_column(self):
+        gm = GeneMatcher('4932')
+
+        data = gm.match_table_column(Table('brown-selected.tab'), 'gene')
+        self.assertTrue(ENTREZ_ID in data.domain)
+
+    def test_match_table_attributes(self):
+        gm = GeneMatcher('4932')
+
+        data = Table('brown-selected.tab')
+        data = Table.transpose(data, feature_names_column='gene')
+        gm.match_table_attributes(data)
+
+        for column in data.domain.attributes:
+            self.assertTrue(ENTREZ_ID in column.attributes)
 
 
 class TestGeneInfo(unittest.TestCase):
