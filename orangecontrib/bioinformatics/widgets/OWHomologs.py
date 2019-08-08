@@ -75,7 +75,7 @@ class OWHomologs(widget.OWWidget):
 
     @Inputs.data
     def set_data(self, data: Table) -> None:
-        self.Warning.no_genes.clear()
+        self.Warning.clear()
         self.data = data
 
         if self.data:
@@ -98,7 +98,6 @@ class OWHomologs(widget.OWWidget):
                     self.Warning.missing_gene_id()
                     return
         else:
-            self.Warning.no_genes()
             self.info.set_input_summary("0")
             self.info_gene.clear()
             self.info_gene_type.setText("No data on input.")
