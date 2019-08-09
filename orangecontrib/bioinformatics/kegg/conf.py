@@ -14,7 +14,7 @@ except ImportError:
     import configparser
 
 from six import StringIO
-from ..utils import serverfiles
+from orangecontrib.bioinformatics.utils import serverfiles
 kegg_dir = serverfiles.localpath("KEGG2")
 
 default = """

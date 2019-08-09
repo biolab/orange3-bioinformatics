@@ -1,9 +1,9 @@
 from six import StringIO
-import doctest
 
 import unittest
 
-from orangecontrib.bio.kegg.entry import parser, fields, DBEntry, entry_decorate
+
+from orangecontrib.bioinformatics.kegg.entry import parser, DBEntry, entry_decorate
 
 
 TEST_ENTRY = """\
@@ -24,6 +24,7 @@ class Entry(DBEntry):
 
 
 class TestEntry(unittest.TestCase):
+
     def test_entry(self):
         """
         Test basic DBEntry class.
@@ -35,6 +36,7 @@ class TestEntry(unittest.TestCase):
 
 
 class TestParser(unittest.TestCase):
+
     def test_parser(self):
         parse = parser.DBGETEntryParser()
         stream = StringIO(TEST_ENTRY)
@@ -57,6 +59,5 @@ class TestParser(unittest.TestCase):
         self.assertSequenceEqual(list(parse.parse(stream)), expected)
 
 
-def load_tests(loader, tests, ignore):
-    tests.addTests(doctest.DocTestSuite(parser))
-    return tests
+if __name__ == '__main__':
+    unittest.main()

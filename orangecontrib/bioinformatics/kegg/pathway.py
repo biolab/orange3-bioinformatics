@@ -17,9 +17,9 @@ from functools import reduce
 
 import requests
 
-from . import conf
-from . import caching
-from . import api
+from orangecontrib.bioinformatics.kegg import conf
+from orangecontrib.bioinformatics.kegg import caching
+from orangecontrib.bioinformatics.kegg import api
 
 
 def cached_method(func, cache_name="_cached_method_cache", store=None):

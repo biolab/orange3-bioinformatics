@@ -2,28 +2,11 @@ import unittest
 import tempfile
 import shutil
 
-try:
-    from unittest import mock
-except ImportError:
-    import backports.unittest_mock
-    backports.unittest_mock.install()
-    from unittest import mock
+from unittest import mock
+from types import SimpleNamespace as namespace
 
-try:
-    from types import SimpleNamespace as namespace
-except ImportError:
-    class namespace(object):
-        def __init__(self, **kwargs): self.__dict__.update(kwargs)
-        def __repr__(self):
-            contents = ",".join("{}={!r}".format(*it)
-                                for it in sorted(self.__dict__.items()))
-            return "namespace(" + contents + ")"
-
-import doctest
-
-from orangecontrib.bio import kegg
-from orangecontrib.bio.kegg import api as keggapi
-from orangecontrib.bio.kegg import conf as keggconf
+from orangecontrib.bioinformatics.kegg import api as keggapi
+from orangecontrib.bioinformatics.kegg import conf as keggconf
 
 
 list_organism = """\
@@ -81,37 +64,33 @@ def mock_service():
     return s
 
 
-def mock_kegg_api():
-    api = keggapi.KeggApi()
-    api.service = mock_service()
-    return api
-
-
-def load_tests(loader, tests, ignore):
-    def setUp(testcase):
+class TestKeggApi(unittest.TestCase):
+    def setUp(self):
         # testcase._tmpdir = tempfile.TemporaryDirectory(prefix="kegg-tests")
-        testcase._tmpdir = tempfile.mkdtemp(prefix="kegg-tests")
-        testcase._old_cache_path = keggconf.params["cache.path"]
-        keggconf.params["cache.path"] = testcase._tmpdir
-        testcase._mock_ctx = mock.patch(
-            "orangecontrib.bio.kegg.api.web_service",
-            mock_service)
-        testcase._mock_ctx.__enter__()
+        self._tmpdir = tempfile.mkdtemp(prefix="kegg-tests")
+        self._old_cache_path = keggconf.params["cache.path"]
+        keggconf.params["cache.path"] = self._tmpdir
+        self._mock_ctx = mock.patch("orangecontrib.bioinformatics.kegg.api.web_service", mock_service)
+        self._mock_ctx.__enter__()
         s = keggapi.web_service()
         assert isinstance(s, namespace)
 
-    def tearDown(testcase):
-        testcase._mock_ctx.__exit__(None, None, None)
-        keggconf.params["cache.path"] = testcase._old_cache_path
-        shutil.rmtree(testcase._tmpdir)
+    def tearDown(self):
+        self._mock_ctx.__exit__(None, None, None)
+        keggconf.params["cache.path"] = self._old_cache_path
+        shutil.rmtree(self._tmpdir)
 
-    api = mock_kegg_api()
+    def test_api(self):
+        def mock_kegg_api():
+            api = keggapi.KeggApi()
+            api.service = mock_service()
+            return api
 
-    tests.addTests(
-        doctest.DocTestSuite(
-            keggapi, optionflags=doctest.ELLIPSIS,
-            extraglobs={"api": api},
-            setUp=setUp, tearDown=tearDown
-        )
-    )
-    return tests
+        api = mock_kegg_api()
+        self.assertIsNotNone(api.list_organisms())
+        self.assertIsNotNone(api.list_pathways("hsa"))
+        self.assertIsNotNone(api.info("pathway"))
+
+
+if __name__ == '__main__':
+    unittest.main()
