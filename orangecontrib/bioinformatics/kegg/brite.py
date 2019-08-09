@@ -13,7 +13,7 @@ try:
 except ImportError:
     from urllib.request import urlopen
 
-from . import conf
+from orangecontrib.bioinformatics.kegg import conf
 
 
 class BriteEntry(object):

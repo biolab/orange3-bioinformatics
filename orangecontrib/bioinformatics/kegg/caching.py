@@ -12,7 +12,7 @@ except ImportError:
 from contextlib import closing
 
 from datetime import datetime, date, timedelta
-from . import conf
+from orangecontrib.bioinformatics.kegg import conf
 
 import six
 

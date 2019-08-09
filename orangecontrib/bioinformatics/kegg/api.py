@@ -7,8 +7,8 @@ from operator import itemgetter
 import warnings
 import six
 
-from .service import web_service
-from .types import OrganismSummary, Definition, BInfo, Link
+from orangecontrib.bioinformatics.kegg.service import web_service
+from orangecontrib.bioinformatics.kegg.types import OrganismSummary, Definition, BInfo, Link
 
 
 # A list of all databases with names, abbreviations
@@ -334,8 +334,8 @@ KEGG api with caching
 
 import os
 
-from . import caching
-from .caching import cached_method, cache_entry, touch_dir
+from orangecontrib.bioinformatics.kegg import caching
+from orangecontrib.bioinformatics.kegg.caching import cached_method, cache_entry, touch_dir
 
 try:
     from functools import lru_cache

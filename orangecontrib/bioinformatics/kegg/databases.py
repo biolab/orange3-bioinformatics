@@ -9,9 +9,9 @@ import sys
 import re
 from contextlib import closing
 
-from . import entry
-from .entry import fields
-from . import api
+from orangecontrib.bioinformatics.kegg import entry
+from orangecontrib.bioinformatics.kegg.entry import fields
+from orangecontrib.bioinformatics.kegg import api
 
 
 def iter_take(source_iter, n):
