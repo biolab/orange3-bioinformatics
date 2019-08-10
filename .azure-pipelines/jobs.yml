@@ -32,7 +32,6 @@ jobs:
           orange_version: 'released'
 
     - template: test.yml
-    - template: build.yml
 
 # this job will only run if build with stable (released) Orange fails.
 - job: ${{ parameters.name }}_dev
