@@ -17,7 +17,7 @@ jobs:
     - ${{ if in(parameters.name, 'Linux') }}:
       - task: CondaEnvironment@1
         inputs:
-          packageSpecs: 'python=3.7.2'
+          packageSpecs: 'python=3.7.3'
           updateConda: false
         displayName: Install python and activate conda environment
 
@@ -25,8 +25,6 @@ jobs:
       - task: UsePythonVersion@0
         inputs:
           versionSpec: '$(python.version)'
-
-    - script: printenv
 
     - template: install_addon.yml
       parameters:
@@ -47,11 +45,10 @@ jobs:
         python.version: '3.7'
 
   steps:
-    # use conda python on linux. Temporary fix. https://github.com/microsoft/azure-pipelines-image-generation/issues/1083
     - ${{ if in(parameters.name, 'Linux') }}:
       - task: CondaEnvironment@1
         inputs:
-          packageSpecs: 'python=3.7.2'
+          packageSpecs: 'python=3.7.3'
           installOptions: '-c conda-forge'
           updateConda: false
         displayName: Install python and activate conda environment
