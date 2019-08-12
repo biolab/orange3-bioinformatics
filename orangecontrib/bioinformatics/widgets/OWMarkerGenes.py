@@ -311,7 +311,6 @@ class OWMarkerGenes(widget.OWWidget):
     def handle_source_changed(self, source_index):
         self.set_db_source_index(source_index)
         self._load_data()
-        self.clear_selection()
 
     def set_db_source_index(self, source_index):
         self.closeContext()
