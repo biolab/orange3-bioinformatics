@@ -3,20 +3,12 @@ import sys
 import numpy as np
 
 
-from typing import List
+from typing import Set
 from collections import defaultdict
 from functools import partial
 
 
-from AnyQt.QtCore import (
-    Qt,
-    QSize,
-    QTimer,
-    QModelIndex,
-    QItemSelection,
-    QItemSelectionModel,
-    QItemSelectionRange,
-)
+from AnyQt.QtCore import Qt, QSize, QTimer, QModelIndex, QItemSelection, QItemSelectionModel, QItemSelectionRange
 from AnyQt.QtGui import QFont, QColor
 from AnyQt.QtWidgets import QTreeView, QLineEdit
 
@@ -25,11 +17,7 @@ from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils.itemmodels import TableModel
 
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    GENE_AS_ATTRIBUTE_NAME,
-    TAX_ID,
-    GENE_ID_COLUMN,
-)
+from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME, TAX_ID, GENE_ID_COLUMN
 
 serverfiles_domain = 'marker_genes'
 
@@ -38,15 +26,9 @@ def get_available_db_sources():
     found_sources = dict()
 
     try:
-        found_sources.update(
-            serverfiles.ServerFiles().allinfo(serverfiles_domain)
-        )
+        found_sources.update(serverfiles.ServerFiles().allinfo(serverfiles_domain))
     except ConnectionError as e:
-        raise ConnectionError(
-            'Can not connect to {}. Using only local files.'.format(
-                serverfiles.server_url
-            )
-        )
+        raise ConnectionError('Can not connect to {}. Using only local files.'.format(serverfiles.server_url))
     finally:
         found_sources.update(serverfiles.allinfo(serverfiles_domain))
         return {item.get('title').split(': ')[-1]: item for item in found_sources.values()}
@@ -62,11 +44,7 @@ class HeaderIndex:
     URL = 5
 
 
-HeaderLabels = {
-    HeaderIndex.GENE: 'Entrez ID',
-    HeaderIndex.REFERENCE: 'Reference',
-    HeaderIndex.URL: 'URL',
-}
+HeaderLabels = {HeaderIndex.GENE: 'Entrez ID', HeaderIndex.REFERENCE: 'Reference', HeaderIndex.URL: 'URL'}
 
 
 class SearchableTableModel(TableModel):
@@ -79,17 +57,13 @@ class SearchableTableModel(TableModel):
         TableModel.__init__(self, data, parent)
         self._data = data
         self._roleData = {Qt.DisplayRole: self.source}
-        self._roleData = partial(
-            defaultdict,
-            partial(defaultdict, partial(defaultdict, lambda: None)),
-        )(self._roleData)
+        self._roleData = partial(defaultdict, partial(defaultdict, partial(defaultdict, lambda: None)))(self._roleData)
         self.set_column_links()
 
     def set_column_links(self):
         domain = self._data.domain
-        ref_col = domain.metas.index(
-            domain[HeaderLabels[HeaderIndex.REFERENCE]]
-        )
+        ref_col = domain.metas.index(domain[HeaderLabels[HeaderIndex.REFERENCE]])
+
         font = QFont()
         font.setUnderline(True)
         color = QColor(Qt.blue)
@@ -123,11 +97,7 @@ class SearchableTableModel(TableModel):
         selection = np.full(self._data.metas.shape, True)
         for search_word in filter_pattern.split():
             match_result = (
-                np.core.defchararray.find(
-                    np.char.lower(self._data.metas.astype(str)),
-                    search_word.lower(),
-                )
-                >= 0
+                np.core.defchararray.find(np.char.lower(self._data.metas.astype(str)), search_word.lower()) >= 0
             )
             selection = selection & match_result
         return selection
@@ -137,6 +107,9 @@ class SearchableTableModel(TableModel):
         self._row_instance.cache_clear()
         self.wrap(self._data[self.filter_table(filter_pattern).any(axis=1), :])
         self.set_column_links()
+
+    def data_length(self):
+        return len(self._data)
 
 
 class MarkerGroupContextHandler(settings.ContextHandler):
@@ -171,18 +144,22 @@ class OWMarkerGenes(widget.OWWidget):
     selected_db_source: str = settings.Setting('')
     filter_text: str = settings.Setting('')
     header_state: bytes = settings.Setting(b'')
+    auto_commit = settings.Setting(True)
 
     settingsHandler = MarkerGroupContextHandler()
-    selected_genes: List[tuple] = settings.ContextSetting([])
+    selected_genes: Set[tuple] = settings.ContextSetting(set())
 
     def __init__(self):
         super().__init__()
         self._data = None
         self._available_db_sources = None
+        self.output = None
 
         self._timer = QTimer()
         self._timer.timeout.connect(self._filter_table)
         self._timer.setSingleShot(True)
+        self.info.set_input_summary("0")
+        self.info.set_output_summary("0")
 
         box = gui.widgetBox(self.controlArea, 'Database', margin=0)
         self.db_source_index = -1
@@ -193,14 +170,14 @@ class OWMarkerGenes(widget.OWWidget):
         self.group_index = -1
         self.group_cb = gui.comboBox(box, self, 'group_index')
         self.group_cb.activated[int].connect(self.set_group_index)
+
         gui.rubber(self.controlArea)
 
+        gui.auto_commit(self.controlArea, self, "auto_commit", "Commit", "Commit Automatically")
         # TODO: to avoid this, marker genes table should have 'tax_id' column
         self.map_group_to_taxid = {'Human': '9606', 'Mouse': '10090'}
 
-        filter_line_edit = gui.lineEdit(
-            self.mainArea, self, "filter_text"
-        )  # type: QLineEdit
+        filter_line_edit = gui.lineEdit(self.mainArea, self, "filter_text")  # type: QLineEdit
         filter_line_edit.setPlaceholderText("Filter...")
         filter_line_edit.textEdited.connect(self.call_filter_timer)
 
@@ -239,9 +216,7 @@ class OWMarkerGenes(widget.OWWidget):
             self.db_source_index = idx
             self.selected_db_source = items[idx]
         elif items:
-            self.db_source_index = min(
-                max(self.db_source_index, 0), len(items) - 1
-            )
+            self.db_source_index = min(max(self.db_source_index, 0), len(items) - 1)
 
         self.set_db_source_index(self.db_source_index)
 
@@ -280,29 +255,20 @@ class OWMarkerGenes(widget.OWWidget):
                 self.group_index = idx
                 self.selected_group = group_values[idx]
             elif group_values:
-                self.group_index = min(
-                    max(self.group_index, 0), len(group_values) - 1
-                )
+                self.group_index = min(max(self.group_index, 0), len(group_values) - 1)
 
             self.set_group_index(self.group_index)
 
     def _load_data(self):
         self.available_db_sources = get_available_db_sources()
-        file_name = self.available_db_sources[self.selected_db_source][
-            'filename'
-        ]
+        file_name = self.available_db_sources[self.selected_db_source]['filename']
 
         try:
             serverfiles.update(serverfiles_domain, file_name)
         except ConnectionError as e:
-            raise ConnectionError(
-                'Can not connect to {}. '
-                'Using only local files.'.format(serverfiles.server_url)
-            )
+            raise ConnectionError('Can not connect to {}. ' 'Using only local files.'.format(serverfiles.server_url))
         finally:
-            file_path = serverfiles.localpath_download(
-                serverfiles_domain, file_name
-            )
+            file_path = serverfiles.localpath_download(serverfiles_domain, file_name)
             data = Table(file_path)
 
             # enforce order
@@ -336,18 +302,16 @@ class OWMarkerGenes(widget.OWWidget):
             for row_index in selected:
                 selection.append(
                     QItemSelectionRange(
-                        self.view.model().index(row_index, 0),
-                        self.view.model().index(row_index, header_count),
+                        self.view.model().index(row_index, 0), self.view.model().index(row_index, header_count)
                     )
                 )
 
-            self.view.selectionModel().select(
-                selection, QItemSelectionModel.ClearAndSelect
-            )
+            self.view.selectionModel().select(selection, QItemSelectionModel.ClearAndSelect)
 
     def handle_source_changed(self, source_index):
         self.set_db_source_index(source_index)
         self._load_data()
+        self.clear_selection()
 
     def set_db_source_index(self, source_index):
         self.closeContext()
@@ -364,12 +328,21 @@ class OWMarkerGenes(widget.OWWidget):
         self._timer.stop()
         if search_string != self.filter_text:
             self.filter_text = search_string
-        self._timer.start(500)
+        self._timer.start(700)
 
     def _filter_table(self):
         model = self.view.model()
         assert isinstance(model, SearchableTableModel)
         model.update_model(str(self.filter_text))
+        self.set_selection()
+        self.update_data_info()
+        self.update_model()
+        self.commit()
+
+    def update_data_info(self):
+        model = self.view.model()
+        self.info.set_input_summary(f"Shown : {str(len(model.source))}/{str(model.data_length())}")
+        self.info.set_output_summary(f"Selected: {str(len(self.selected_genes))}")
 
     def _setup(self):
         self.closeContext()
@@ -378,44 +351,36 @@ class OWMarkerGenes(widget.OWWidget):
         gvec = data.get_column_view(group)[0]
 
         if group.is_string:
-            mask = gvec == self.group_cb.itemData(
-                self.group_index, Qt.DisplayRole
-            )
+            mask = gvec == self.group_cb.itemData(self.group_index, Qt.DisplayRole)
         else:
             mask = gvec == self.group_index
 
         data = data[mask]
         rest = data[:, data.domain.metas[1:]]
         model = SearchableTableModel(rest, parent=self)
-        ref_col = rest.domain.metas.index(
-            rest.domain[HeaderLabels[HeaderIndex.REFERENCE]]
-        )
-        self.view.setItemDelegateForColumn(
-            ref_col, gui.LinkStyledItemDelegate(self.view)
-        )
+        ref_col = rest.domain.metas.index(rest.domain[HeaderLabels[HeaderIndex.REFERENCE]])
+        self.view.setItemDelegateForColumn(ref_col, gui.LinkStyledItemDelegate(self.view))
 
         self.view.setModel(model)
-        self.view.selectionModel().selectionChanged.connect(
-            self._on_selection_changed
-        )
+        self.view.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
         self.openContext(self.selected_group)
         self.call_filter_timer(self.filter_text)
         self.view.hideColumn(HeaderIndex.URL)
-        self.set_selection()
 
+    def _on_selection_changed(self, *args):
+        self.update_model()
         self.commit()
-
-    def _on_selection_changed(self):
-        self.commit()
+        self.update_data_info()
 
     def selected_rows(self):
         """ Return row index for selected genes
         """
+        model = self.view.model()
+
         if not self.selected_genes:
             return []
 
-        model = self.view.model()
         return [
             row_index
             for row_index in range(model.rowCount())
@@ -428,45 +393,43 @@ class OWMarkerGenes(widget.OWWidget):
         ]
 
     def commit(self):
+        self.Outputs.genes.send(self.output)
+
+    def update_model(self):
         model = self.view.model()
         assert isinstance(model, SearchableTableModel)
         rows = [mi.row() for mi in self.view.selectionModel().selectedRows(0)]
 
-        if rows:
+        if rows and len(rows) != len(model.source):
             rows = model.mapToSourceRows(rows)
             output = model.source[rows]
         else:
             output = model.source
 
         gene_id = self.view.selectionModel().selectedRows(HeaderIndex.GENE)
-        cell_type = self.view.selectionModel().selectedRows(
-            HeaderIndex.CELL_TYPE
-        )
+        cell_type = self.view.selectionModel().selectedRows(HeaderIndex.CELL_TYPE)
         ref = self.view.selectionModel().selectedRows(HeaderIndex.REFERENCE)
 
-        self.selected_genes = [
-            (entrez.data(), cell.data(), ref.data())
-            for entrez, cell, ref in zip(gene_id, cell_type, ref)
-        ]
+        self.selected_genes = {
+            (entrez.data(), cell.data(), ref.data()) for entrez, cell, ref in zip(gene_id, cell_type, ref)
+        }
 
         # always false for marker genes data tables in single cell
         output.attributes[GENE_AS_ATTRIBUTE_NAME] = False
         # set taxonomy id in data.attributes
-        output.attributes[TAX_ID] = self.map_group_to_taxid.get(
-            self.selected_group, ''
-        )
+        output.attributes[TAX_ID] = self.map_group_to_taxid.get(self.selected_group, '')
         # set column id flag
         output.attributes[GENE_ID_COLUMN] = HeaderLabels[HeaderIndex.GENE]
         output.name = 'Marker Genes'
 
-        self.Outputs.genes.send(output)
+        self.output = output
 
     def closeEvent(self, event):
         self.header_state = bytes(self.view.header().saveState())
         super().closeEvent(event)
 
     def sizeHint(self):
-        return super().sizeHint().expandedTo(QSize(600, 500))
+        return super().sizeHint().expandedTo(QSize(750, 500))
 
 
 def main(argv=None):
