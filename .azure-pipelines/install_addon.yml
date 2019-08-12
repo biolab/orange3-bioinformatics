@@ -4,7 +4,8 @@ parameters:
 steps:
 
 - script: |
-    python -m pip install --upgrade pip setuptools wheel numpy==1.16.4
+    python -m pip install --upgrade pip setuptools wheel
+    pip install numpy==1.16.4
   displayName: 'Install build tools'
 
 - ${{ if in(parameters.orange_version, 'dev') }}:
