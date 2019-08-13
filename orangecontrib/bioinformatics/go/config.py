@@ -4,8 +4,8 @@ FTP_FILE_ANNOTATIONS = 'gene2go.gz'
 
 FTP_URL_ONTOLOGY = 'http://www.geneontology.org/ontology/gene_ontology_edit.obo'
 
-DOMAIN = 'GO'
-FILENAME_ANNOTATION = 'gene_association.{}'
+DOMAIN = 'go'
+FILENAME_ANNOTATION = '{}.tab'
 
 
 FILENAME_ONTOLOGY = 'gene_ontology.obo'

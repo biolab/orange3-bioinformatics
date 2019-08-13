@@ -73,8 +73,8 @@ def isstring(var):
 
 def listAvailable():
     taxids = taxonomy.common_taxids()
-    essential = [(taxonomy.name(taxid), 'gene_association.{}'.format(taxid)) for taxid in taxids
-                 if (DOMAIN, 'gene_association.{}'.format(taxid)) in serverfiles.ServerFiles().listfiles(DOMAIN)]
+    essential = [(taxonomy.name(taxid), '{}.tab'.format(taxid)) for taxid in taxids
+                 if (DOMAIN, '{}.tab'.format(taxid)) in serverfiles.ServerFiles().listfiles(DOMAIN)]
     return dict(essential)
 
 
@@ -317,14 +317,14 @@ class OWGOBrowser(widget.OWWidget):
 
             @staticmethod
             def parse_tax_id(f_name):
-                return f_name.split('.')[1]
+                return f_name.split('.')[0]
 
         try:
             remote_files = serverfiles.ServerFiles().listfiles(DOMAIN)
         except (ConnectTimeout, RequestException, ConnectionError):
             # TODO: Warn user about failed connection to the remote server
             remote_files = []
-
+        print(set(remote_files + serverfiles.listfiles(DOMAIN)))
         self.available_annotations = [
             AnnotationSlot(
                 taxid=AnnotationSlot.parse_tax_id(annotation_file),
