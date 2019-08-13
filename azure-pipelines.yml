@@ -1,19 +1,39 @@
 trigger:
 - master
 
-jobs:
+strategy:
+  matrix:
+    linux-stable-orange-python37:
+      vmImage: 'ubuntu-16.04'
+      orange_version: 'stable'
+      python_version: '3.7.3'
+    linux-development-orange-python37:
+      vmImage: 'ubuntu-16.04'
+      orange_version: 'development'
+      python_version: '3.7.3'
 
-- template: .azure-pipelines/jobs.yml
-  parameters:
-    name: Linux
-    vmImage: 'ubuntu-16.04'
+    macos-stable-orange-python37:
+      vmImage: 'macOS-10.14'
+      orange_version: 'stable'
+      python_version: '3.7.3'
+    macos-development-orange-python37:
+      vmImage: 'macOS-10.14'
+      orange_version: 'development'
+      python_version: '3.7.3'
 
-- template: .azure-pipelines/jobs.yml
-  parameters:
-    name: macOS
-    vmImage: 'macOS-10.14'
+    windows-stable-orange-python37:
+      vmImage: 'windows-2019'
+      orange_version: 'stable'
+      python_version: '3.7.3'
+    windows-development-orange-python37:
+      vmImage: 'windows-2019'
+      orange_version: 'development'
+      python_version: '3.7.3'
 
-- template: .azure-pipelines/jobs.yml
-  parameters:
-    name: Windows
-    vmImage: 'windows-2019'
+
+pool:
+    vmImage: $(vmImage)
+
+steps:
+    - template: .azure-pipelines/install_steps.yml
+    - template: .azure-pipelines/test_steps.yml

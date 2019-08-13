@@ -8,7 +8,7 @@ steps:
 - script: |
     catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" pytest orangecontrib/bioinformatics/tests -vl -ra --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
   condition: in(variables['Agent.OS'], 'Linux')
-  displayName: 'Run pytest'
+  displayName: 'Run pytest on Linux'
 
 - script: |
     pytest orangecontrib/bioinformatics/tests -vl -ra --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html

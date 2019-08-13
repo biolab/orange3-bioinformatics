@@ -1,0 +1,39 @@
+steps:
+
+- task: CondaEnvironment@1
+  inputs:
+    packageSpecs: 'python=$(python_version)'
+    updateConda: true
+  displayName: Activate conda environment and install python
+  continueOnError: false
+
+# On Hosted macOS, the agent user doesn't have ownership of Miniconda's installation directory/
+# We need to take ownership if we want to update conda or install packages globally
+- bash: sudo chown -R $USER $CONDA
+  condition: eq(variables['Agent.OS'], 'Darwin')
+  displayName: Take ownership of conda installation
+  continueOnError: false
+
+- script: |
+    python -m pip install --upgrade pip setuptools wheel
+    pip install numpy==1.16.4
+  displayName: 'Install build tools'
+  continueOnError: false
+
+- script: |
+    pip install https://github.com/biolab/orange3/archive/master.zip
+  displayName: 'Install dev version of Orange'
+  condition: eq(variables['orange_version'], 'development')
+  continueOnError: false
+
+- script: |
+    pip install -r requirements.txt
+    pip install PyQt5~=5.9.0
+    pip install sphinx recommonmark
+  displayName: 'Install requirements'
+  continueOnError: false
+
+- script: |
+    pip install -e .
+  displayName: 'Install Orange3-Bioinformatics'
+  continueOnError: false
