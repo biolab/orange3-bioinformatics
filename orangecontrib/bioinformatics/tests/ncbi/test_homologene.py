@@ -12,6 +12,6 @@ class TestHomoloGene(unittest.TestCase):
         self.assertEqual(basename(normpath(self.homology.file_path)), 'homologene.tab')
 
     def test_homology(self):
-        self.assertEqual(self.homology.find_homolog('920', '9913').gene_id, '407098')
-        self.assertEqual(self.homology.find_homolog('920', '10090').gene_id, '12504')
-        self.assertEqual(self.homology.find_homolog('920', '10116').gene_id, '24932')
+        self.assertEqual(self.homology.find_homolog('920', '9913'), '407098')
+        self.assertEqual(self.homology.find_homolog('920', '10090'), '12504')
+        self.assertEqual(self.homology.find_homolog('920', '10116'), '24932')
