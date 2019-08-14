@@ -1,44 +1,53 @@
 """ Databases update widget """
-import sys
 import os
-import threading
+import sys
 import json
-
-
-from datetime import datetime
-from collections import namedtuple, OrderedDict
+import threading
+from shutil import copyfile
 from datetime import datetime as d_time
 from functools import partial
-from shutil import copyfile
+from collections import OrderedDict, namedtuple
+
 from requests.exceptions import Timeout, ConnectionError
 
-from AnyQt.QtCore import Signal
-from AnyQt.QtCore import (
-    Qt, QSize, QThreadPool
-)
+from AnyQt.QtCore import Qt, QSize, Signal, QThreadPool
 from AnyQt.QtWidgets import (
-    QWidget, QTreeWidget, QTreeWidgetItem, QToolButton,
-    QCheckBox, QLabel, QLineEdit, QStyledItemDelegate,
-    QApplication, QAbstractItemView, QHBoxLayout, QPushButton, QDialog, QVBoxLayout,
-    QDialogButtonBox, QComboBox, QFileDialog)
-from Orange.widgets.widget import OWWidget
-from Orange.widgets import gui
+    QLabel,
+    QDialog,
+    QWidget,
+    QCheckBox,
+    QComboBox,
+    QLineEdit,
+    QFileDialog,
+    QHBoxLayout,
+    QPushButton,
+    QToolButton,
+    QTreeWidget,
+    QVBoxLayout,
+    QApplication,
+    QTreeWidgetItem,
+    QDialogButtonBox,
+    QAbstractItemView,
+    QStyledItemDelegate,
+)
 
+from Orange.widgets import gui
+from Orange.widgets.widget import OWWidget
 
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
-from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
-from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids, common_taxid_to_name, species_name_to_taxid
-from orangecontrib.bioinformatics.go.config import FILENAME_ANNOTATION, DOMAIN as gene_ontology_domain
 from orangecontrib.bioinformatics.geneset import filename
+from orangecontrib.bioinformatics.go.config import DOMAIN as gene_ontology_domain
+from orangecontrib.bioinformatics.go.config import FILENAME_ANNOTATION
+from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids, common_taxid_to_name, species_name_to_taxid
 from orangecontrib.bioinformatics.geneset.config import DOMAIN as gene_sets_domain
-
+from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
+from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 
 # File states
 AVAILABLE, CURRENT, OUTDATED, DEPRECATED, USER_FILE = range(5)
 # File sources
 SOURCE_SERVER = 'server_file'  # files on the serverfiles-bio repository
-SOURCE_USER = 'user_file'      # user defined files
+SOURCE_USER = 'user_file'  # user defined files
 INFO_FILE_SCHEMA = {
     'domain': None,
     'filename': None,
@@ -62,7 +71,7 @@ def create_info_file(file_path, **kwargs):
     info_dict = OrderedDict(INFO_FILE_SCHEMA)
 
     info_dict.update(**kwargs)
-    info_dict['datetime'] = '{0:%Y-%m-%d %H:%M:%S.%f}'.format(datetime.today())
+    info_dict['datetime'] = '{0:%Y-%m-%d %H:%M:%S.%f}'.format(d_time.today())
     info_dict['size'] = file_size_bytes(file_path)
 
     with open(file_path + '.info', 'wt') as f:
@@ -87,8 +96,9 @@ class UpdateOptionsItemDelegate(QStyledItemDelegate):
         Must be a child of a QTreeWidget.
 
     """
+
     def sizeHint(self, option, index):
-        size = QStyledItemDelegate.sizeHint(self,  option, index)
+        size = QStyledItemDelegate.sizeHint(self, option, index)
         parent = self.parent()
         item = parent.itemFromIndex(index)
         widget = parent.itemWidget(item, 0)
@@ -97,9 +107,7 @@ class UpdateOptionsItemDelegate(QStyledItemDelegate):
         return size
 
 
-file_state = namedtuple(
-    'file_state', ['info_local', 'info_server', 'state', ]
-)
+file_state = namedtuple('file_state', ['info_local', 'info_server', 'state'])
 
 header_labels = ['', 'Title', 'Update', 'Updated', 'Size', 'Source']
 header_index = namedtuple('header_index', ['Download'] + header_labels[1:])
@@ -113,8 +121,7 @@ def UpdateItem_match(item, string):
 
     """
     string = string.lower()
-    return any(string.lower() in tag.lower()
-               for tag in item.tags + [item.title])
+    return any(string.lower() in tag.lower() for tag in item.tags + [item.title])
 
 
 def evaluate_all_info(local, server):
@@ -128,20 +135,7 @@ def evaluate_all_info(local, server):
     files = set(local.keys()).union(server.keys())
 
     for domain, file_name in sorted(files):
-        yield FileState(domain,
-                        file_name,
-                        server.get((domain, file_name), None),
-                        local.get((domain, file_name), None))
-
-
-def special_tags(item):
-    """
-    Return a dictionary of special tags in an UpdateItem instance (special
-    tags are the ones starting with #).
-
-    """
-    return dict([tuple(tag.split(":")) for tag in item.tags
-                 if tag.startswith("#") and ":" in tag])
+        yield FileState(domain, file_name, server.get((domain, file_name), None), local.get((domain, file_name), None))
 
 
 def evaluate_files_state(progress_callback):
@@ -161,9 +155,14 @@ def evaluate_files_state(progress_callback):
     all_info = set(local_info.keys()).union(server_info.keys())
 
     for domain, file_name in sorted(all_info):
-        files.append(FileState(domain, file_name,
-                               server_info.get((domain, file_name), None),
-                               local_info.get((domain, file_name), None)))
+        files.append(
+            FileState(
+                domain,
+                file_name,
+                server_info.get((domain, file_name), None),
+                local_info.get((domain, file_name), None),
+            )
+        )
     progress_callback.emit()
     return files
 
@@ -171,7 +170,7 @@ def evaluate_files_state(progress_callback):
 def download_server_file(fs, index, progress_callback):
     try:
         serverfiles.download(fs.domain, fs.filename, callback=progress_callback.emit)
-    except Exception as e:
+    except Exception:
         # send FileState and index with Exception
         raise ValueError(fs, index)
 
@@ -191,14 +190,12 @@ class OWDatabasesUpdate(OWWidget):
     want_main_area = False
 
     def __init__(self, parent=None, signalManager=None, name="Databases update"):
-        OWWidget.__init__(self, parent, signalManager, name,
-                          wantMainArea=False)
+        OWWidget.__init__(self, parent, signalManager, name, wantMainArea=False)
 
         self.searchString = ""
 
         fbox = gui.widgetBox(self.controlArea, "Filter")
-        self.completer = TokenListCompleter(
-            self, caseSensitivity=Qt.CaseInsensitive)
+        self.completer = TokenListCompleter(self, caseSensitivity=Qt.CaseInsensitive)
         self.lineEditFilter = QLineEdit(textChanged=self.search_update)
         self.lineEditFilter.setCompleter(self.completer)
 
@@ -212,8 +209,7 @@ class OWDatabasesUpdate(OWWidget):
         self.filesView.setSelectionMode(QAbstractItemView.NoSelection)
         self.filesView.setSortingEnabled(True)
         self.filesView.sortItems(header.Title, Qt.AscendingOrder)
-        self.filesView.setItemDelegateForColumn(
-            0, UpdateOptionsItemDelegate(self.filesView))
+        self.filesView.setItemDelegateForColumn(0, UpdateOptionsItemDelegate(self.filesView))
 
         self.filesView.model().layoutChanged.connect(self.search_update)
 
@@ -223,25 +219,19 @@ class OWDatabasesUpdate(OWWidget):
         gui.widgetBox(self.controlArea, margin=0, orientation=layout)
 
         self.updateButton = gui.button(
-            box, self, "Update all",
-            callback=self.update_all,
-            tooltip="Update all updatable files",
-         )
+            box, self, "Update all", callback=self.update_all, tooltip="Update all updatable files"
+        )
 
         self.downloadButton = gui.button(
-            box, self, "Download all",
-            callback=self.download_filtered,
-            tooltip="Download all filtered files shown"
+            box, self, "Download all", callback=self.download_filtered, tooltip="Download all filtered files shown"
         )
 
         self.cancelButton = gui.button(
-            box, self, "Cancel", callback=self.cancel_active_threads,
-            tooltip="Cancel scheduled downloads/updates."
+            box, self, "Cancel", callback=self.cancel_active_threads, tooltip="Cancel scheduled downloads/updates."
         )
 
         self.addButton = gui.button(
-            box, self, "Add ...", callback=self.__handle_dialog,
-            tooltip="Add files for personal use."
+            box, self, "Add ...", callback=self.__handle_dialog, tooltip="Add files for personal use."
         )
 
         layout.addWidget(self.updateButton)
@@ -264,8 +254,8 @@ class OWDatabasesUpdate(OWWidget):
 
         # threads
         self.threadpool = QThreadPool(self)
-        #self.threadpool.setMaxThreadCount(1)
-        self.workers = list()
+        # self.threadpool.setMaxThreadCount(1)
+        self.workers = []
 
         self.initialize_files_view()
 
@@ -299,7 +289,7 @@ class OWDatabasesUpdate(OWWidget):
         # status message
         self.setStatusMessage('initializing')
 
-        worker = Worker(evaluate_files_state,  progress_callback=True)
+        worker = Worker(evaluate_files_state, progress_callback=True)
         worker.signals.progress.connect(self.__progress_advance)
         worker.signals.result.connect(self.set_files_list)
         worker.signals.error.connect(self.handle_worker_exception)
@@ -352,17 +342,11 @@ class OWDatabasesUpdate(OWWidget):
             fs.tree_item = FileStateItem(fs)
             fs.download_option = DownloadOption(state=fs.state)
 
-            fs.download_option.download_clicked.connect(
-                partial(self.submit_download_task, fs.domain, fs.filename)
-            )
-            fs.download_option.remove_clicked.connect(
-                partial(self.submit_remove_task, fs.domain, fs.filename)
-            )
+            fs.download_option.download_clicked.connect(partial(self.submit_download_task, fs.domain, fs.filename))
+            fs.download_option.remove_clicked.connect(partial(self.submit_remove_task, fs.domain, fs.filename))
 
         # add widget items to the QTreeWidget
-        self.filesView.addTopLevelItems(
-            [fs.tree_item for fs in self.update_items]
-        )
+        self.filesView.addTopLevelItems([fs.tree_item for fs in self.update_items])
 
         # add action widgets to tree items
         for fs in self.update_items:
@@ -437,7 +421,7 @@ class OWDatabasesUpdate(OWWidget):
         self.cancelButton.setEnabled(True)
         # init progress bar
 
-        self.progress_bar = gui.ProgressBar(self, iterations=len(self.workers)*100)
+        self.progress_bar = gui.ProgressBar(self, iterations=len(self.workers) * 100)
 
         # status message
         self.setStatusMessage('downloading')
@@ -446,7 +430,7 @@ class OWDatabasesUpdate(OWWidget):
         [self.threadpool.start(worker) for worker in self.workers]
         self.filesView.setDisabled(True)
         # reset list of workers
-        self.workers = list()
+        self.workers = []
 
     def on_download_exception(self, ex):
         assert threading.current_thread() == threading.main_thread()
@@ -574,19 +558,18 @@ class DownloadOption(QWidget):
             raise ValueError("Invalid state %r" % self.state)
 
         try:
-            self.checkButton.clicked.disconnect()   # Remove old signals if they exist
+            self.checkButton.clicked.disconnect()  # Remove old signals if they exist
         except Exception:
             pass
 
-        if not self.checkButton.isChecked():        # Switch signals if the file is present or not
+        if not self.checkButton.isChecked():  # Switch signals if the file is present or not
             self.checkButton.clicked.connect(self.download_clicked)
         else:
             self.checkButton.clicked.connect(self.remove_clicked)
 
 
 class FileState:
-
-    def __init__(self, domain, file_name,  info_server, info_local):
+    def __init__(self, domain, file_name, info_server, info_local):
         self.domain = domain
         self.filename = file_name
 
@@ -701,7 +684,7 @@ class FileStateItem(QTreeWidgetItem):
         1: 'downloaded, current',
         2: 'downloaded, needs update',
         3: 'obsolete',
-        4: 'custom file'
+        4: 'custom file',
     }
 
     #: A role for the state item data.
@@ -748,9 +731,7 @@ class FileStateItem(QTreeWidgetItem):
         else:
             diff_date = None
 
-        tooltip = "State: {}\nTags: {}".format(state_str,
-                                               ', '.join(tag for tag in fs.tags
-                                                         if not tag.startswith("#")))
+        tooltip = "State: {}\nTags: {}".format(state_str, ', '.join(tag for tag in fs.tags if not tag.startswith("#")))
 
         if fs.state in [CURRENT, OUTDATED, DEPRECATED]:
             tooltip += "\nFile: {}".format(serverfiles.localpath(fs.domain, fs.filename))
@@ -789,26 +770,27 @@ class FileUploadHelper(QDialog):
     # settings
     kegg_domain = 'KEGG'
 
-    supported_domains = OrderedDict(
-        {'Gene Ontology': gene_ontology_domain,
-         'Gene Sets': gene_sets_domain}
-    )
+    supported_domains = OrderedDict({'Gene Ontology': gene_ontology_domain, 'Gene Sets': gene_sets_domain})
 
     supported_organisms = [common_taxid_to_name(tax_id) for tax_id in common_taxids()]
 
-    hierarchies = {'GO - Biological Process': ('GO', 'biological_process'),
-                   'GO - Molecular Function': ('GO', 'molecular_function'),
-                   'GO - Cellular Component': ('GO', 'cellular_component'),
-                   'KEGG - Pathways': ('KEGG', 'pathways'),
-                   'KEGG - Orthologs': ('KEGG', 'orthologs')
-                   }
+    hierarchies = {
+        'GO - Biological Process': ('GO', 'biological_process'),
+        'GO - Molecular Function': ('GO', 'molecular_function'),
+        'GO - Cellular Component': ('GO', 'cellular_component'),
+        'KEGG - Pathways': ('KEGG', 'pathways'),
+        'KEGG - Orthologs': ('KEGG', 'orthologs'),
+    }
 
     def __init__(self, parent=None):
-        super(FileUploadHelper, self).__init__(parent,
-                                               Qt.Window |
-                                               Qt.WindowTitleHint |
-                                               Qt.CustomizeWindowHint |
-                                               Qt.WindowCloseButtonHint | Qt.WindowMaximizeButtonHint)
+        super(FileUploadHelper, self).__init__(
+            parent,
+            Qt.Window
+            | Qt.WindowTitleHint
+            | Qt.CustomizeWindowHint
+            | Qt.WindowCloseButtonHint
+            | Qt.WindowMaximizeButtonHint,
+        )
         self.setAttribute(Qt.WA_DeleteOnClose)
         self.setWindowTitle('Add new file')
 
@@ -910,12 +892,12 @@ class FileUploadHelper(QDialog):
             raise e
 
         return {
-            'domain':   domain,
+            'domain': domain,
             'organism': organism,
             'filename': self.__filename(domain, organism),
-            'title':    self.line_edit_title.text(),
-            'tags':     self.line_edit_tags.text().split(','),
-            'source':   SOURCE_USER
+            'title': self.line_edit_title.text(),
+            'tags': self.line_edit_tags.text().split(','),
+            'source': SOURCE_USER,
         }
 
     def __move_to_serverfiles_folder(self, selected_file_path):
@@ -944,6 +926,6 @@ if __name__ == "__main__":
         w = OWDatabasesUpdate()
         w.show()
         w.raise_()
-        return w.exec_()
+        return app.exec_()
 
     sys.exit(main_test())

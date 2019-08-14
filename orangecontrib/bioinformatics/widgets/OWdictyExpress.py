@@ -2,27 +2,27 @@
 import sys
 import threading
 
-
 from requests.exceptions import ConnectionError
 
-from AnyQt.QtCore import Qt, QThreadPool, QSize
 from AnyQt.QtGui import QFont
-from AnyQt.QtWidgets import QTreeWidget, QTreeWidgetItem, QLabel, QLineEdit, QApplication, QFrame
+from AnyQt.QtCore import Qt, QSize, QThreadPool
+from AnyQt.QtWidgets import QFrame, QLabel, QLineEdit, QTreeWidget, QApplication, QTreeWidgetItem
 
-from Orange.data import Table, StringVariable, Domain
+from Orange.data import Table, Domain, StringVariable
 from Orange.widgets import gui, settings
-from Orange.widgets.widget import OWWidget, Msg
+from Orange.widgets.widget import Msg, OWWidget
 from Orange.widgets.utils.signals import Output
 
-
 from orangecontrib.bioinformatics import resolwe
+from orangecontrib.bioinformatics.ncbi.gene import ENTREZ_ID, GeneMatcher
 from orangecontrib.bioinformatics.resolwe.utils import etc_to_table
 from orangecontrib.bioinformatics.widgets.utils.data import (
-    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_ATTRIBUTE, GENE_ID_COLUMN
+    TAX_ID,
+    GENE_ID_COLUMN,
+    GENE_ID_ATTRIBUTE,
+    GENE_AS_ATTRIBUTE_NAME,
 )
-from orangecontrib.bioinformatics.ncbi.gene import ENTREZ_ID, GeneMatcher
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
-
 
 Labels = [
     (" ", " "),
@@ -31,7 +31,8 @@ Labels = [
     ("static.cite", "Citation"),
     ("var.growth", "Growth"),
     ("var.treatment", "Treatment"),
-    ("var.strain", "Strain")]
+    ("var.strain", "Strain"),
+]
 
 
 # Creates line separator
@@ -85,20 +86,23 @@ class OWdictyExpress(OWWidget):
         # Login Section
         box = gui.widgetBox(self.controlArea, 'Login')
 
-        self.namefield = gui.lineEdit(box, self, "username", "Username:", labelWidth=100, orientation='horizontal',
-                                      callback=self.auth_changed)
+        self.namefield = gui.lineEdit(
+            box, self, "username", "Username:", labelWidth=100, orientation='horizontal', callback=self.auth_changed
+        )
 
         self.password = ''
-        self.passfield = gui.lineEdit(box, self, "password", "Password:", labelWidth=100, orientation='horizontal',
-                                      callback=self.auth_changed)
+        self.passfield = gui.lineEdit(
+            box, self, "password", "Password:", labelWidth=100, orientation='horizontal', callback=self.auth_changed
+        )
 
         self.passfield.setEchoMode(QLineEdit.Password)
 
         self.controlArea.layout().addWidget(h_line())
 
         box = gui.widgetBox(self.controlArea, "Output", addSpace=True)
-        gui.radioButtonsInBox(box, self, "gene_as_attr_name", ["Genes in rows", "Genes in columns"],
-                              callback=self.invalidate)
+        gui.radioButtonsInBox(
+            box, self, "gene_as_attr_name", ["Genes in rows", "Genes in columns"], callback=self.invalidate
+        )
 
         self.controlArea.layout().addWidget(h_line())
 
@@ -119,19 +123,17 @@ class OWdictyExpress(OWWidget):
 
         self.mainArea.layout().addWidget(h_line())
 
-        self.filter = gui.lineEdit(self.mainArea, self, "searchString", "Filter:", callbackOnType=True,
-                                   callback=self.search_update)
+        self.filter = gui.lineEdit(
+            self.mainArea, self, "searchString", "Filter:", callbackOnType=True, callback=self.search_update
+        )
 
-        self.experimentsWidget = QTreeWidget(alternatingRowColors=True,
-                                             rootIsDecorated=False,
-                                             uniformRowHeights=True,
-                                             sortingEnabled=True)
+        self.experimentsWidget = QTreeWidget(
+            alternatingRowColors=True, rootIsDecorated=False, uniformRowHeights=True, sortingEnabled=True
+        )
 
-        self.experimentsWidget.setItemDelegateForColumn(
-            0, gui.IndicatorItemDelegate(self, role=Qt.DisplayRole))
+        self.experimentsWidget.setItemDelegateForColumn(0, gui.IndicatorItemDelegate(self, role=Qt.DisplayRole))
 
-        self.experimentsWidget.selectionModel().selectionChanged.connect(
-            self.onSelectionChanged)
+        self.experimentsWidget.selectionModel().selectionChanged.connect(self.onSelectionChanged)
 
         self.experimentsWidget.setHeaderLabels(self.headerLabels)
         self.mainArea.layout().addWidget(self.experimentsWidget)
@@ -196,7 +198,7 @@ class OWdictyExpress(OWWidget):
 
         try:
             self.res = resolwe.connect(user, password, self.server, 'genesis')
-        except resolwe.ResolweAuthException as e:
+        except resolwe.ResolweAuthException:
             self.Error.invalid_credentials()
         else:
             self.load_experiments()
@@ -290,10 +292,12 @@ class OWdictyExpress(OWWidget):
             # status message
             self.setStatusMessage('downloading experiment data')
 
-            worker = Worker(self.res.download_etc_data,
-                            selected_item.gen_data_id,
-                            table_name=selected_item.data_name,
-                            progress_callback=True)
+            worker = Worker(
+                self.res.download_etc_data,
+                selected_item.gen_data_id,
+                table_name=selected_item.data_name,
+                progress_callback=True,
+            )
 
             worker.signals.progress.connect(self.progress_advance)
             worker.signals.result.connect(self.send_to_output)
@@ -314,7 +318,6 @@ class OWdictyExpress(OWWidget):
 
 
 class CustomTreeItem(QTreeWidgetItem):
-
     def __init__(self, parent, gen_data):
         super(CustomTreeItem, self).__init__(parent)  # Init super class (QtGui.QTreeWidgetItem )
 

@@ -1,34 +1,37 @@
 """ GeneSets """
 import threading
 import concurrent.futures
-
 from functools import partial
 
-from AnyQt.QtWidgets import (
-    QTreeView, QHeaderView, QHBoxLayout
-)
-from AnyQt.QtCore import (
-    Qt, Slot, QThread
-)
-from AnyQt.QtGui import (
-    QColor, QStandardItemModel, QStandardItem,
-)
+from AnyQt.QtGui import QColor, QStandardItem, QStandardItemModel
+from AnyQt.QtCore import Qt, Slot, QThread
+from AnyQt.QtWidgets import QTreeView, QHBoxLayout, QHeaderView
 
-from Orange.widgets.gui import (
-    vBox, lineEdit, LinkRole, LinkStyledItemDelegate, doubleSpin,
-    auto_commit, widgetLabel, spin,  widgetBox, radioButtonsInBox
-)
 from Orange.data import Table
-from Orange.widgets.settings import Setting
-from Orange.widgets.utils.signals import Output, Input
-
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
+from Orange.widgets.gui import (
+    LinkRole,
+    LinkStyledItemDelegate,
+    spin,
+    vBox,
+    lineEdit,
+    widgetBox,
+    doubleSpin,
+    auto_commit,
+    widgetLabel,
+    radioButtonsInBox,
 )
+from Orange.widgets.settings import Setting
+from Orange.widgets.utils.signals import Input, Output
 
-from orangecontrib.bioinformatics.widgets.utils.gui import GeneSetsSelection, NumericalColumnDelegate, FilterProxyModel
 from orangecontrib.bioinformatics.widgets import OWGeneSets as gene_sets
 from orangecontrib.bioinformatics.utils.statistics import FDR
+from orangecontrib.bioinformatics.widgets.utils.gui import FilterProxyModel, GeneSetsSelection, NumericalColumnDelegate
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID,
+    GENE_ID_COLUMN,
+    GENE_ID_ATTRIBUTE,
+    GENE_AS_ATTRIBUTE_NAME,
+)
 
 
 class OWGeneSetEnrichment(gene_sets.OWGeneSets):
@@ -64,7 +67,6 @@ class OWGeneSetEnrichment(gene_sets.OWGeneSets):
 
         super().__init__()
 
-
     @Inputs.reference
     def handle_reference_genes(self, data):
         """
@@ -78,8 +80,10 @@ class OWGeneSetEnrichment(gene_sets.OWGeneSets):
             self.reference_gene_id_attribute = self.reference_data.attributes.get(GENE_ID_ATTRIBUTE, None)
             self.reference_gene_id_column = self.reference_data.attributes.get(GENE_ID_COLUMN, None)
 
-            if not (self.reference_attr_names is not None
-                    and ((self.reference_gene_id_attribute is None) ^ (self.reference_gene_id_column is None))):
+            if not (
+                self.reference_attr_names is not None
+                and ((self.reference_gene_id_attribute is None) ^ (self.reference_gene_id_column is None))
+            ):
 
                 if self.reference_tax_id is None:
                     self.Error.missing_annotation()
@@ -136,46 +140,36 @@ class OWGeneSetEnrichment(gene_sets.OWGeneSets):
         # apply filtering rules
         filters = [
             FilterProxyModel.Filter(
-                self.TERM, Qt.DisplayRole,
-                lambda value: all(fs in value.lower() for fs in search_term))
+                self.TERM, Qt.DisplayRole, lambda value: all(fs in value.lower() for fs in search_term)
+            )
         ]
 
         if self.use_min_count:
-           filters.append(
-               FilterProxyModel.Filter(
-                   self.COUNT, Qt.DisplayRole,
-                   lambda value: value >= self.min_count,
-               )
-           )
+            filters.append(FilterProxyModel.Filter(self.COUNT, Qt.DisplayRole, lambda value: value >= self.min_count))
 
         if self.use_p_value:
-            filters.append(
-                FilterProxyModel.Filter(
-                    self.P_VAL, Qt.DisplayRole,
-                    lambda value: value < self.max_p_value
-                )
-            )
+            filters.append(FilterProxyModel.Filter(self.P_VAL, Qt.DisplayRole, lambda value: value < self.max_p_value))
 
         if self.use_max_fdr:
-            filters.append(
-                FilterProxyModel.Filter(
-                    self.FDR, Qt.DisplayRole,
-                    lambda value: value < self.max_fdr
-                )
-            )
+            filters.append(FilterProxyModel.Filter(self.FDR, Qt.DisplayRole, lambda value: value < self.max_fdr))
 
         return filters
 
     def create_partial(self):
-        reference_genes = self.reference_genes if (self.use_reference_data and self.reference_data)\
-                                               else self.gs_widget.gs_object.genes()
+        reference_genes = (
+            self.reference_genes
+            if (self.use_reference_data and self.reference_data)
+            else self.gs_widget.gs_object.genes()
+        )
 
-        return partial(self.set_items,
-                       self.gs_widget.gs_object,
-                       self.stored_gene_sets_selection,
-                       set(self.input_genes),
-                       self.callback,
-                       reference_genes=reference_genes)
+        return partial(
+            self.set_items,
+            self.gs_widget.gs_object,
+            self.stored_gene_sets_selection,
+            set(self.input_genes),
+            self.callback,
+            reference_genes=reference_genes,
+        )
 
     @staticmethod
     def set_items(gene_sets, sets_to_display, genes, callback, reference_genes=None):
@@ -211,7 +205,9 @@ class OWGeneSetEnrichment(gene_sets.OWGeneSets):
                 count_column.setData(set(enrichemnt_result.query), Qt.UserRole)
 
                 genes_column.setData(len(gene_set.genes), Qt.DisplayRole)
-                genes_column.setData(set(gene_set.genes), Qt.UserRole)  # store genes to get then on output on selection
+                genes_column.setData(
+                    set(gene_set.genes), Qt.UserRole
+                )  # store genes to get then on output on selection
 
                 ref_column.setData(len(enrichemnt_result.reference), Qt.DisplayRole)
 
@@ -221,8 +217,18 @@ class OWGeneSetEnrichment(gene_sets.OWGeneSets):
                 enrichment_column.setData(enrichemnt_result.enrichment_score, Qt.DisplayRole)
                 enrichment_column.setData(enrichemnt_result.enrichment_score, Qt.ToolTipRole)
 
-                model_items.append([count_column, ref_column, pval_column, fdr_column, enrichment_column,
-                                    genes_column, category_column, name_column])
+                model_items.append(
+                    [
+                        count_column,
+                        ref_column,
+                        pval_column,
+                        fdr_column,
+                        enrichment_column,
+                        genes_column,
+                        category_column,
+                        name_column,
+                    ]
+                )
         return model_items
 
     # We must extend this, because we need to update FDR values after workers finish enrichment
@@ -252,42 +258,33 @@ class OWGeneSetEnrichment(gene_sets.OWGeneSets):
             print(ex)
 
     def assign_delegates(self):
-        self.data_view.setItemDelegateForColumn(
-            self.GENES, NumericalColumnDelegate(self)
-        )
+        self.data_view.setItemDelegateForColumn(self.GENES, NumericalColumnDelegate(self))
 
-        self.data_view.setItemDelegateForColumn(
-            self.COUNT, NumericalColumnDelegate(self)
-        )
+        self.data_view.setItemDelegateForColumn(self.COUNT, NumericalColumnDelegate(self))
 
-        self.data_view.setItemDelegateForColumn(
-            self.REFERENCE, NumericalColumnDelegate(self)
-        )
+        self.data_view.setItemDelegateForColumn(self.REFERENCE, NumericalColumnDelegate(self))
 
-        self.data_view.setItemDelegateForColumn(
-            self.P_VAL, NumericalColumnDelegate(self, precision=2, notation='e')
-        )
+        self.data_view.setItemDelegateForColumn(self.P_VAL, NumericalColumnDelegate(self, precision=2, notation='e'))
 
-        self.data_view.setItemDelegateForColumn(
-            self.FDR, NumericalColumnDelegate(self, precision=2, notation='e')
-        )
+        self.data_view.setItemDelegateForColumn(self.FDR, NumericalColumnDelegate(self, precision=2, notation='e'))
 
-        self.data_view.setItemDelegateForColumn(
-            self.ENRICHMENT, NumericalColumnDelegate(self, precision=1)
-        )
+        self.data_view.setItemDelegateForColumn(self.ENRICHMENT, NumericalColumnDelegate(self, precision=1))
 
     def setup_control_area(self):
         # Control area
-        self.input_info = widgetLabel(
-            widgetBox(self.controlArea, "Info", addSpace=True), 'No data on input.\n'
-        )
+        self.input_info = widgetLabel(widgetBox(self.controlArea, "Info", addSpace=True), 'No data on input.\n')
         self.custom_gs_col_box = box = vBox(self.controlArea, 'Custom Gene Set Term Column')
         box.hide()
 
         self.reference_radio_box = radioButtonsInBox(
-            self.controlArea, self, "use_reference_data", ["Entire genome", "Reference gene set (input)"],
+            self.controlArea,
+            self,
+            "use_reference_data",
+            ["Entire genome", "Reference gene set (input)"],
             tooltips=["Use entire genome (for gene set enrichment)", "Use reference set of genes"],
-            box="Reference", callback=self.invalidate)
+            box="Reference",
+            callback=self.invalidate,
+        )
 
         self.reference_radio_box.setEnabled(False)
 
@@ -302,31 +299,49 @@ class OWGeneSetEnrichment(gene_sets.OWGeneSets):
         h_layout.setSpacing(100)
         h_widget = widgetBox(self.mainArea, orientation=h_layout)
 
-        spin(h_widget, self, 'min_count', 0, 100,
-             label='Count',
-             tooltip='Minimum genes count',
-             checked='use_min_count',
-             callback=self.filter_data_view,
-             callbackOnReturn=True,
-             checkCallback=self.filter_data_view)
+        spin(
+            h_widget,
+            self,
+            'min_count',
+            0,
+            100,
+            label='Count',
+            tooltip='Minimum genes count',
+            checked='use_min_count',
+            callback=self.filter_data_view,
+            callbackOnReturn=True,
+            checkCallback=self.filter_data_view,
+        )
 
-        doubleSpin(h_widget, self, 'max_p_value', 0.0, 1.0, 0.0001,
-                   label='p-value',
-                   tooltip='Maximum p-value of the enrichment score',
-                   checked='use_p_value',
-                   callback=self.filter_data_view,
-                   callbackOnReturn=True,
-                   checkCallback=self.filter_data_view
-                   )
+        doubleSpin(
+            h_widget,
+            self,
+            'max_p_value',
+            0.0,
+            1.0,
+            0.0001,
+            label='p-value',
+            tooltip='Maximum p-value of the enrichment score',
+            checked='use_p_value',
+            callback=self.filter_data_view,
+            callbackOnReturn=True,
+            checkCallback=self.filter_data_view,
+        )
 
-        doubleSpin(h_widget, self, 'max_fdr', 0.0, 1.0, 0.0001,
-                   label='FDR',
-                   tooltip='Maximum false discovery rate',
-                   checked='use_max_fdr',
-                   callback=self.filter_data_view,
-                   callbackOnReturn=True,
-                   checkCallback=self.filter_data_view
-                   )
+        doubleSpin(
+            h_widget,
+            self,
+            'max_fdr',
+            0.0,
+            1.0,
+            0.0001,
+            label='FDR',
+            tooltip='Maximum false discovery rate',
+            checked='use_max_fdr',
+            callback=self.filter_data_view,
+            callbackOnReturn=True,
+            checkCallback=self.filter_data_view,
+        )
 
         self.line_edit_filter = lineEdit(h_widget, self, 'search_pattern')
         self.line_edit_filter.setPlaceholderText('Filter gene sets ...')
@@ -356,6 +371,7 @@ class OWGeneSetEnrichment(gene_sets.OWGeneSets):
 
 if __name__ == "__main__":
     from AnyQt.QtWidgets import QApplication
+
     app = QApplication([])
     ow = OWGeneSetEnrichment()
     ow.show()

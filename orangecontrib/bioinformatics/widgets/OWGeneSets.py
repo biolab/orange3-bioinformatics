@@ -1,39 +1,53 @@
 """ GeneSets """
 import threading
 import concurrent.futures
-
-from functools import partial
 from typing import Optional
+from functools import partial
 
-from AnyQt.QtWidgets import (
-    QTreeView, QHeaderView, QHBoxLayout,
-)
+from AnyQt.QtGui import QColor, QStandardItem, QStandardItemModel
 from AnyQt.QtCore import (
-    Qt, QSize, QThreadPool, Slot, QThread, QItemSelection, QItemSelectionRange, QItemSelectionModel
+    Qt,
+    Slot,
+    QSize,
+    QThread,
+    QThreadPool,
+    QItemSelection,
+    QItemSelectionModel,
+    QItemSelectionRange,
 )
-from AnyQt.QtGui import (
-    QColor, QStandardItemModel, QStandardItem,
-)
+from AnyQt.QtWidgets import QTreeView, QHBoxLayout, QHeaderView
 
+from Orange.data import Table, Domain, StringVariable, DiscreteVariable
+from Orange.data import filter as table_filter
 from Orange.widgets.gui import (
-    vBox, lineEdit, ProgressBar, LinkRole, LinkStyledItemDelegate,
-    auto_commit, widgetLabel, spin, comboBox, widgetBox
+    LinkRole,
+    ProgressBar,
+    LinkStyledItemDelegate,
+    spin,
+    vBox,
+    comboBox,
+    lineEdit,
+    widgetBox,
+    auto_commit,
+    widgetLabel,
 )
-from Orange.data import Domain, Table, DiscreteVariable, StringVariable, filter as table_filter
-from Orange.widgets.widget import OWWidget, Msg
+from Orange.widgets.widget import Msg, OWWidget
 from Orange.widgets.settings import Setting
-from Orange.widgets.utils.signals import Output, Input
+from Orange.widgets.utils.signals import Input, Output
+from Orange.widgets.utils.concurrent import FutureWatcher, ThreadExecutor, methodinvoke
 from Orange.widgets.utils.itemmodels import DomainModel
-from Orange.widgets.utils.concurrent import ThreadExecutor, FutureWatcher, methodinvoke
 
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE,
-    ERROR_ON_MISSING_ANNOTATION, ERROR_ON_MISSING_GENE_ID, ERROR_ON_MISSING_TAX_ID
-)
-
-from orangecontrib.bioinformatics.widgets.utils.gui import GeneSetsSelection
-from orangecontrib.bioinformatics.widgets.utils.gui import NumericalColumnDelegate, FilterProxyModel
 from orangecontrib.bioinformatics import geneset
+from orangecontrib.bioinformatics.widgets.utils.gui import FilterProxyModel, GeneSetsSelection, NumericalColumnDelegate
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID,
+    GENE_ID_COLUMN,
+    GENE_ID_ATTRIBUTE,
+    GENE_AS_ATTRIBUTE_NAME,
+    ERROR_ON_MISSING_TAX_ID,
+    ERROR_ON_MISSING_GENE_ID,
+    ERROR_ON_MISSING_ANNOTATION,
+)
 
 
 class Task:
@@ -201,18 +215,22 @@ class OWGeneSets(OWWidget):
 
                 if isinstance(self.custom_gene_set_indicator, DiscreteVariable):
                     labels = self.custom_gene_set_indicator.values
-                    gene_sets_names = [labels[int(idx)] for idx
-                                       in self.custom_data.get_column_view(self.custom_gene_set_indicator)[0]]
+                    gene_sets_names = [
+                        labels[int(idx)] for idx in self.custom_data.get_column_view(self.custom_gene_set_indicator)[0]
+                    ]
                 else:
                     gene_sets_names, _ = self.custom_data.get_column_view(self.custom_gene_set_indicator)
 
                 self.num_of_custom_sets = len(set(gene_sets_names))
                 gene_names, _ = self.custom_data.get_column_view(self.custom_gene_id_column)
-                hierarchy_title = (self.custom_data.name if self.custom_data.name else 'Custom sets', )
+                hierarchy_title = (self.custom_data.name if self.custom_data.name else 'Custom sets',)
                 try:
                     self.gs_widget.add_custom_sets(
-                        gene_sets_names, gene_names,
-                        hierarchy_title=hierarchy_title, select_customs_flag=select_customs_flag)
+                        gene_sets_names,
+                        gene_names,
+                        hierarchy_title=hierarchy_title,
+                        select_customs_flag=select_customs_flag,
+                    )
                 except geneset.GeneSetException:
                     pass
                 # self.gs_label_combobox.setDisabled(False)
@@ -273,9 +291,14 @@ class OWGeneSets(OWWidget):
             self.custom_gene_id_column = self.custom_data.attributes.get(GENE_ID_COLUMN, None)
 
             if self.gs_label_combobox is None:
-                self.gs_label_combobox = comboBox(self.custom_gs_col_box, self, "custom_gene_set_indicator",
-                                                  sendSelectedValue=True, model=self.feature_model,
-                                                  callback=self.on_gene_set_indicator_changed)
+                self.gs_label_combobox = comboBox(
+                    self.custom_gs_col_box,
+                    self,
+                    "custom_gene_set_indicator",
+                    sendSelectedValue=True,
+                    model=self.feature_model,
+                    callback=self.on_gene_set_indicator_changed,
+                )
             self.custom_gs_col_box.show()
 
             if self.custom_gene_set_indicator in self.feature_model:
@@ -314,8 +337,9 @@ class OWGeneSets(OWWidget):
             self.gene_id_column = self.input_data.attributes.get(GENE_ID_COLUMN, None)
             self.update_info_box()
 
-            if not(self.use_attr_names is not None
-                   and ((self.gene_id_attribute is None) ^ (self.gene_id_column is None))):
+            if not (
+                self.use_attr_names is not None and ((self.gene_id_attribute is None) ^ (self.gene_id_column is None))
+            ):
 
                 if self.tax_id is None:
                     self.Error.missing_annotation()
@@ -359,11 +383,13 @@ class OWGeneSets(OWWidget):
         self.input_info.setText(info_string)
 
     def create_partial(self):
-        return partial(self.set_items,
-                       self.gs_widget.gs_object,
-                       self.stored_gene_sets_selection,
-                       set(self.input_genes),
-                       self.callback)
+        return partial(
+            self.set_items,
+            self.gs_widget.gs_object,
+            self.stored_gene_sets_selection,
+            set(self.input_genes),
+            self.callback,
+        )
 
     def callback(self):
         if self._task.cancelled:
@@ -384,9 +410,13 @@ class OWGeneSets(OWWidget):
 
         f = self.create_partial()
 
-        progress_iterations = sum([len(g_set) for hier, g_set
-                                   in self.gs_widget.gs_object.map_hierarchy_to_sets().items()
-                                   if hier in self.stored_gene_sets_selection])
+        progress_iterations = sum(
+            (
+                len(g_set)
+                for hier, g_set in self.gs_widget.gs_object.map_hierarchy_to_sets().items()
+                if hier in self.stored_gene_sets_selection
+            )
+        )
 
         self.progress_bar = ProgressBar(self, iterations=progress_iterations)
 
@@ -423,23 +453,18 @@ class OWGeneSets(OWWidget):
 
         filters = [
             FilterProxyModel.Filter(
-                self.TERM, Qt.DisplayRole,
-                lambda value: all(fs in value.lower() for fs in search_term))
+                self.TERM, Qt.DisplayRole, lambda value: all(fs in value.lower() for fs in search_term)
+            )
         ]
 
         if self.use_min_count:
-            filters.append(
-                FilterProxyModel.Filter(
-                    self.COUNT, Qt.DisplayRole,
-                    lambda value: value >= self.min_count,
-                )
-            )
+            filters.append(FilterProxyModel.Filter(self.COUNT, Qt.DisplayRole, lambda value: value >= self.min_count))
 
         return filters
 
     def filter_data_view(self):
         filter_proxy = self.filter_proxy_model  # type: FilterProxyModel
-        model = filter_proxy.sourceModel()      # type: QStandardItemModel
+        model = filter_proxy.sourceModel()  # type: QStandardItemModel
 
         if isinstance(model, QStandardItemModel):
 
@@ -469,7 +494,7 @@ class OWGeneSets(OWWidget):
                 selection.append(
                     QItemSelectionRange(
                         self.filter_proxy_model.index(row_index, 0),
-                        self.filter_proxy_model.index(row_index, header_count)
+                        self.filter_proxy_model.index(row_index, header_count),
                     )
                 )
 
@@ -489,9 +514,12 @@ class OWGeneSets(OWWidget):
                 self.update_info_box()
 
                 if self.use_attr_names:
-                    selected = [column for column in self.input_data.domain.attributes
-                                if self.gene_id_attribute in column.attributes and
-                                str(column.attributes[self.gene_id_attribute]) in output_genes]
+                    selected = [
+                        column
+                        for column in self.input_data.domain.attributes
+                        if self.gene_id_attribute in column.attributes
+                        and str(column.attributes[self.gene_id_attribute]) in output_genes
+                    ]
 
                     domain = Domain(selected, self.input_data.domain.class_vars, self.input_data.domain.metas)
                     new_data = self.input_data.from_table(domain, self.input_data)
@@ -506,13 +534,9 @@ class OWGeneSets(OWWidget):
                     self.Outputs.matched_genes.send(data_table)
 
     def assign_delegates(self):
-        self.data_view.setItemDelegateForColumn(
-            self.GENES, NumericalColumnDelegate(self)
-        )
+        self.data_view.setItemDelegateForColumn(self.GENES, NumericalColumnDelegate(self))
 
-        self.data_view.setItemDelegateForColumn(
-            self.COUNT, NumericalColumnDelegate(self)
-        )
+        self.data_view.setItemDelegateForColumn(self.COUNT, NumericalColumnDelegate(self))
 
     def setup_filter_model(self):
         self.filter_proxy_model = FilterProxyModel()
@@ -524,13 +548,19 @@ class OWGeneSets(OWWidget):
         h_layout.setSpacing(100)
         h_widget = widgetBox(self.mainArea, orientation=h_layout)
 
-        spin(h_widget, self, 'min_count', 0, 1000,
-             label='Count',
-             tooltip='Minimum genes count',
-             checked='use_min_count',
-             callback=self.filter_data_view,
-             callbackOnReturn=True,
-             checkCallback=self.filter_data_view)
+        spin(
+            h_widget,
+            self,
+            'min_count',
+            0,
+            1000,
+            label='Count',
+            tooltip='Minimum genes count',
+            checked='use_min_count',
+            callback=self.filter_data_view,
+            callbackOnReturn=True,
+            checkCallback=self.filter_data_view,
+        )
 
         self.line_edit_filter = lineEdit(h_widget, self, 'search_pattern')
         self.line_edit_filter.setPlaceholderText('Filter gene sets ...')
@@ -544,9 +574,7 @@ class OWGeneSets(OWWidget):
 
     def setup_control_area(self):
         # Control area
-        self.input_info = widgetLabel(
-            widgetBox(self.controlArea, "Info", addSpace=True), 'No data on input.\n'
-        )
+        self.input_info = widgetLabel(widgetBox(self.controlArea, "Info", addSpace=True), 'No data on input.\n')
         self.custom_gs_col_box = box = vBox(self.controlArea, 'Custom Gene Set Term Column')
         box.hide()
 
@@ -606,7 +634,9 @@ class OWGeneSets(OWWidget):
                 count_column.setData(len(matched_set), Qt.DisplayRole)
 
                 genes_column.setData(len(gene_set.genes), Qt.DisplayRole)
-                genes_column.setData(set(gene_set.genes), Qt.UserRole)  # store genes to get then on output on selection
+                genes_column.setData(
+                    set(gene_set.genes), Qt.UserRole
+                )  # store genes to get then on output on selection
 
                 model_items.append([count_column, genes_column, term_column, category_column])
 
@@ -628,6 +658,7 @@ class OWGeneSets(OWWidget):
 
 if __name__ == "__main__":
     from AnyQt.QtWidgets import QApplication
+
     app = QApplication([])
     ow = OWGeneSets()
     ow.show()

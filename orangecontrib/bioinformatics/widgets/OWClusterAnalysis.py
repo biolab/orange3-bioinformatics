@@ -1,55 +1,54 @@
 """ OWClusterAnalysis """
 import sys
 import itertools
+
 import numpy as np
-
-from AnyQt.QtWidgets import (
-    QTableView, QHeaderView, QHBoxLayout,
-    QSplitter, QListWidget
-)
-from AnyQt.QtCore import (
-    Qt, QSize
-)
-
 from scipy.stats import rankdata
 
-from Orange.widgets.gui import (
-    vBox, widgetBox, widgetLabel, spin, doubleSpin, comboBox, listView, auto_commit
-)
-from Orange.widgets.widget import OWWidget, Msg
-from Orange.widgets.settings import Setting, ContextSetting, DomainContextHandler, PerfectDomainContextHandler, vartype
-from Orange.widgets.utils.signals import Output, Input
-from Orange.widgets import settings
-from Orange.widgets.utils import itemmodels
-from Orange.data import StringVariable, DiscreteVariable, ContinuousVariable, Table, Domain
+from AnyQt.QtCore import Qt, QSize
+from AnyQt.QtWidgets import QSplitter, QTableView, QHBoxLayout, QHeaderView, QListWidget
 
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
-)
-from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_test
-from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneSetsSelection, GeneScoringWidget
-from orangecontrib.bioinformatics.cluster_analysis import Cluster, ClusterModel, DISPLAY_GENE_SETS_COUNT
+from Orange.data import Table, Domain, StringVariable, DiscreteVariable, ContinuousVariable
+from Orange.widgets import settings
+from Orange.widgets.gui import spin, vBox, comboBox, listView, widgetBox, doubleSpin, auto_commit, widgetLabel
+from Orange.widgets.utils import itemmodels
+from Orange.widgets.widget import Msg, OWWidget
+from Orange.widgets.settings import Setting, ContextSetting, PerfectDomainContextHandler, vartype
+from Orange.widgets.utils.signals import Input, Output
+
 from orangecontrib.bioinformatics.geneset.utils import GeneSetException
+from orangecontrib.bioinformatics.cluster_analysis import DISPLAY_GENE_SETS_COUNT, Cluster, ClusterModel
 from orangecontrib.bioinformatics.ncbi.gene.config import ENTREZ_ID
+from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_test
+from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneScoringWidget, GeneSetsSelection
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID,
+    GENE_ID_COLUMN,
+    GENE_ID_ATTRIBUTE,
+    GENE_AS_ATTRIBUTE_NAME,
+)
 
 
 class ClusterAnalysisContextHandler(PerfectDomainContextHandler):
-
     def encode_setting(self, context, setting, value):
         if setting.name == 'cluster_indicators':
             value = [(var.name, 100 + vartype(var)) for var in value]
         return super().encode_setting(context, setting, value)
 
     def decode_setting(self, setting, value, domain=None):
-        return [domain[var[0]] for var in value] \
-                if setting.name == 'cluster_indicators' \
-                else super().decode_setting(setting, value, domain)
+        return (
+            [domain[var[0]] for var in value]
+            if setting.name == 'cluster_indicators'
+            else super().decode_setting(setting, value, domain)
+        )
 
 
 class OWClusterAnalysis(OWWidget):
     name = "Cluster Analysis"
-    description = "The widget displays differentially expressed genes that characterize the cluster, " \
-                  "and corresponding gene terms that describe differentially expressed genes"
+    description = (
+        "The widget displays differentially expressed genes that characterize the cluster, "
+        "and corresponding gene terms that describe differentially expressed genes"
+    )
     icon = "../widgets/icons/OWClusterAnalysis.svg"
     priority = 100
 
@@ -78,7 +77,7 @@ class OWClusterAnalysis(OWWidget):
     settingsHandler = ClusterAnalysisContextHandler()
     cluster_indicators = ContextSetting([])
     batch_indicator = ContextSetting(None)
-    stored_gene_sets_selection = ContextSetting(tuple())
+    stored_gene_sets_selection = ContextSetting(())
 
     scoring_method_selection = ContextSetting(0)
     scoring_method_design = ContextSetting(0)
@@ -147,20 +146,29 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,), separators=False)
         self.cluster_indicator_box = widgetBox(self.controlArea, 'Cluster Indicator')
 
-        self.cluster_indicator_view = listView(self.cluster_indicator_box, self, 'cluster_indicators',
-                                               model=self.cluster_indicator_model,
-                                               selectionMode=QListWidget.MultiSelection,
-                                               callback=self.invalidate,
-                                               sizeHint=QSize(256, 70))
+        self.cluster_indicator_view = listView(
+            self.cluster_indicator_box,
+            self,
+            'cluster_indicators',
+            model=self.cluster_indicator_model,
+            selectionMode=QListWidget.MultiSelection,
+            callback=self.invalidate,
+            sizeHint=QSize(256, 70),
+        )
 
         # Batch selection
-        self.batch_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,), separators=False,
-                                                            placeholder="")
+        self.batch_indicator_model = itemmodels.DomainModel(
+            valid_types=(DiscreteVariable,), separators=False, placeholder=""
+        )
         box = widgetBox(self.controlArea, 'Batch Indicator')
-        self.batch_indicator_combobox = comboBox(box, self, 'batch_indicator',
-                                                 model=self.batch_indicator_model,
-                                                 sendSelectedValue=True,
-                                                 callback=self.batch_indicator_changed)
+        self.batch_indicator_combobox = comboBox(
+            box,
+            self,
+            'batch_indicator',
+            model=self.batch_indicator_model,
+            sendSelectedValue=True,
+            callback=self.batch_indicator_changed,
+        )
 
         # Gene scoring
         box = widgetBox(self.controlArea, 'Gene Scoring')
@@ -180,8 +188,14 @@ class OWClusterAnalysis(OWWidget):
         if self.custom_gene_set_indicator not in self.feature_model:
             self.custom_gene_set_indicator = None
 
-        self.gs_label_combobox = comboBox(box, self, "custom_gene_set_indicator", sendSelectedValue=True,
-                                          model=self.feature_model, callback=self.handle_custom_gene_sets)
+        self.gs_label_combobox = comboBox(
+            box,
+            self,
+            "custom_gene_set_indicator",
+            sendSelectedValue=True,
+            model=self.feature_model,
+            callback=self.handle_custom_gene_sets,
+        )
         self.gs_label_combobox.setDisabled(True)
 
         # main area
@@ -189,58 +203,94 @@ class OWClusterAnalysis(OWWidget):
         self.mainArea.layout().addWidget(splitter)
 
         genes_filter = widgetBox(splitter, 'Filter Genes', orientation=QHBoxLayout())
-        spin(genes_filter, self, 'max_gene_count', 0, 10000,
-             label='Count',
-             tooltip='Minimum genes count',
-             checked='use_gene_count_filter',
-             callback=self.filter_genes,
-             callbackOnReturn=True,
-             checkCallback=self.filter_genes)
+        spin(
+            genes_filter,
+            self,
+            'max_gene_count',
+            0,
+            10000,
+            label='Count',
+            tooltip='Minimum genes count',
+            checked='use_gene_count_filter',
+            callback=self.filter_genes,
+            callbackOnReturn=True,
+            checkCallback=self.filter_genes,
+        )
 
-        doubleSpin(genes_filter, self, 'max_gene_p_value', 0.0, 1.0, 0.0001,
-                   label='p-value',
-                   tooltip='Maximum p-value of the enrichment score',
-                   checked='use_gene_pval_filter',
-                   callback=self.filter_genes,
-                   callbackOnReturn=True,
-                   checkCallback=self.filter_genes
-                   )
+        doubleSpin(
+            genes_filter,
+            self,
+            'max_gene_p_value',
+            0.0,
+            1.0,
+            0.0001,
+            label='p-value',
+            tooltip='Maximum p-value of the enrichment score',
+            checked='use_gene_pval_filter',
+            callback=self.filter_genes,
+            callbackOnReturn=True,
+            checkCallback=self.filter_genes,
+        )
 
-        doubleSpin(genes_filter, self, 'max_gene_fdr', 0.0, 1.0, 0.0001,
-                   label='FDR',
-                   tooltip='Maximum false discovery rate',
-                   checked='use_gene_fdr_filter',
-                   callback=self.filter_genes,
-                   callbackOnReturn=True,
-                   checkCallback=self.filter_genes
-                   )
+        doubleSpin(
+            genes_filter,
+            self,
+            'max_gene_fdr',
+            0.0,
+            1.0,
+            0.0001,
+            label='FDR',
+            tooltip='Maximum false discovery rate',
+            checked='use_gene_fdr_filter',
+            callback=self.filter_genes,
+            callbackOnReturn=True,
+            checkCallback=self.filter_genes,
+        )
 
         gene_sets_filter = widgetBox(splitter, 'Filter Gene Sets', orientation=QHBoxLayout())
-        spin(gene_sets_filter, self, 'min_gs_count', 0, DISPLAY_GENE_SETS_COUNT,
-             label='Count',
-             tooltip='Minimum genes count',
-             checked='use_gs_count_filter',
-             callback=self.filter_gene_sets,
-             callbackOnReturn=True,
-             checkCallback=self.filter_gene_sets)
+        spin(
+            gene_sets_filter,
+            self,
+            'min_gs_count',
+            0,
+            DISPLAY_GENE_SETS_COUNT,
+            label='Count',
+            tooltip='Minimum genes count',
+            checked='use_gs_count_filter',
+            callback=self.filter_gene_sets,
+            callbackOnReturn=True,
+            checkCallback=self.filter_gene_sets,
+        )
 
-        doubleSpin(gene_sets_filter, self, 'max_gs_p_value', 0.0, 1.0, 0.0001,
-                   label='p-value',
-                   tooltip='Maximum p-value of the enrichment score',
-                   checked='use_gs_pval_filter',
-                   callback=self.filter_gene_sets,
-                   callbackOnReturn=True,
-                   checkCallback=self.filter_gene_sets
-                   )
+        doubleSpin(
+            gene_sets_filter,
+            self,
+            'max_gs_p_value',
+            0.0,
+            1.0,
+            0.0001,
+            label='p-value',
+            tooltip='Maximum p-value of the enrichment score',
+            checked='use_gs_pval_filter',
+            callback=self.filter_gene_sets,
+            callbackOnReturn=True,
+            checkCallback=self.filter_gene_sets,
+        )
 
-        doubleSpin(gene_sets_filter, self, 'max_gs_fdr', 0.0, 1.0, 0.0001,
-                   label='FDR',
-                   tooltip='Maximum false discovery rate',
-                   checked='use_gs_max_fdr',
-                   callback=self.filter_gene_sets,
-                   callbackOnReturn=True,
-                   checkCallback=self.filter_gene_sets
-                   )
+        doubleSpin(
+            gene_sets_filter,
+            self,
+            'max_gs_fdr',
+            0.0,
+            1.0,
+            0.0001,
+            label='FDR',
+            tooltip='Maximum false discovery rate',
+            checked='use_gs_max_fdr',
+            callback=self.filter_gene_sets,
+            callbackOnReturn=True,
+            checkCallback=self.filter_gene_sets,
+        )
 
         self.cluster_info_view = QTableView()
         self.cluster_info_view.verticalHeader().setVisible(False)
@@ -259,7 +309,8 @@ class OWClusterAnalysis(OWWidget):
         info_string = ''
         if self.input_genes_ids:
             info_string += '{} samples, {} clusters\n'.format(
-                self.input_data.X.shape[0], len(self.clusters) if self.clusters else '?')
+                self.input_data.X.shape[0], len(self.clusters) if self.clusters else '?'
+            )
             info_string += '{:,d} unique genes\n'.format(len(self.input_genes_ids))
         else:
             info_string += 'No genes on input.\n'
@@ -284,36 +335,38 @@ class OWClusterAnalysis(OWWidget):
     def __create_temp_class_var(self):
         """ See no evil !"""
         cluster_indicator_name = 'Cluster indicators'
-
-        var_index_lookup = dict([(val, idx)
-                                for var in self.cluster_indicators
-                                for idx, val in enumerate(var.values)])
-
         row_profile = None
         new_cluster_values = []
+        var_index_lookup = {val: idx for var in self.cluster_indicators for idx, val in enumerate(var.values)}
 
         cart_prod = itertools.product(*[cluster.values for cluster in self.cluster_indicators])
         for comb in cart_prod:
             new_cluster_values.append(', '.join([val for val in comb]))
             self.new_cluster_profile.append([var_index_lookup[val] for val in comb])
 
-        row_profile_lookup = dict([(tuple(profile), indx)
-                                   for indx, (profile, _) in enumerate(zip(self.new_cluster_profile, new_cluster_values))])
+        row_profile_lookup = {
+            tuple(profile): indx for indx, (profile, _) in enumerate(zip(self.new_cluster_profile, new_cluster_values))
+        }
         for var in self.cluster_indicators:
             if row_profile is None:
                 row_profile = np.asarray(self.input_data.get_column_view(var)[0], dtype=int)
             else:
                 row_profile = np.vstack((row_profile, np.asarray(self.input_data.get_column_view(var)[0], dtype=int)))
 
-        ca_ind = DiscreteVariable.make(cluster_indicator_name, values=[val for val in new_cluster_values], ordered=True)
+        ca_ind = DiscreteVariable.make(
+            cluster_indicator_name, values=[val for val in new_cluster_values], ordered=True
+        )
 
-        domain = Domain(self.input_data.domain.attributes,
-                        self.input_data.domain.class_vars,
-                        self.input_data.domain.metas + (ca_ind, ))
+        domain = Domain(
+            self.input_data.domain.attributes,
+            self.input_data.domain.class_vars,
+            self.input_data.domain.metas + (ca_ind,),
+        )
 
         table = self.input_data.transform(domain)
-        table[:, ca_ind] = np.array([[row_profile_lookup[tuple(row_profile[:, i])]]
-                                     for i in range(row_profile.shape[1])])
+        table[:, ca_ind] = np.array(
+            [[row_profile_lookup[tuple(row_profile[:, i])]] for i in range(row_profile.shape[1])]
+        )
         self.input_data = table
         return ca_ind
 
@@ -361,7 +414,8 @@ class OWClusterAnalysis(OWWidget):
             self.cluster_info_model.apply_gene_filters(
                 self.max_gene_p_value if self.use_gene_pval_filter else None,
                 self.max_gene_fdr if self.use_gene_fdr_filter else None,
-                self.max_gene_count if self.use_gene_count_filter else None)
+                self.max_gene_count if self.use_gene_count_filter else None,
+            )
 
             # recalculate gene set enrichment
             self.__gene_sets_enrichment()
@@ -377,7 +431,8 @@ class OWClusterAnalysis(OWWidget):
             self.cluster_info_model.apply_gene_sets_filters(
                 self.max_gs_p_value if self.use_gs_pval_filter else None,
                 self.max_gs_fdr if self.use_gs_max_fdr else None,
-                self.min_gs_count if self.use_gs_count_filter else None)
+                self.min_gs_count if self.use_gs_count_filter else None,
+            )
 
             # call sizeHint function
             self.cluster_info_view.resizeRowsToContents()
@@ -392,12 +447,14 @@ class OWClusterAnalysis(OWWidget):
                 if (0 not in values) or (len(values) != 2):
                     raise ValueError('Binary data expected (use Preprocess)')
 
-            self.cluster_info_model.score_genes(design=design,
-                                                table_x=self.input_data.X,
-                                                rows_by_cluster=self.rows_by_cluster,
-                                                rows_by_batch=self.rows_by_batch,
-                                                method=method,
-                                                alternative=test_type)
+            self.cluster_info_model.score_genes(
+                design=design,
+                table_x=self.input_data.X,
+                rows_by_cluster=self.rows_by_cluster,
+                rows_by_batch=self.rows_by_batch,
+                method=method,
+                alternative=test_type,
+            )
         except ValueError as e:
             self.Warning.gene_enrichment(str(e), 'p-values are set to 1')
 
@@ -415,9 +472,7 @@ class OWClusterAnalysis(OWWidget):
             ref_genes = set(self.input_genes_ids)
 
             try:
-                self.cluster_info_model.gene_sets_enrichment(self.gs_widget.gs_object,
-                                                             selected_sets,
-                                                             ref_genes)
+                self.cluster_info_model.gene_sets_enrichment(self.gs_widget.gs_object, selected_sets, ref_genes)
             except Exception as e:
                 # TODO: possible exceptions?
 
@@ -454,7 +509,7 @@ class OWClusterAnalysis(OWWidget):
 
         self.input_data = None
         self.store_input_domain = None
-        self.stored_gene_sets_selection = tuple()
+        self.stored_gene_sets_selection = ()
         self.input_genes_names = []
         self.input_genes_ids = []
         self.tax_id = None
@@ -484,8 +539,10 @@ class OWClusterAnalysis(OWWidget):
             self.cluster_indicator_model.wrap([item for item in self.cluster_indicator_model if len(item.values) > 1])
             # First value in batch indicator model is a NoneType,
             # we can skip it when we validate categorical variables
-            self.batch_indicator_model.wrap(self.batch_indicator_model[:1] +
-                                            [item for item in self.batch_indicator_model[1:] if len(item.values) > 1])
+            self.batch_indicator_model.wrap(
+                self.batch_indicator_model[:1]
+                + [item for item in self.batch_indicator_model[1:] if len(item.values) > 1]
+            )
 
             self.tax_id = self.input_data.attributes.get(TAX_ID, None)
             self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
@@ -575,18 +632,22 @@ class OWClusterAnalysis(OWWidget):
 
                 if isinstance(self.custom_gene_set_indicator, DiscreteVariable):
                     labels = self.custom_gene_set_indicator.values
-                    gene_sets_names = [labels[int(idx)] for idx
-                                       in self.custom_data.get_column_view(self.custom_gene_set_indicator)[0]]
+                    gene_sets_names = [
+                        labels[int(idx)] for idx in self.custom_data.get_column_view(self.custom_gene_set_indicator)[0]
+                    ]
                 else:
                     gene_sets_names, _ = self.custom_data.get_column_view(self.custom_gene_set_indicator)
 
                 self.num_of_custom_sets = len(set(gene_sets_names))
                 gene_names, _ = self.custom_data.get_column_view(self.custom_gene_id_column)
-                hierarchy_title = (self.custom_data.name if self.custom_data.name else 'Custom sets', )
+                hierarchy_title = (self.custom_data.name if self.custom_data.name else 'Custom sets',)
                 try:
                     self.gs_widget.add_custom_sets(
-                        gene_sets_names, gene_names,
-                        hierarchy_title=hierarchy_title, select_customs_flag=select_customs_flag)
+                        gene_sets_names,
+                        gene_names,
+                        hierarchy_title=hierarchy_title,
+                        select_customs_flag=select_customs_flag,
+                    )
                 except GeneSetException:
                     pass
                 self.gs_label_combobox.setDisabled(False)
@@ -602,9 +663,14 @@ class OWClusterAnalysis(OWWidget):
 
     def gene_scores_output(self, selected_clusters):
 
-        metas = [StringVariable('Gene'), StringVariable(ENTREZ_ID),
-                 StringVariable('Rank'), ContinuousVariable('Statistic score'),
-                 ContinuousVariable('P-value'), ContinuousVariable('FDR')]
+        metas = [
+            StringVariable('Gene'),
+            StringVariable(ENTREZ_ID),
+            StringVariable('Rank'),
+            ContinuousVariable('Statistic score'),
+            ContinuousVariable('P-value'),
+            ContinuousVariable('FDR'),
+        ]
 
         if len(self.new_cluster_profile):
             # note: order is important
@@ -640,8 +706,13 @@ class OWClusterAnalysis(OWWidget):
 
     def gene_set_scores_output(self, selected_clusters):
 
-        metas = [StringVariable('Term'), StringVariable('Term ID'), StringVariable('Rank'),
-                 ContinuousVariable('P-value'), ContinuousVariable('FDR')]
+        metas = [
+            StringVariable('Term'),
+            StringVariable('Term ID'),
+            StringVariable('Rank'),
+            ContinuousVariable('P-value'),
+            ContinuousVariable('FDR'),
+        ]
 
         if len(self.new_cluster_profile):
             # note: order is important
@@ -688,16 +759,22 @@ class OWClusterAnalysis(OWWidget):
             [selected_cluster_genes.add(gene.ncbi_id) for gene in cluster.filtered_genes]
 
         # get columns of selected clusters
-        selected_columns = [column for column in self.input_data.domain.attributes
-                            if self.gene_id_attribute in column.attributes and
-                            str(column.attributes[self.gene_id_attribute]) in selected_cluster_genes]
+        selected_columns = [
+            column
+            for column in self.input_data.domain.attributes
+            if self.gene_id_attribute in column.attributes
+            and str(column.attributes[self.gene_id_attribute]) in selected_cluster_genes
+        ]
 
         domain = Domain(selected_columns, self.input_data.domain.class_vars, self.input_data.domain.metas)
         output_data = self.input_data.from_table(domain, self.input_data)
 
         # get rows of selected clusters
-        selected_rows = [row_index for row_index, col_index in enumerate(self.rows_by_cluster)
-                         if col_index in selected_cluster_indexes]
+        selected_rows = [
+            row_index
+            for row_index, col_index in enumerate(self.rows_by_cluster)
+            if col_index in selected_cluster_indexes
+        ]
 
         # send to output signal
         self.Outputs.selected_data.send(output_data[selected_rows])
@@ -709,6 +786,7 @@ if __name__ == "__main__":
 
     def main(argv=None):
         from AnyQt.QtWidgets import QApplication
+
         app = QApplication(list(argv) if argv else [])
 
         w = OWClusterAnalysis()

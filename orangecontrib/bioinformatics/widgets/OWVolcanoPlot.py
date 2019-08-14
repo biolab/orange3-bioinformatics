@@ -1,16 +1,13 @@
 import numpy as np
 
-
-from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets import gui, settings
+from Orange.widgets.widget import Msg
 from Orange.widgets.settings import SettingProvider
-from Orange.widgets.visualize.owscatterplot import OWScatterPlotBase,  OWDataProjectionWidget
+from Orange.widgets.visualize.owscatterplot import OWScatterPlotBase, OWDataProjectionWidget
 
+from orangecontrib.bioinformatics.utils.statistics import score_t_test, score_fold_change
 from orangecontrib.bioinformatics.widgets.utils.gui import label_selection
-from orangecontrib.bioinformatics.utils.statistics import score_fold_change, score_t_test
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN
-)
+from orangecontrib.bioinformatics.widgets.utils.data import GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
 
 
 class VolcanoGraph(OWScatterPlotBase):
@@ -27,8 +24,9 @@ class OWVolcanoPlot(OWDataProjectionWidget):
     priority = 100
 
     class Warning(OWDataProjectionWidget.Warning):
-        insufficient_data = Msg('Insufficient data to compute statistics.'
-                                'More than one measurement per class should be provided ')
+        insufficient_data = Msg(
+            'Insufficient data to compute statistics.' 'More than one measurement per class should be provided '
+        )
 
         gene_enrichment = Msg('{}, {}.')
         no_selected_gene_sets = Msg('No gene set selected, select them from Gene Sets box.')
@@ -128,8 +126,7 @@ class OWVolcanoPlot(OWDataProjectionWidget):
         use_attr_names = self.data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
         gene_id_column = self.data.attributes.get(GENE_ID_COLUMN, None)
 
-        if self.data is not None and (len(self.data) == 0 or
-                                      len(self.data.domain) == 0):
+        if self.data is not None and (len(self.data) == 0 or len(self.data.domain) == 0):
             self.data = None
 
         if use_attr_names is None:

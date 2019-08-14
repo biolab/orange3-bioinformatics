@@ -11,10 +11,9 @@ WIDGET_HELP_PATH = (
     # make htmlhelp
     # inside doc folder
     ("{DEVELOP_ROOT}/doc/_build/htmlhelp/index.html", None),
-
     # Online documentation url, used when the local documentation is available.
     # Url should point to a page with a section Widgets. This section should
     # includes links to documentation pages of each widget. Matching is
     # performed by comparing link caption to widget name.
-    ("https://orange3-bioinformatics.readthedocs.io/en/latest/", "")
+    ("https://orange3-bioinformatics.readthedocs.io/en/latest/", ""),
 )

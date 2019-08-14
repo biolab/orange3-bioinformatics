@@ -1,31 +1,32 @@
 """ Differential Gene Expression """
 import sys
+from types import SimpleNamespace as namespace
+
 import numpy as np
 import pyqtgraph as pg
-import scipy.special
 import scipy.stats
+import scipy.special
+
+from AnyQt.QtGui import QPen, QStandardItemModel
+from AnyQt.QtCore import Qt, QSize, QLineF, QRectF
+from AnyQt.QtCore import pyqtSlot as Slot
+from AnyQt.QtCore import pyqtSignal as Signal
+
 import Orange.data
-
-from types import SimpleNamespace as namespace
-from AnyQt.QtGui import (
-    QStandardItemModel, QPen
-)
-from AnyQt.QtCore import (
-    Qt, pyqtSignal as Signal, pyqtSlot as Slot, QSize, QRectF, QLineF
-)
-
+from Orange.widgets import gui, report, widget, settings
 from Orange.preprocess import transformation
-from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils import concurrent
 from Orange.widgets.utils.datacaching import data_hints
-from Orange.widgets import report
 
-from orangecontrib.bioinformatics.widgets.utils.settings import SetContextHandler
 from orangecontrib.bioinformatics.widgets.utils import gui as guiutils
 from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_test
 from orangecontrib.bioinformatics.widgets.utils.data import (
-    GENE_AS_ATTRIBUTE_NAME, GENE_ID_ATTRIBUTE, GENE_ID_COLUMN, TAX_ID
+    TAX_ID,
+    GENE_ID_COLUMN,
+    GENE_ID_ATTRIBUTE,
+    GENE_AS_ATTRIBUTE_NAME,
 )
+from orangecontrib.bioinformatics.widgets.utils.settings import SetContextHandler
 
 
 def score_fold_change(a, b, **kwargs):
@@ -104,8 +105,7 @@ def score_anova_(*arrays, **kwargs):
     if not 0 <= axis < 2:
         raise ValueError("0 <= axis < 2")
 
-    if not all(arrays[i].ndim == arrays[i + 1].ndim
-               for i in range(len(arrays) - 2)):
+    if not all(arrays[i].ndim == arrays[i + 1].ndim for i in range(len(arrays) - 2)):
         raise ValueError("All arrays must have the same number of dimensions")
 
     if axis >= arrays[0].ndim:
@@ -151,8 +151,7 @@ def f_oneway(*arrays, **kwargs):
     bign = alldata.shape[axis]
     sstot = np.sum(alldata ** 2, axis) - (np.sum(alldata, axis) ** 2) / bign
 
-    ssarrays = [(np.sum(a, axis, keepdims=True) ** 2) / a.shape[axis]
-                for a in arrays]
+    ssarrays = [(np.sum(a, axis, keepdims=True) ** 2) / a.shape[axis] for a in arrays]
     ssbn = np.sum(np.concatenate(ssarrays, axis), axis)
     ssbn -= (np.sum(alldata, axis) ** 2) / bign
     assert sstot.shape == ssbn.shape
@@ -242,6 +241,7 @@ class Histogram(pg.PlotWidget):
     """
     A histogram plot with interactive 'tail' selection
     """
+
     #: Emitted when the selection boundary has changed
     selectionChanged = Signal()
     #: Emitted when the selection boundary has been edited by the user
@@ -279,12 +279,10 @@ class Histogram(pg.PlotWidget):
         self.__cutlow.sigPositionChangeFinished.connect(self.selectionEdited)
 
         brush = pg.mkBrush((200, 200, 200, 180))
-        self.__taillow = pg.PlotCurveItem(
-            fillLevel=0, brush=brush, pen=QPen(Qt.NoPen))
+        self.__taillow = pg.PlotCurveItem(fillLevel=0, brush=brush, pen=QPen(Qt.NoPen))
         self.__taillow.setVisible(False)
 
-        self.__tailhigh = pg.PlotCurveItem(
-            fillLevel=0, brush=brush, pen=QPen(Qt.NoPen))
+        self.__tailhigh = pg.PlotCurveItem(fillLevel=0, brush=brush, pen=QPen(Qt.NoPen))
         self.__tailhigh.setVisible(False)
 
     def setData(self, hist, bins=None):
@@ -296,9 +294,7 @@ class Histogram(pg.PlotWidget):
 
         self.__data = (hist, bins)
         if self.__histcurve is None:
-            self.__histcurve = pg.PlotCurveItem(
-                x=bins, y=hist, stepMode=True
-            )
+            self.__histcurve = pg.PlotCurveItem(x=bins, y=hist, stepMode=True)
         else:
             self.__histcurve.setData(x=bins, y=hist, stepMode=True)
 
@@ -503,8 +499,8 @@ def histogram_cut(hist, bins, low, high):
     else:
         highidx = np.searchsorted(bins, high, side="right")
 
-    cbins = bins[lowidx: highidx]
-    chist = hist[lowidx: highidx - 1]
+    cbins = bins[lowidx:highidx]
+    chist = hist[lowidx : highidx - 1]
 
     if cbins[0] > low:
         cbins = np.r_[low, cbins]
@@ -541,9 +537,11 @@ class OWDifferentialExpression(widget.OWWidget):
     priority = 6
 
     inputs = [("Data", Orange.data.Table, "set_data")]
-    outputs = [("Data subset", Orange.data.Table, widget.Default),
-               ("Remaining data subset", Orange.data.Table),
-               ("Selected genes", Orange.data.Table)]
+    outputs = [
+        ("Data subset", Orange.data.Table, widget.Default),
+        ("Remaining data subset", Orange.data.Table),
+        ("Selected genes", Orange.data.Table),
+    ]
 
     #: Selection types
     LowTail, HighTail, TwoTail = 1, 2, 3
@@ -560,7 +558,7 @@ class OWDifferentialExpression(widget.OWWidget):
         ("ANOVA P-value", LowTail, VarSampleTest, score_anova_p),
         ("Signal to Noise Ratio", TwoTail, TwoSampleTest, score_signal_to_noise),
         ("Mann-Whitney", LowTail, TwoSampleTest, score_mann_whitney_u),
-        ('Hypergeometric Test', TwoTail, TwoSampleTest, hypergeometric_test_score)
+        ('Hypergeometric Test', TwoTail, TwoSampleTest, hypergeometric_test_score),
     ]
 
     settingsHandler = SetContextHandler()
@@ -578,14 +576,16 @@ class OWDifferentialExpression(widget.OWWidget):
     n_best = settings.Setting(20)
 
     #: Stored thresholds for scores.
-    thresholds = settings.Setting({
-        "Fold Change": (0.5, 2.),
-        "log2(Fold Change)": (-1, 1),
-        "T-test": (-2, 2),
-        "T-test P-value": (0.01, 0.01),
-        "ANOVA": (0, 3),
-        "ANOVA P-value": (0, 0.01),
-    })
+    thresholds = settings.Setting(
+        {
+            "Fold Change": (0.5, 2.0),
+            "log2(Fold Change)": (-1, 1),
+            "T-test": (-2, 2),
+            "T-test P-value": (0.01, 0.01),
+            "ANOVA": (0, 3),
+            "ANOVA P-value": (0, 0.01),
+        }
+    )
 
     auto_commit = settings.Setting(False)
 
@@ -599,8 +599,7 @@ class OWDifferentialExpression(widget.OWWidget):
     def __init__(self, parent=None):
         widget.OWWidget.__init__(self, parent)
 
-        self.min_value, self.max_value = \
-            self.thresholds.get(self.Scores[self.score_index][0], (1, 0))
+        self.min_value, self.max_value = self.thresholds.get(self.Scores[self.score_index][0], (1, 0))
 
         # threshold defining expressed genes (for Hypergeometric Test)
         self.expression_threshold_value = 1.0
@@ -624,18 +623,12 @@ class OWDifferentialExpression(widget.OWWidget):
             OWDifferentialExpression.TwoTail: test_two_tail,
         }
 
-        self.histogram = Histogram(
-            enableMouse=False, enableMenu=False, background="w"
-        )
+        self.histogram = Histogram(enableMouse=False, enableMenu=False, background="w")
         self.histogram.enableAutoRange(enable=False)
         self.histogram.getPlotItem().hideButtons()  # hide auto range button
         self.histogram.getViewBox().setMouseEnabled(False, False)
-        self.histogram.selectionChanged.connect(
-            self.__on_histogram_plot_selection_changed
-        )
-        self.histogram.selectionEdited.connect(
-            self._invalidate_selection
-        )
+        self.histogram.selectionChanged.connect(self.__on_histogram_plot_selection_changed)
+        self.histogram.selectionEdited.connect(self._invalidate_selection)
 
         self.mainArea.layout().addWidget(self.histogram)
 
@@ -646,77 +639,93 @@ class OWDifferentialExpression(widget.OWWidget):
         self.selectedInfoLabel = gui.widgetLabel(box, "\n")
 
         box1 = gui.widgetBox(self.controlArea, "Scoring Method")
-        gui.comboBox(box1, self, "score_index",
-                     items=[sm[0] for sm in self.Scores],
-                     callback=[self.on_scoring_method_changed, self.update_scores])
+        gui.comboBox(
+            box1,
+            self,
+            "score_index",
+            items=[sm[0] for sm in self.Scores],
+            callback=[self.on_scoring_method_changed, self.update_scores],
+        )
 
         self.expression_threshold_box = gui.widgetBox(self.controlArea, 'Expression threshold')
         self.expression_threshold = gui.doubleSpin(
             self.expression_threshold_box,
-            self, "expression_threshold_value",
-            minv=0, maxv=1e2, step=1e-2,
+            self,
+            "expression_threshold_value",
+            minv=0,
+            maxv=1e2,
+            step=1e-2,
             callback=self.update_scores,
-            callbackOnReturn=True)
+            callbackOnReturn=True,
+        )
 
         box = gui.widgetBox(self.controlArea, "Target Labels")
         self.label_selection_widget = guiutils.LabelSelectionWidget()
         self.label_selection_widget.setMaximumHeight(150)
         box.layout().addWidget(self.label_selection_widget)
 
-        self.label_selection_widget.groupChanged.connect(
-            self.on_label_activated)
+        self.label_selection_widget.groupChanged.connect(self.on_label_activated)
 
-        self.label_selection_widget.groupSelectionChanged.connect(
-            self.on_target_changed)
+        self.label_selection_widget.groupSelectionChanged.connect(self.on_target_changed)
 
         box = gui.widgetBox(self.controlArea, "Selection")
         box.layout().setSpacing(0)
 
         self.max_value_spin = gui.doubleSpin(
-            box, self, "max_value", minv=-1e6, maxv=1e6, step=1e-6,
-            label="Upper threshold:", callback=self.update_boundary,
-            callbackOnReturn=True)
+            box,
+            self,
+            "max_value",
+            minv=-1e6,
+            maxv=1e6,
+            step=1e-6,
+            label="Upper threshold:",
+            callback=self.update_boundary,
+            callbackOnReturn=True,
+        )
 
         self.low_value_spin = gui.doubleSpin(
-            box, self, "min_value", minv=-1e6, maxv=1e6, step=1e-6,
-            label="Lower threshold:", callback=self.update_boundary,
-            callbackOnReturn=True)
+            box,
+            self,
+            "min_value",
+            minv=-1e6,
+            maxv=1e6,
+            step=1e-6,
+            label="Lower threshold:",
+            callback=self.update_boundary,
+            callbackOnReturn=True,
+        )
 
-        check = gui.checkBox(
-            box, self, "compute_null", "Compute null distribution",
-            callback=self.update_scores)
+        check = gui.checkBox(box, self, "compute_null", "Compute null distribution", callback=self.update_scores)
 
         perm_spin = gui.spin(
-            box, self, "permutations_count", minv=1, maxv=50,
-            label="Permutations:", callback=self.update_scores,
-            callbackOnReturn=True)
+            box,
+            self,
+            "permutations_count",
+            minv=1,
+            maxv=50,
+            label="Permutations:",
+            callback=self.update_scores,
+            callbackOnReturn=True,
+        )
 
         check.disables.append(perm_spin)
 
         box1 = gui.widgetBox(box, orientation='horizontal')
 
-        pval_spin = gui.doubleSpin(
-            box1, self, "alpha_value", minv=2e-7, maxv=1.0, step=1e-7,
-            label="α-value:")
-        pval_select = gui.button(
-            box1, self, "Select", callback=self.select_p_best,
-            autoDefault=False
-        )
+        pval_spin = gui.doubleSpin(box1, self, "alpha_value", minv=2e-7, maxv=1.0, step=1e-7, label="α-value:")
+        pval_select = gui.button(box1, self, "Select", callback=self.select_p_best, autoDefault=False)
         check.disables.append(pval_spin)
         check.disables.append(pval_select)
 
         check.makeConsistent()
 
         box1 = gui.widgetBox(box, orientation='horizontal')
-        gui.spin(box1, self, "n_best", 0, 10000, step=1,
-                 label="Best Ranked:")
-        gui.button(box1, self, "Select", callback=self.select_n_best,
-                   autoDefault=False)
+        gui.spin(box1, self, "n_best", 0, 10000, step=1, label="Best Ranked:")
+        gui.button(box1, self, "Select", callback=self.select_n_best, autoDefault=False)
 
         box = gui.widgetBox(self.controlArea, "Output")
 
-        acbox = gui.auto_commit(
-            box, self, "auto_commit", "Commit", box=None)
+        acbox = gui.auto_commit(box, self, "auto_commit", "Commit", box=None)
         acbox.button.setDefault(True)
 
         gui.rubber(self.controlArea)
@@ -750,8 +759,7 @@ class OWDifferentialExpression(widget.OWWidget):
         """Initialize widget state from the data."""
 
         col_targets, row_targets = guiutils.group_candidates(data)
-        modelitems = [guiutils.standarditem_from(obj)
-                      for obj in col_targets + row_targets]
+        modelitems = [guiutils.standarditem_from(obj) for obj in col_targets + row_targets]
 
         model = QStandardItemModel()
         for item in modelitems:
@@ -787,9 +795,10 @@ class OWDifferentialExpression(widget.OWWidget):
         if self.data is not None and not self.targets:
             # If both attr. labels and classes are missing, show an error
             self.error(
-                1, "Cannot compute gene scores! Differential expression "
-                   "widget requires a data-set with a discrete class "
-                   "variable(s) or column labels!"
+                1,
+                "Cannot compute gene scores! Differential expression "
+                "widget requires a data-set with a discrete class "
+                "variable(s) or column labels!",
             )
             self.data = None
 
@@ -801,28 +810,27 @@ class OWDifferentialExpression(widget.OWWidget):
 
             if not rowshint:
                 # Select the first row group split candidate (if available)
-                indices = [i for i, grp in enumerate(self.targets)
-                           if isinstance(grp, guiutils.RowGroup)]
+                indices = [i for i, grp in enumerate(self.targets) if isinstance(grp, guiutils.RowGroup)]
                 if indices:
                     index = indices[0]
 
             self.current_group_index = index
 
             # Restore target label selection from context settings
-            items = {(grp.name, val)
-                     for grp in self.targets for val in grp.values}
+            items = {(grp.name, val) for grp in self.targets for val in grp.values}
             self.openContext(items)
 
             # Restore current group / selection
             model = self.label_selection_widget.model()
-            selection = [model.index(i, 0, model.index(keyind, 0))
-                         for keyind, selection in enumerate(self.stored_selections)
-                         for i in selection]
+            selection = [
+                model.index(i, 0, model.index(keyind, 0))
+                for keyind, selection in enumerate(self.stored_selections)
+                for i in selection
+            ]
             selection = guiutils.itemselection(selection)
 
             self.label_selection_widget.setSelection(selection)
-            self.label_selection_widget.setCurrentGroupIndex(
-                self.current_group_index)
+            self.label_selection_widget.setCurrentGroupIndex(self.current_group_index)
 
         self.commit()
 
@@ -844,9 +852,7 @@ class OWDifferentialExpression(widget.OWWidget):
 
         def compute_scores(X, group_indices, warn=False):
             arrays = [X[ind] for ind in group_indices]
-            ss = score_func(*arrays,
-                            axis=0,
-                            treshold=self.expression_threshold_value)
+            ss = score_func(*arrays, axis=0, treshold=self.expression_threshold_value)
 
             return ss[0] if isinstance(ss, tuple) and not warn else ss
 
@@ -866,21 +872,18 @@ class OWDifferentialExpression(widget.OWWidget):
             axis = 1
 
         if test_type == OWDifferentialExpression.TwoSampleTest:
-            G1 = guiutils.group_selection_mask(
-                self.data, grp, split_selection)
+            G1 = guiutils.group_selection_mask(self.data, grp, split_selection)
             G2 = ~G1
             indices = [np.flatnonzero(G1), np.flatnonzero(G2)]
 
         elif test_type == OWDifferentialExpression.VarSampleTest:
-            indices = [guiutils.group_selection_mask(self.data, grp, [i])
-                       for i in range(len(grp.values))]
+            indices = [guiutils.group_selection_mask(self.data, grp, [i]) for i in range(len(grp.values))]
             indices = [np.flatnonzero(ind) for ind in indices]
         else:
             assert False
 
         if not all(ind.size > 0 for ind in indices):
-            self.error(0, "Target labels most exclude/include at least one "
-                          "value.")
+            self.error(0, "Target labels most exclude/include at least one " "value.")
             self.scores = None
             self.nulldist = None
             self.update_data_info_label()
@@ -893,8 +896,7 @@ class OWDifferentialExpression(widget.OWWidget):
         # TODO: Check that each label has more than one measurement,
         # raise warning otherwise.
 
-        def compute_scores_with_perm(X, indices, nperm=0, rstate=None,
-                                     progress_advance=None):
+        def compute_scores_with_perm(X, indices, nperm=0, rstate=None, progress_advance=None):
             warning = None
             scores = compute_scores(X, indices, warn=True)
             if isinstance(scores, tuple):
@@ -909,8 +911,7 @@ class OWDifferentialExpression(widget.OWWidget):
 
                 for i in range(nperm):
                     p_indices = permute_indices(indices, rstate)
-                    assert all(pind.shape == ind.shape
-                               for pind, ind in zip(indices, p_indices))
+                    assert all(pind.shape == ind.shape for pind, ind in zip(indices, p_indices))
                     pscore = compute_scores(X, p_indices)
                     assert pscore.shape == scores.shape
                     null_scores.append(pscore)
@@ -919,8 +920,7 @@ class OWDifferentialExpression(widget.OWWidget):
 
             return scores, null_scores, warning
 
-        p_advance = concurrent.methodinvoke(
-            self, "progressBarAdvance", (float,))
+        p_advance = concurrent.methodinvoke(self, "progressBarAdvance", (float,))
         state = namespace(cancelled=False, advance=p_advance)
 
         def progress():
@@ -930,19 +930,18 @@ class OWDifferentialExpression(widget.OWWidget):
                 state.advance(100 / (nperm + 1))
 
         self.progressBarInit()
-        set_scores = concurrent.methodinvoke(
-            self, "__set_score_results", (concurrent.Future,))
+        set_scores = concurrent.methodinvoke(self, "__set_score_results", (concurrent.Future,))
 
         nperm = self.permutations_count if self.compute_null else 0
         self.__scores_state = state
         self.__scores_future = self._executor.submit(
-                compute_scores_with_perm, X, indices, nperm,
-                progress_advance=progress)
+            compute_scores_with_perm, X, indices, nperm, progress_advance=progress
+        )
         self.__scores_future.add_done_callback(set_scores)
 
     @Slot(float)
     def __pb_advance(self, value):
-        self.progressBarAdvance(value, )
+        self.progressBarAdvance(value)
 
     @Slot(float)
     def progressBarAdvance(self, value):
@@ -1017,10 +1016,7 @@ class OWDifferentialExpression(widget.OWWidget):
 
         nbins = int(max(np.ceil(np.sqrt(len(validscores))), 20))
         freq, edges = np.histogram(validscores, bins=nbins)
-        self.histogram.setHistogramCurve(
-            pg.PlotCurveItem(x=edges, y=freq, stepMode=True,
-                             pen=pg.mkPen("b", width=2))
-        )
+        self.histogram.setHistogramCurve(pg.PlotCurveItem(x=edges, y=freq, stepMode=True, pen=pg.mkPen("b", width=2)))
 
         if nulldist is not None:
             nulldist = nulldist.ravel()
@@ -1029,10 +1025,7 @@ class OWDifferentialExpression(widget.OWWidget):
             nullbins = edges  # XXX: extend to the full range of nulldist
             nullfreq, _ = np.histogram(validnulldist, bins=nullbins)
             nullfreq = nullfreq * (freq.sum() / nullfreq.sum())
-            nullitem = pg.PlotCurveItem(
-                x=nullbins, y=nullfreq, stepMode=True,
-                pen=pg.mkPen((50, 50, 50, 100))
-            )
+            nullitem = pg.PlotCurveItem(x=nullbins, y=nullfreq, stepMode=True, pen=pg.mkPen((50, 50, 50, 100)))
             # Ensure it stacks behind the main curve
             nullitem.setZValue(nullitem.zValue() - 10)
             self.histogram.addItem(nullitem)
@@ -1055,8 +1048,7 @@ class OWDifferentialExpression(widget.OWWidget):
 
         # If this is a two sample test add markers to the left and right
         # plot indicating which group is over-expressed in that part
-        if test_type == OWDifferentialExpression.TwoSampleTest and \
-                side == OWDifferentialExpression.TwoTail:
+        if test_type == OWDifferentialExpression.TwoSampleTest and side == OWDifferentialExpression.TwoTail:
             maxy = np.max(freq)
             # XXX: Change use of integer constant
             if scoreindex == 0:  # fold change is centered on 1.0
@@ -1087,10 +1079,7 @@ class OWDifferentialExpression(widget.OWWidget):
             maxy = max(np.max(nullfreq), maxy)
 
         if not np.any(np.isnan([maxx, minx, maxy])):
-            self.histogram.setRange(
-                QRectF(minx, miny, maxx - minx, maxy - miny),
-                padding=0.05
-            )
+            self.histogram.setRange(QRectF(minx, miny, maxx - minx, maxy - miny), padding=0.05)
 
     def update_data_info_label(self):
         if self.data is not None:
@@ -1109,7 +1098,9 @@ class OWDifferentialExpression(widget.OWWidget):
         self.dataInfoLabel.setText(text)
 
     def update_selected_info_label(self):
-        pl = lambda c: "" if c == 1 else "s"
+        def pl(c):
+            return "" if c == 1 else "s"
+
         if self.data is not None and self.scores is not None:
             scores = self.scores
             low, high = self.min_value, self.max_value
@@ -1120,8 +1111,7 @@ class OWDifferentialExpression(widget.OWWidget):
             scores = scores[np.isfinite(scores)]
 
             nselected = np.count_nonzero(test(scores, low, high))
-            defined_txt = ("{} of {} score{} undefined."
-                           .format(count_undef, count_scores, pl(count_scores)))
+            defined_txt = "{} of {} score{} undefined.".format(count_undef, count_scores, pl(count_scores))
 
         elif self.data is not None:
             nselected = 0
@@ -1130,10 +1120,7 @@ class OWDifferentialExpression(widget.OWWidget):
             nselected = 0
             defined_txt = ""
 
-        self.selectedInfoLabel.setText(
-            defined_txt + "\n" +
-            "{} selected gene{}".format(nselected, pl(nselected))
-        )
+        self.selectedInfoLabel.setText(defined_txt + "\n" + "{} selected gene{}".format(nselected, pl(nselected)))
 
     def __on_histogram_plot_selection_changed(self):
         low, high = self.histogram.boundary()
@@ -1185,10 +1172,10 @@ class OWDifferentialExpression(widget.OWWidget):
                 scores = np.log2(scoresabs)
                 scores = scores[np.isfinite(scoresabs)]
             scoresabs = np.sort(np.abs(scores))
-            limit = (scoresabs[-n] + scoresabs[-min(n+1, len(scores))]) / 2
+            limit = (scoresabs[-n] + scoresabs[-min(n + 1, len(scores))]) / 2
             cuthigh, cutlow = limit, -limit
             if score_name == "Fold Change":
-                cuthigh, cutlow = 2**cuthigh, 2**cutlow
+                cuthigh, cutlow = 2 ** cuthigh, 2 ** cutlow
             self.histogram.setBoundary(cutlow, cuthigh)
         self._invalidate_selection()
 
@@ -1233,9 +1220,7 @@ class OWDifferentialExpression(widget.OWWidget):
 
     def on_scoring_method_changed(self):
         _, _, test_type, score_method = self.Scores[self.score_index]
-        self.label_selection_widget.values_view.setEnabled(
-            test_type == OWDifferentialExpression.TwoSampleTest
-        )
+        self.label_selection_widget.values_view.setEnabled(test_type == OWDifferentialExpression.TwoSampleTest)
 
         # TODO: refactor this, not pretty :)
         self.expression_threshold_box.setHidden(score_method.__name__ != hypergeometric_test_score.__name__)
@@ -1294,9 +1279,14 @@ class OWDifferentialExpression(widget.OWWidget):
             self.send("Selected genes", table_selected_genes[indices])
         else:
             gene_ids = self.data.attributes[GENE_ID_ATTRIBUTE]
-            domain_selected_genes = Orange.data.Domain([], metas=[Orange.data.StringVariable('genes'),
-                                                                  Orange.data.StringVariable(gene_ids),
-                                                                  Orange.data.ContinuousVariable(score_name)])
+            domain_selected_genes = Orange.data.Domain(
+                [],
+                metas=[
+                    Orange.data.StringVariable('genes'),
+                    Orange.data.StringVariable(gene_ids),
+                    Orange.data.ContinuousVariable(score_name),
+                ],
+            )
             data_selected_genes = []
 
             # select columns
@@ -1313,12 +1303,10 @@ class OWDifferentialExpression(widget.OWWidget):
             selected_attrs = [attrs[i] for i in indices]
             remaining_attrs = [attrs[i] for i in remaining]
 
-            domain = Orange.data.Domain(
-                selected_attrs, domain.class_vars, domain.metas)
+            domain = Orange.data.Domain(selected_attrs, domain.class_vars, domain.metas)
             subsetdata = self.data.from_table(domain, self.data)
 
-            domain = Orange.data.Domain(
-                remaining_attrs, domain.class_vars, domain.metas)
+            domain = Orange.data.Domain(remaining_attrs, domain.class_vars, domain.metas)
             remainingdata = self.data.from_table(domain, self.data)
 
             self.send("Selected genes", table_selected_genes[indices])
@@ -1328,15 +1316,17 @@ class OWDifferentialExpression(widget.OWWidget):
 
     def send_report(self):
         self.report_plot()
-        caption = report.render_items_vert((
-            ("Scoring method", self.Scores[self.score_index][0]),
-            ("Upper treshold", self.max_value),
-            ("Lower threshold", self.min_value),
-            ("Compute null distribution", self.compute_null),
-            ("Permutations", self.permutations_count),
-            ("α-value", self.alpha_value),
-            ("Best Ranked", self.n_best)
-        ))
+        caption = report.render_items_vert(
+            (
+                ("Scoring method", self.Scores[self.score_index][0]),
+                ("Upper treshold", self.max_value),
+                ("Lower threshold", self.min_value),
+                ("Compute null distribution", self.compute_null),
+                ("Permutations", self.permutations_count),
+                ("α-value", self.alpha_value),
+                ("Best Ranked", self.n_best),
+            )
+        )
         self.report_caption(caption)
         self.report_caption(self.selectedInfoLabel.text())
 
@@ -1357,6 +1347,7 @@ if __name__ == "__main__":
 
     def main(argv=None):
         from AnyQt.QtWidgets import QApplication
+
         app = QApplication(list(argv) if argv else [])
         argv = app.arguments()
         if len(argv) > 1:

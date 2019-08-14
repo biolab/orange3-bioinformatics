@@ -1,49 +1,45 @@
 """ Gene Expression Omnibus datasets widget """
 import sys
+from types import SimpleNamespace as namespace
+from typing import Any, Optional, DefaultDict
+from functools import lru_cache
+from collections import OrderedDict, defaultdict
+
 import numpy as np
 
-
-from typing import Optional, DefaultDict, Any
-from types import SimpleNamespace as namespace
-from collections import defaultdict, OrderedDict
-from functools import lru_cache
-
+from AnyQt.QtGui import QFont, QColor
+from AnyQt.QtCore import Qt, QSize, QVariant, QModelIndex
 from AnyQt.QtWidgets import (
+    QStyle,
     QSplitter,
     QTableView,
-    QAbstractItemView,
-    QStyle,
     QTreeWidget,
     QTreeWidgetItem,
+    QAbstractItemView,
     QAbstractScrollArea,
-)
-from AnyQt.QtCore import Qt, QSize, QVariant, QModelIndex
-from AnyQt.QtGui import QFont, QColor
-
-from Orange.widgets.gui import (
-    widgetLabel,
-    widgetBox,
-    radioButtonsInBox,
-    separator,
-    auto_commit,
-    rubber,
-    lineEdit,
-    LinkRole,
-    LinkStyledItemDelegate,
-    IndicatorItemDelegate,
 )
 
 from Orange.data import Table
-from Orange.widgets.widget import OWWidget
+from Orange.widgets.gui import (
+    LinkRole,
+    IndicatorItemDelegate,
+    LinkStyledItemDelegate,
+    rubber,
+    lineEdit,
+    separator,
+    widgetBox,
+    auto_commit,
+    widgetLabel,
+    radioButtonsInBox,
+)
 from Orange.widgets.utils import itemmodels
+from Orange.widgets.widget import OWWidget
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 
-from orangecontrib.bioinformatics.geo import local_files
-from orangecontrib.bioinformatics.geo.dataset import GDSInfo
-from orangecontrib.bioinformatics.geo import pubmed_url, is_cached
-from orangecontrib.bioinformatics.geo.dataset import get_samples, dataset_download
+from orangecontrib.bioinformatics.geo import is_cached, pubmed_url, local_files
+from orangecontrib.bioinformatics.geo.dataset import GDSInfo, get_samples, dataset_download
 
 
 class Result(namespace):
@@ -240,8 +236,10 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     gdsSelectionStates = Setting({})
     splitter_settings = Setting(
         (
-            b'\x00\x00\x00\xff\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x01\xea\x00\x00\x00\xd7\x01\x00\x00\x00\x07\x01\x00\x00\x00\x02',
-            b'\x00\x00\x00\xff\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x01\xb5\x00\x00\x02\x10\x01\x00\x00\x00\x07\x01\x00\x00\x00\x01',
+            b'\x00\x00\x00\xff\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x01'
+            b'\xea\x00\x00\x00\xd7\x01\x00\x00\x00\x07\x01\x00\x00\x00\x02',
+            b'\x00\x00\x00\xff\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x01'
+            b'\xb5\x00\x00\x02\x10\x01\x00\x00\x00\x07\x01\x00\x00\x00\x01',
         )
     )
 

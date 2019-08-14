@@ -1,33 +1,31 @@
 """ OWMarkerGenes """
 import sys
+from typing import Set
+from functools import partial
+from collections import defaultdict
+
 import numpy as np
 
-
-from typing import Set
-from collections import defaultdict
-from functools import partial
-
-
-from AnyQt.QtCore import Qt, QSize, QTimer, QModelIndex, QItemSelection, QItemSelectionModel, QItemSelectionRange
 from AnyQt.QtGui import QFont, QColor
-from AnyQt.QtWidgets import QTreeView, QLineEdit
+from AnyQt.QtCore import Qt, QSize, QTimer, QModelIndex, QItemSelection, QItemSelectionModel, QItemSelectionRange
+from AnyQt.QtWidgets import QLineEdit, QTreeView
 
 from Orange.data import MISSING_VALUES, Table, Domain
-from Orange.widgets import widget, gui, settings
+from Orange.widgets import gui, widget, settings
 from Orange.widgets.utils.itemmodels import TableModel
 
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_AS_ATTRIBUTE_NAME, TAX_ID, GENE_ID_COLUMN
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
 
 serverfiles_domain = 'marker_genes'
 
 
 def get_available_db_sources():
-    found_sources = dict()
+    found_sources = {}
 
     try:
         found_sources.update(serverfiles.ServerFiles().allinfo(serverfiles_domain))
-    except ConnectionError as e:
+    except ConnectionError:
         raise ConnectionError('Can not connect to {}. Using only local files.'.format(serverfiles.server_url))
     finally:
         found_sources.update(serverfiles.allinfo(serverfiles_domain))
@@ -265,7 +263,7 @@ class OWMarkerGenes(widget.OWWidget):
 
         try:
             serverfiles.update(serverfiles_domain, file_name)
-        except ConnectionError as e:
+        except ConnectionError:
             raise ConnectionError('Can not connect to {}. ' 'Using only local files.'.format(serverfiles.server_url))
         finally:
             file_path = serverfiles.localpath_download(serverfiles_domain, file_name)

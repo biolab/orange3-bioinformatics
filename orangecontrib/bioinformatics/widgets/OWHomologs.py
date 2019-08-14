@@ -1,24 +1,26 @@
 """ OWMarkerGenes """
 import sys
+from typing import List, Union, Optional
 
-from typing import List, Optional,Union
 from AnyQt.QtCore import QSize
 
-from Orange.widgets import widget, gui
+from Orange.data import Table, Domain, StringVariable
+from Orange.widgets import gui, widget
 from Orange.widgets.widget import Msg
 from Orange.widgets.settings import Setting
-from Orange.data import Table, Domain, StringVariable
 
-from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    ERROR_ON_MISSING_ANNOTATION,
-    ERROR_ON_MISSING_GENE_ID,
-    ERROR_ON_MISSING_TAX_ID,
+from orangecontrib.bioinformatics.ncbi.gene import Gene, GeneMatcher, load_gene_summary
+from orangecontrib.bioinformatics.ncbi.taxonomy import (
+    COMMON_NAMES_MAPPING,
+    common_taxid_to_name,
+    species_name_to_taxid,
 )
-
-from orangecontrib.bioinformatics.ncbi.taxonomy import COMMON_NAMES_MAPPING, common_taxid_to_name, species_name_to_taxid
-from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, load_gene_summary, Gene
-
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    ERROR_ON_MISSING_TAX_ID,
+    ERROR_ON_MISSING_GENE_ID,
+    ERROR_ON_MISSING_ANNOTATION,
+    TableAnnotation,
+)
 
 HOMOLOG_SYMBOL = "Homolog"
 HOMOLOG_ID = "Homolog ID"
@@ -136,8 +138,9 @@ class OWHomologs(widget.OWWidget):
                 self.target_tax = species_name_to_taxid(self.selected_organism)
 
         self.info_gene_type.setText(f"Organism: {taxonomy}")
-        data_len = len(data.domain.attributes) if self.data.attributes[
-            TableAnnotation.gene_as_attr_name] else len(data)
+        data_len = (
+            len(data.domain.attributes) if self.data.attributes[TableAnnotation.gene_as_attr_name] else len(data)
+        )
         self.info_gene.setText(f"Number of genes: {data_len}")
         self.info.set_input_summary(f"{data_len}")
 
@@ -190,7 +193,9 @@ class OWHomologs(widget.OWWidget):
                 homolog = StringVariable(HOMOLOG_SYMBOL)
                 homolog_id = StringVariable(HOMOLOG_ID)
                 domain = Domain(
-                    self.data.domain.attributes, self.data.domain.class_vars, self.data.domain.metas + (homolog, homolog_id)
+                    self.data.domain.attributes,
+                    self.data.domain.class_vars,
+                    self.data.domain.metas + (homolog, homolog_id),
                 )
 
                 table = self.data.transform(domain)
