@@ -1,16 +1,13 @@
 """ Qt component for Gene sets """
-import numpy as np
-
 from typing import Union
 from collections import defaultdict
 
-from AnyQt.QtWidgets import (
-    QTreeView, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QWidget,
-    QGroupBox
-)
-from AnyQt.QtCore import Qt
+import numpy as np
 
-from orangecontrib.bioinformatics.geneset import GeneSet, GeneSets, load_gene_sets, list_all
+from AnyQt.QtCore import Qt
+from AnyQt.QtWidgets import QWidget, QGroupBox, QTreeView, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator
+
+from orangecontrib.bioinformatics.geneset import GeneSet, GeneSets, list_all, load_gene_sets
 
 # TODO: better handle stored selection
 # TODO: Don't use hardcoded 'Custom sets', use table name if available
@@ -33,7 +30,9 @@ class GeneSetsSelection(QWidget):
 
         self.custom_set_hier = None
         self.default_selection = [
-            ('GO', 'molecular_function'), ('GO', 'biological_process'), ('GO', 'cellular_component')
+            ('GO', 'molecular_function'),
+            ('GO', 'biological_process'),
+            ('GO', 'cellular_component'),
         ]
 
     def clear_custom_sets(self):
@@ -52,11 +51,15 @@ class GeneSetsSelection(QWidget):
 
         g_sets = []
         for key, value in temp_dict.items():
-            g_sets.append(GeneSet(gs_id=key,
-                                  hierarchy=self.custom_set_hier,
-                                  organism=self.gs_object.common_org(),
-                                  name=key,
-                                  genes=set(value)))
+            g_sets.append(
+                GeneSet(
+                    gs_id=key,
+                    hierarchy=self.custom_set_hier,
+                    organism=self.gs_object.common_org(),
+                    name=key,
+                    genes=set(value),
+                )
+            )
 
         self.gs_object.update(g_sets)
         self.update_gs_hierarchy(select_customs_flag=select_customs_flag)
@@ -91,7 +94,6 @@ class GeneSetsSelection(QWidget):
             self.set_selected_hierarchies()
 
     def set_hierarchy_model(self, tree_widget, sets):
-
         def beautify_displayed_text(text):
             if '_' in text:
                 return text.replace('_', ' ').title()
@@ -113,14 +115,14 @@ class GeneSetsSelection(QWidget):
                     item.hierarchy = (item.parent().hierarchy, key)
 
             if not item.childCount() and not item.parent():
-                item.hierarchy = (key, )
+                item.hierarchy = (key,)
 
     def get_hierarchies(self, **kwargs):
         """ return selected hierarchy
         """
         only_selected = kwargs.get('only_selected', None)
 
-        sets_to_display = list()
+        sets_to_display = []
 
         if only_selected:
             iterator = QTreeWidgetItemIterator(self.hierarchy_tree_widget, QTreeWidgetItemIterator.Checked)

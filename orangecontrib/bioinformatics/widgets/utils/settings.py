@@ -37,7 +37,6 @@ class SetContextHandler(settings.ContextHandler):
 
 
 class OrganismContextHandler(settings.ContextHandler):
-
     def __init__(self):
         super().__init__()
 

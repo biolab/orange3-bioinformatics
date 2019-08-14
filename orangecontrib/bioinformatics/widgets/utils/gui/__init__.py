@@ -1,26 +1,37 @@
 """ GUI utils for widgets """
-from collections import namedtuple
-from numbers import Integral, Real
 from typing import Sequence
+from numbers import Real, Integral
+from collections import namedtuple
 
-from AnyQt.QtWidgets import (
-    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QApplication, QFrame,
-)
-
-from AnyQt.QtGui import (
-    QAbstractTextDocumentLayout, QTextDocument
-)
-
-from AnyQt.QtCore import (
-    Qt, QSortFilterProxyModel, QSize
-)
+from AnyQt.QtGui import QTextDocument, QAbstractTextDocumentLayout
+from AnyQt.QtCore import Qt, QSize, QSortFilterProxyModel
+from AnyQt.QtWidgets import QFrame, QStyle, QApplication, QStyledItemDelegate, QStyleOptionViewItem
 
 from .gene_sets import GeneSetsSelection
 from .gene_scoring import GeneScoringWidget, gene_scoring_method
 from .list_completer import TokenListCompleter
 from .label_selection import (
-    standarditem_from, group_candidates, itemselection, RowGroup, ColumnGroup, group_selection_mask,
-    LabelSelectionWidget
+    RowGroup,
+    ColumnGroup,
+    LabelSelectionWidget,
+    itemselection,
+    group_candidates,
+    standarditem_from,
+    group_selection_mask,
+)
+
+__all__ = (
+    'GeneSetsSelection',
+    'GeneScoringWidget',
+    'gene_scoring_method',
+    'TokenListCompleter',
+    'RowGroup',
+    'ColumnGroup',
+    'LabelSelectionWidget',
+    'itemselection',
+    'group_candidates',
+    'standarditem_from',
+    'group_selection_mask',
 )
 
 
@@ -42,6 +53,7 @@ class FilterProxyModel(QSortFilterProxyModel):
     ...     FilterProxyModel.Filter(0, Qt.DisplayRole, lambda value: value < 1)
     ... ])
     """
+
     Filter = namedtuple("Filter", ["column", "role", "predicate"])
 
     def __init__(self, *args, **kwargs):
@@ -77,6 +89,7 @@ class NumericalColumnDelegate(QStyledItemDelegate):
     """
     An Item delegate for displaying numerical columns
     """
+
     def __init__(self, parent=None, precision=4, notation='f'):
         super().__init__(parent)
         self.precision = precision

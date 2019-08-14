@@ -1,9 +1,8 @@
 """ List Completer """
 import re
 
-
+from AnyQt.QtCore import Qt, QObject, QStringListModel
 from AnyQt.QtWidgets import QCompleter
-from AnyQt.QtCore import QStringListModel, QObject, Qt
 
 
 class TokenListCompleter(QCompleter):
@@ -20,6 +19,7 @@ class TokenListCompleter(QCompleter):
          print(completer.currentCompletion())
 
     """
+
     def __init__(self, *args, **kwargs):
         separator = kwargs.pop("separator", " ")
         super().__init__(*args, **kwargs)
@@ -70,12 +70,9 @@ class TokenListCompleter(QCompleter):
             return
 
         if self.__completerModel is not None:
-            self.__completerModel.dataChanged.disconnect(
-                self.__initDynamicModel)
-            self.__completerModel.rowsInserted.disconnect(
-                self.__initDynamicModel)
-            self.__completerModel.rowsRemoved.disconnect(
-                self.__initDynamicModel)
+            self.__completerModel.dataChanged.disconnect(self.__initDynamicModel)
+            self.__completerModel.rowsInserted.disconnect(self.__initDynamicModel)
+            self.__completerModel.rowsRemoved.disconnect(self.__initDynamicModel)
 
             if QObject.parent(self.__completerModel) is self:
                 self.__completerModel.deleteLater()
@@ -84,12 +81,9 @@ class TokenListCompleter(QCompleter):
         self.__completerModel = model
 
         if self.__completerModel is not None:
-            self.__completerModel.dataChanged.connect(
-                self.__initDynamicModel)
-            self.__completerModel.rowsInserted.connect(
-                self.__initDynamicModel)
-            self.__completerModel.rowsRemoved.connect(
-                self.__initDynamicModel)
+            self.__completerModel.dataChanged.connect(self.__initDynamicModel)
+            self.__completerModel.rowsInserted.connect(self.__initDynamicModel)
+            self.__completerModel.rowsRemoved.connect(self.__initDynamicModel)
 
         self.__initDynamicModel()
 
@@ -136,8 +130,7 @@ class TokenListCompleter(QCompleter):
                 whitespace, rest = match.groups()
             else:
                 whitespace = ""
-            items = [prefix + separator + whitespace + item
-                     for item in self.__tokenList]
+            items = [prefix + separator + whitespace + item for item in self.__tokenList]
         else:
             # Either completing the the first word or immediately after
             # the separator. In both cases the original tokens list is
@@ -159,8 +152,7 @@ class TokenListCompleter(QCompleter):
             if isinstance(model, QStringListModel):
                 tokens = model.stringList()
             else:
-                tokens = [model.data(model.index(row, 0), Qt.DisplayRole)
-                          for row in range(model.rowCount())]
+                tokens = [model.data(model.index(row, 0), Qt.DisplayRole) for row in range(model.rowCount())]
                 tokens = [str(token) for token in filter(None, tokens)]
         else:
             tokens = []
