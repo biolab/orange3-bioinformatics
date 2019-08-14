@@ -1,17 +1,19 @@
 """ Taxonomy utils """
+import collections
+import os
+import shutil
 import sqlite3
 import tarfile
-import shutil
 import tempfile
-import collections
 import textwrap
-import os
-
-
 from collections import namedtuple
 from urllib.request import urlopen
+
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics.ncbi.taxonomy.config import DOMAIN, FILENAME, TAXDUMP_URL
+
+DOMAIN = "taxonomy"
+FILENAME = "taxonomy.sqlite"
+TAXDUMP_URL = "http://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
 
 
 def namedtuple_repr_pretty(self, p, cycle):  # pragma: no cover
@@ -28,9 +30,7 @@ def namedtuple_repr_pretty(self, p, cycle):  # pragma: no cover
                     p.breakable()
 
 
-_taxon = namedtuple(
-    "taxon", ["tax_id", "parent_tax_id", "name", "synonyms", "rank"]
-)
+_taxon = namedtuple("taxon", ["tax_id", "parent_tax_id", "name", "synonyms", "rank"])
 
 
 class Taxon(_taxon):
@@ -46,7 +46,6 @@ class UnknownSpeciesIdentifier(Exception):
 
 
 class Taxonomy:
-
     def __init__(self):
         """
         In orange-bio environment we typically work with organisms commonly used in molecular research projects
@@ -66,8 +65,7 @@ class Taxonomy:
     def search(self, string, onlySpecies=True, exact=False):
         res = self._tax.search(string, exact)
         if onlySpecies:
-            res = [taxid for taxid in res
-                   if self._tax[taxid].rank == "species"]
+            res = [taxid for taxid in res if self._tax[taxid].rank == "species"]
         return res
 
     def __iter__(self):
@@ -77,8 +75,7 @@ class Taxonomy:
         return self.get_entry(id).name
 
     def other_names(self, id):
-        return [(name, q) for name, q in self._tax[id].synonyms
-                if q != "scientific name"]
+        return [(name, q) for name, q in self._tax[id].synonyms if q != "scientific name"]
 
     def rank(self, id):
         return self._tax[id].rank
@@ -112,7 +109,8 @@ class Taxonomy:
         return self._tax.strains(tax_id)
 
 
-_INIT_TABLES = textwrap.dedent('''
+_INIT_TABLES = textwrap.dedent(
+    '''
                                 CREATE TABLE ranks (
                                     rank_id INTEGER PRIMARY KEY ASC,
                                     rank TEXT UNIQUE
@@ -134,7 +132,8 @@ _INIT_TABLES = textwrap.dedent('''
                                     name text COLLATE NOCASE,
                                     name_class_id INTEGER REFERENCES name_classes(name_class_id)
                                 );
-                            ''')
+                            '''
+)
 
 
 class TaxonomyDB(collections.Mapping):
@@ -146,11 +145,14 @@ class TaxonomyDB(collections.Mapping):
         self._con.execute("CREATE INDEX IF NOT EXISTS index_names_tax_id ON names(tax_id)")
 
     def __node_query(self, tax_id):
-        c = self._con.execute("""
+        c = self._con.execute(
+            """
             SELECT nodes.tax_id, nodes.parent_tax_id, ranks.rank
             FROM nodes INNER JOIN ranks USING(rank_id)
             WHERE tax_id = ?
-        """, (tax_id,))
+        """,
+            (tax_id,),
+        )
         if not c:
             raise KeyError(tax_id)
         else:
@@ -158,14 +160,16 @@ class TaxonomyDB(collections.Mapping):
 
     def __getitem__(self, tax_id):
         if not isinstance(tax_id, str):
-            raise TypeError("expected a string, got {}"
-                            .format(type(tax_id).__name__))
+            raise TypeError("expected a string, got {}".format(type(tax_id).__name__))
 
-        c = self._con.execute("""
+        c = self._con.execute(
+            """
             SELECT names.name, name_classes.name_class
             FROM names INNER JOIN name_classes USING (name_class_id)
             WHERE names.tax_id = ?
-        """, (tax_id,))
+        """,
+            (tax_id,),
+        )
 
         names = list(c)
         if not names:
@@ -197,17 +201,23 @@ class TaxonomyDB(collections.Mapping):
         else:
             operator = "="
 
-        c = self._con.execute("""
+        c = self._con.execute(
+            """
             SELECT DISTINCT(tax_id)
             FROM names
             WHERE names.name {operator} ?
-            """.format(operator=operator), (name,))
+            """.format(
+                operator=operator
+            ),
+            (name,),
+        )
         return (str(r[0]) for r in c)
 
     def strains(self, tax_id):
         """ recursively select all strains for given organism
         """
-        c = self._con.execute("""
+        c = self._con.execute(
+            """
             WITH results as (
                 SELECT tax_id, parent_tax_id, rank_id FROM nodes WHERE parent_tax_id = ?
                 UNION ALL
@@ -215,7 +225,9 @@ class TaxonomyDB(collections.Mapping):
                 ON res.tax_id = n.parent_tax_id)
             SELECT DISTINCT tax_id, parent_tax_id, rank_id
             FROM results ORDER BY tax_id
-            """, (tax_id, ))
+            """,
+            (tax_id,),
+        )
 
         return [str(result[0]) for result in c]
 
@@ -246,11 +258,14 @@ class TaxonomyDB(collections.Mapping):
         if not isinstance(tax_id, str):
             raise TypeError("Expected a string")
 
-        c = self._con.execute("""
+        c = self._con.execute(
+            """
             SELECT tax_id
             FROM nodes
             WHERE parent_tax_id = ?
-        """, (tax_id,))
+        """,
+            (tax_id,),
+        )
         children = list(str(r[0]) for r in c if r[0] != 1)
         return children
 
@@ -297,7 +312,7 @@ class TaxonomyDB(collections.Mapping):
         con = sqlite3.connect(dbfilename)
         cursor = con.cursor()
 
-        for index in ["index_names_tax_id","index_names_name"]:
+        for index in ["index_names_tax_id", "index_names_name"]:
             cursor.execute("DROP INDEX IF EXISTS %s" % index)
 
         for table in ["nodes", "name_classes", "names", "ranks"]:
@@ -321,9 +336,10 @@ class TaxonomyDB(collections.Mapping):
 
         cursor.executemany("INSERT INTO ranks VALUES (?, ?)", ranks)
 
-        cursor.executemany("INSERT INTO nodes VALUES (?, ?, ?)",
-                           ((int(tax_id), int(parent_tax_id), rank_id[rank])
-                            for tax_id, parent_tax_id, rank in nodes))
+        cursor.executemany(
+            "INSERT INTO nodes VALUES (?, ?, ?)",
+            ((int(tax_id), int(parent_tax_id), rank_id[rank]) for tax_id, parent_tax_id, rank in nodes),
+        )
 
         names = taxdump.extractfile("names.dmp")
 
@@ -334,26 +350,26 @@ class TaxonomyDB(collections.Mapping):
                 yield tax_id, name, name_class
 
         names = list(iter_names(iter_rows(names)))
-        name_classes = list(enumerate(set(name_class
-                                          for _, _, name_class in names)))
+        name_classes = list(enumerate(set(name_class for _, _, name_class in names)))
         name_class_id = {name_class: i for i, name_class in name_classes}
 
-        cursor.executemany("INSERT INTO name_classes VALUES (?, ?)",
-                           name_classes)
-        cursor.executemany("INSERT INTO names VALUES (?, ?, ?)",
-                           ((int(tax_id), name, name_class_id[name_class])
-                            for tax_id, name, name_class in names))
+        cursor.executemany("INSERT INTO name_classes VALUES (?, ?)", name_classes)
+        cursor.executemany(
+            "INSERT INTO names VALUES (?, ?, ?)",
+            ((int(tax_id), name, name_class_id[name_class]) for tax_id, name, name_class in names),
+        )
 
         con.commit()
         con.close()
 
 
 if __name__ == "__main__":
+
     def main():
         test = Taxonomy()
         strains = test.get_all_strains("562")
         print(strains)
-        #print(test.lineage('1005443'))
-        #print(test.get_species('1005443'))
+        # print(test.lineage('1005443'))
+        # print(test.get_species('1005443'))
 
     main()

@@ -3,12 +3,13 @@ import sys
 import numpy as np
 
 from functools import lru_cache
+from typing import List
 
 from AnyQt.QtWidgets import (
     QSplitter, QTableView,  QHeaderView, QAbstractItemView, QStyle
 )
 from AnyQt.QtCore import (
-    Qt, QSize, QThreadPool, QAbstractTableModel, QVariant, QModelIndex, QTimer,
+    Qt, QSize,  QAbstractTableModel, QVariant, QModelIndex, QTimer,
 )
 from AnyQt.QtGui import (
     QFont, QColor
@@ -30,7 +31,14 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN, GENE_ID_ATTRIBUTE
 )
 from orangecontrib.bioinformatics.ncbi import taxonomy
-from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, owgenes_header, ENTREZ_ID, NCBI_DETAIL_LINK
+from orangecontrib.bioinformatics.ncbi.gene import Gene, GeneMatcher, ENTREZ_ID
+
+
+NCBI_DETAIL_LINK = 'http://www.ncbi.nlm.nih.gov/sites/entrez?Db=gene&Cmd=ShowDetailView&TermToSearch={}'
+HEADER = [
+    ['Input ID', 'Entrez ID', 'Name', 'Description', 'Synonyms', 'Other IDs'],
+    ['input_identifier', 'gene_id', 'symbol', 'description', 'synonyms', 'db_refs'],
+]
 
 
 def run_gene_matcher(gene_matcher: GeneMatcher, state: TaskState):
@@ -51,7 +59,7 @@ class GeneInfoModel(itemmodels.PyTableModel):
     def __init__(self,  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.header_labels, self.gene_attributes = owgenes_header
+        self.header_labels, self.gene_attributes = HEADER
         self.setHorizontalHeaderLabels(self.header_labels)
 
         try:
@@ -126,9 +134,28 @@ class GeneInfoModel(itemmodels.PyTableModel):
             elif role == _LinkRolee:
                 return NCBI_DETAIL_LINK.format(value)
 
-    def __table_from_genes(self, list_of_genes):
-        # type: (list) -> None
-        self.table = np.asarray([gene.to_list() for gene in list_of_genes])
+    def __table_from_genes(self, list_of_genes: List[Gene]) -> None:
+
+        def to_list(gene: Gene) -> List[str]:
+            _, header_tags = HEADER
+
+            def parse_attribute(tag):
+                gene_attr = getattr(gene, '{}'.format(tag))
+
+                if isinstance(gene_attr, dict):
+                    # note: db_refs are stored as dicts
+                    gene_attr = (
+                        ', '.join('{}: {}'.format(key, val) for (key, val) in gene_attr.items()) if gene_attr else ' '
+                    )
+                elif isinstance(gene_attr, list):
+                    # note: synonyms are stored as lists
+                    gene_attr = ', '.join(gene_attr) if gene_attr else ' '
+
+                return gene_attr
+
+            return [parse_attribute(tag) for tag in header_tags]
+
+        self.table = np.asarray([to_list(gene) for gene in list_of_genes])
 
     def get_filtered_genes(self):
         return list(self._table[:, self.entrez_column_index]) if self._table.size else []

@@ -1,23 +1,15 @@
 """ NCBI GeneInformation module """
+import contextlib
 import json
 import sqlite3
-import contextlib
+from typing import Dict, List, Optional, Tuple
 
-from typing import List, Optional, Tuple, Dict, Union
+from Orange.data import Domain, StringVariable, Table
 
-from Orange.data import StringVariable, Domain, Table
-
-from orangecontrib.bioinformatics.utils import serverfiles
+from orangecontrib.bioinformatics.ncbi.gene.config import (DOMAIN, ENTREZ_ID, gene_info_attributes, query, query_exact)
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
+from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
-from orangecontrib.bioinformatics.ncbi.gene.config import (
-    gene_info_attributes,
-    _select_gene_info_columns,
-    owgenes_header,
-    ENTREZ_ID,
-    DOMAIN,
-    NCBI_DETAIL_LINK,
-)
 
 
 class Gene:
@@ -39,26 +31,7 @@ class Gene:
         for attr, val in zip(attributes, values):
             setattr(self, attr, json.loads(val) if attr in ('synonyms', 'db_refs', 'homologs') else val)
 
-    def to_list(self) -> List[str]:
-        _, header_tags = owgenes_header
-
-        def parse_attribute(tag):
-            gene_attr = getattr(self, '{}'.format(tag))
-
-            if isinstance(gene_attr, dict):
-                # note: db_refs are stored as dicts
-                gene_attr = (
-                    ', '.join('{}: {}'.format(key, val) for (key, val) in gene_attr.items()) if gene_attr else ' '
-                )
-            elif isinstance(gene_attr, list):
-                # note: synonyms are stored as lists
-                gene_attr = ', '.join(gene_attr) if gene_attr else ' '
-
-            return gene_attr
-
-        return [parse_attribute(tag) for tag in header_tags]
-
-    def homolog_gene(self, taxonomy_id: str) -> Union[Dict[str, str], str, None]:
+    def homolog_gene(self, taxonomy_id: str) -> Optional[str]:
         """ Returns gene homologs.
 
         :param taxonomy_id: target organism.
@@ -91,7 +64,7 @@ class GeneMatcher:
         self.gene_db_path = self._gene_db_path()
 
     @property
-    def genes(self):
+    def genes(self) -> List[Gene]:
         return self._genes
 
     @genes.setter
@@ -131,7 +104,7 @@ class GeneMatcher:
         ]
         domain = Domain([], metas=metas)
 
-        genes = self.genes
+        genes: List[Gene] = self.genes
         if selected_genes is not None:
             genes = [gene for gene in self.genes if str(gene.gene_id) in selected_genes]
 
@@ -219,27 +192,6 @@ class GeneMatcher:
     def _gene_db_path(self):
         return serverfiles.localpath_download(DOMAIN, f'{self.tax_id}.sqlite')
 
-    def _query_exact(self):
-        return f""" 
-            SELECT  {_select_gene_info_columns}
-            FROM gene_info
-            JOIN gene_info_fts on gene_info.rowid = gene_info_fts.rowid
-            WHERE gene_info_fts 
-                MATCH ?
-                    AND (lower(gene_info_fts.gene_id)=?
-                     OR  lower(gene_info_fts.symbol)=?
-                     OR  lower(gene_info_fts.locus_tag)=?
-                     OR  lower(gene_info_fts.symbol_from_nomenclature_authority)=?)
-        """
-
-    def _query(self):
-        return f""" 
-            SELECT {_select_gene_info_columns}
-            FROM gene_info
-            JOIN gene_info_fts on gene_info.rowid = gene_info_fts.rowid
-            WHERE gene_info_fts MATCH ?
-        """
-
     def _match(self):
         synonyms, db_refs = 4, 5
 
@@ -256,15 +208,13 @@ class GeneMatcher:
                         match_statement = (
                             '{gene_id symbol locus_tag symbol_from_nomenclature_authority}:^"' + search_param + '"'
                         )
-                        match = cursor.execute(
-                            self._query_exact(), (match_statement,) + tuple([search_param] * 4)
-                        ).fetchall()
+                        match = cursor.execute(query_exact, (match_statement,) + tuple([search_param] * 4)).fetchall()
                         # if unique match
                         if len(match) == 1:
                             gene.load_attributes(match[0])
                             continue
 
-                        match = cursor.execute(self._query(), (f'synonyms:"{search_param}"',)).fetchall()
+                        match = cursor.execute(query, (f'synonyms:"{search_param}"',)).fetchall()
                         synonym_matched_rows = [
                             m for m in match if search_param in [x.lower() for x in json.loads(m[synonyms])]
                         ]
@@ -273,7 +223,7 @@ class GeneMatcher:
                             gene.load_attributes(synonym_matched_rows[0])
                             continue
 
-                        match = cursor.execute(self._query(), (f'db_refs:"{search_param}"',)).fetchall()
+                        match = cursor.execute(query, (f'db_refs:"{search_param}"',)).fetchall()
                         db_ref_matched_rows = [
                             m for m in match if search_param in [x.lower() for x in json.loads(m[db_refs]).values()]
                         ]
@@ -311,7 +261,7 @@ class GeneInfo(dict):
         return serverfiles.localpath_download(DOMAIN, f'{self.tax_id}.sqlite')
 
 
-def load_gene_summary(tax_d: str, genes: List[Union[str, Gene]]) -> List[Gene]:
+def load_gene_summary(tax_d: str, genes: List[Optional[str]]) -> List[Optional[Gene]]:
     gene_db_path = serverfiles.localpath_download(DOMAIN, f'{tax_d}.sqlite')
 
     # filter NoneTypes
@@ -319,25 +269,19 @@ def load_gene_summary(tax_d: str, genes: List[Union[str, Gene]]) -> List[Gene]:
 
     with contextlib.closing(sqlite3.connect(gene_db_path)) as con:
         with con as cur:
-            if all(isinstance(g, Gene) for g in _genes):
-                gene_ids = [g.gene_id for g in _genes]
-            else:
-                gene_ids = _genes
 
-            gene_map = {}
-            for gene_info in cur.execute(f'SELECT * FROM gene_info WHERE gene_id in ({",".join(gene_ids)})').fetchall():
+            gene_map: Dict[str, Gene] = {}
+            for gene_info in cur.execute(f'SELECT * FROM gene_info WHERE gene_id in ({",".join(_genes)})').fetchall():
                 gene = Gene()
                 gene.load_attributes(gene_info)
                 gene_map[gene.gene_id] = gene
 
-            return [gene_map.get(gid, None) for gid in genes]
+            return [gene_map.get(gid, None) if gid else None for gid in genes]
 
 
 if __name__ == "__main__":
     gm = GeneMatcher('9606')
     gm.genes = ['CD4', '614535', 'ENSG00000205426', "2'-PDE", 'HB-1Y']
     print(list(zip(gm.genes, [g.input_identifier for g in gm.genes])))
-
-    homologs = [g.homolog_gene(taxonomy_id='10090') for g in gm.genes]
-    homologs = load_gene_summary('10090', homologs)
-    print(homologs)
+    _homologs = load_gene_summary('10090', [g.homolog_gene(taxonomy_id='10090') for g in gm.genes])
+    print(_homologs)
