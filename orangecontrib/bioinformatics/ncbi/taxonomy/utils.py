@@ -1,11 +1,11 @@
 """ Taxonomy utils """
-import collections
 import os
 import shutil
 import sqlite3
 import tarfile
 import tempfile
 import textwrap
+import collections
 from collections import namedtuple
 from urllib.request import urlopen
 

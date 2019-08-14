@@ -1,14 +1,14 @@
 """ NCBI GeneInformation module """
-import contextlib
 import json
 import sqlite3
-from typing import Dict, List, Optional, Tuple
+import contextlib
+from typing import Dict, List, Tuple, Optional
 
-from Orange.data import Domain, StringVariable, Table
+from Orange.data import Table, Domain, StringVariable
 
-from orangecontrib.bioinformatics.ncbi.gene.config import (DOMAIN, ENTREZ_ID, gene_info_attributes, query, query_exact)
-from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
 from orangecontrib.bioinformatics.utils import serverfiles
+from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
+from orangecontrib.bioinformatics.ncbi.gene.config import DOMAIN, ENTREZ_ID, query, query_exact, gene_info_attributes
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
 

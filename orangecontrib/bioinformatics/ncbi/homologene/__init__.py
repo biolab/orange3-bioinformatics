@@ -1,9 +1,9 @@
-from collections import defaultdict
-from functools import reduce
 from typing import Dict, List, Optional
+from functools import reduce
+from collections import defaultdict
 
-from orangecontrib.bioinformatics.ncbi.gene import Gene
 from orangecontrib.bioinformatics.utils import serverfiles
+from orangecontrib.bioinformatics.ncbi.gene import Gene
 
 
 def _from_data_to_gene(line: str):
