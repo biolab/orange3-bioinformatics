@@ -1,0 +1,73 @@
+parameters:
+  # defaults
+  platform: 'linux'
+  orange_version: 'stable'
+  python_versions: [3.7]
+
+jobs:
+- job: ${{ parameters.platform }}_${{ parameters.orange_version }}_orange
+  pool:
+    ${{ if eq(parameters.platform, 'linux') }}:
+      vmImage: 'ubuntu-16.04'
+    ${{ if eq(parameters.platform, 'windows') }}:
+      vmImage: 'windows-2019'
+    ${{ if eq(parameters.platform, 'mac') }}:
+      vmImage: 'macOS-10.14'
+
+  strategy:
+    matrix:
+      ${{ each version in parameters.python_versions }}:
+        python${{ version }}:
+          python.version: ${{ version }}
+
+  steps:
+    # use conda python on linux. Temporary fix for sqlite FTS extensions.
+    - ${{ if in(parameters.platform, 'linux') }}:
+      - task: CondaEnvironment@1
+        inputs:
+          packageSpecs: 'python=3.7.3'
+          updateConda: false
+        displayName: Install python and activate conda environment
+
+    - ${{ if in(parameters.platform, 'mac', 'windows') }}:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '$(python.version)'
+
+    - script: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install numpy==1.16.4
+      displayName: 'Install build tools'
+
+    - ${{ if in(parameters.orange_version, 'development') }}:
+        - script: |
+            pip install https://github.com/biolab/orange3/archive/master.zip
+          displayName: 'Install development version of Orange'
+          continueOnError: false
+
+    - script: |
+        pip install PyQt5~=5.9.0
+        pip install -e .[test]
+      displayName: 'Install Orange3-Bioinformatics'
+      continueOnError: false
+
+    - ${{ if in(parameters.platform, 'linux') }}:
+        - script: |
+            catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" pytest orangecontrib/bioinformatics/tests -vl -ra --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
+          displayName: 'Run pytest and coverage'
+
+    - ${{ if in(parameters.platform, 'mac', 'windows') }}:
+        - script: |
+            pytest orangecontrib/bioinformatics/tests -vl -ra --doctest-modules --junitxml=junit/test-results.xml --cov=orangecontrib.bioinformatics --cov-report=xml --cov-report=html
+          displayName: 'Run pytest and coverage'
+
+    - script: codecov -f coverage.xml -F adder -F subtractor
+      displayName: 'Upload to codecov'
+      env:
+        CODECOV_TOKEN: $(codecov.token)
+
+    - task: PublishTestResults@2
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFiles: '**/test-results.xml'
+        testRunTitle: '${{ parameters.platform }} - Python $(python.version)'
