@@ -1,8 +1,0 @@
-Orange3>=3.21.0
-serverfiles>=0.3.0
-requests>=2.22.0
-requests-cache>=0.5.0
-genesis-pyapi>=1.2.1
-scipy>=1.3.0
-numpy>=1.16.4
-pyclipper
