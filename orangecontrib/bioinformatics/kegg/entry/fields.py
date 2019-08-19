@@ -9,6 +9,7 @@ class DBField(object):
     """
     Base DBGET entry field
     """
+
     __SLOTS__ = ["text"]
 
     def __init__(self, text):
@@ -25,6 +26,7 @@ class DBSimpleField(DBField):
     """
     Simple field (with no subsections).
     """
+
     __SLOTS__ = ["text"]
     # TITLE must be set in subclasses or object instances
     TITLE = None
@@ -33,9 +35,7 @@ class DBSimpleField(DBField):
         return self.format()
 
     def format(self, section_indent=12, subsection_indent=0):
-        fmt = (" " * subsection_indent) + "%-" + \
-              str(section_indent - subsection_indent) + \
-              "s%s"
+        fmt = (" " * subsection_indent) + "%-" + str(section_indent - subsection_indent) + "s%s"
         text = self._indent(self.text, section_indent)
         text = fmt % (self.TITLE, text)
         return text
@@ -50,6 +50,7 @@ class DBEntryField(DBSimpleField):
     """
     ENTRY field (all entries start with this field)
     """
+
     __SLOTS__ = ["text"]
     TITLE = "ENTRY"
 
@@ -68,6 +69,7 @@ class DBFieldWithSubsections(DBSimpleField):
     """
     A field with subsections (for instance REFERENCE in genome)
     """
+
     __SLOTS__ = ["text", "subsections"]
     TITLE = None
     SUBSECTIONS = None
@@ -78,14 +80,12 @@ class DBFieldWithSubsections(DBSimpleField):
 
     def format(self, section_indent=12, subsection_indent=2):
         text = DBSimpleField.format(self, section_indent, subsection_indent=0)
-        subsections = [sub.format(section_indent, subsection_indent)\
-                       for sub in self.subsections]
+        subsections = [sub.format(section_indent, subsection_indent) for sub in self.subsections]
         return "".join([text] + subsections)
 
     def _convert(self):
         my = DBSimpleField._convert(self)
-        subs = [(s.TITLE.lower(), s._convert()) \
-                for s in self.subsections]
+        subs = [(s.TITLE.lower(), s._convert()) for s in self.subsections]
         return (my, subs)
 
 
@@ -128,15 +128,13 @@ class DBDBLinks(DBSimpleField):
 
     @property
     def links(self):
-        return [tuple(s.split(": ", 1)) \
-                for s in self.text.splitlines()]
+        return [tuple(s.split(": ", 1)) for s in self.text.splitlines()]
 
     def _convert(self):
         # Some dblinks can span multiple lines but are always 'indented'
         links = DBSimpleField._convert(self).replace("\n ", "").splitlines()
         links = [tuple(link.split(": ", 1)) for link in links]
-        links = [(key, [v for v in values.split(" ") if v]) \
-                 for key, values in links]
+        links = [(key, [v for v in values.split(" ") if v]) for key, values in links]
         return dict(links)
 
 

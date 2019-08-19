@@ -52,9 +52,7 @@ class DBGETEntryParser(object):
     #: Text element event
     TEXT = 6
 
-    EVENTS = ["ENTRY_START", "ENTRY_END", 'SECTION_START',
-              'SECTION_END', 'SUBSECTION_START', 'SUBSECTION_END',
-              'TEXT']
+    EVENTS = ["ENTRY_START", "ENTRY_END", 'SECTION_START', 'SECTION_END', 'SUBSECTION_START', 'SUBSECTION_END', 'TEXT']
 
     def __init__(self):
         pass

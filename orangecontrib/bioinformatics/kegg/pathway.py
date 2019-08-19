@@ -6,20 +6,16 @@ KEGG Pathway
 """
 from __future__ import absolute_import
 
-import os
 import io
-
+import os
 import xml.parsers
 from xml.dom import minidom
-
-from contextlib import closing
 from functools import reduce
+from contextlib import closing
 
 import requests
 
-from orangecontrib.bioinformatics.kegg import conf
-from orangecontrib.bioinformatics.kegg import caching
-from orangecontrib.bioinformatics.kegg import api
+from orangecontrib.bioinformatics.kegg import api, conf, caching
 
 
 def cached_method(func, cache_name="_cached_method_cache", store=None):
@@ -30,6 +26,7 @@ def cached_method(func, cache_name="_cached_method_cache", store=None):
         if sig not in getattr(self, cache_name):
             getattr(self, cache_name)[sig] = func(self, *args, **kwargs)
         return getattr(self, cache_name)[sig]
+
     return wrapper
 
 
@@ -40,6 +37,7 @@ class Pathway(object):
     :param str pathway_id: A KEGG pathway id (e.g. 'path:hsa05130')
 
     """
+
     KGML_URL_FORMAT = "http://rest.kegg.jp/get/{pathway_id}/kgml"
 
     def __init__(self, pathway_id, local_cache=None, connection=None):
@@ -54,13 +52,11 @@ class Pathway(object):
 
     def cache_store(self):
         caching.touch_path(self.local_cache)
-        return caching.Sqlite3Store(os.path.join(self.local_cache,
-                                                 "pathway_store.sqlite3"))
+        return caching.Sqlite3Store(os.path.join(self.local_cache, "pathway_store.sqlite3"))
 
     def _open_last_modified_store(self):
         caching.touch_dir(self.local_cache)
-        return caching.Sqlite3Store(os.path.join(self.local_cache,
-                                                 "last_modified.sqlite3"))
+        return caching.Sqlite3Store(os.path.join(self.local_cache, "last_modified.sqlite3"))
 
     def _get_kgml(self):
         """
@@ -75,8 +71,7 @@ class Pathway(object):
         """
         url = str(self.image)
 
-        local_filename = os.path.join(self.local_cache,
-                                      self.pathway_id + ".png")
+        local_filename = os.path.join(self.local_cache, self.pathway_id + ".png")
 
         if not os.path.exists(local_filename):
             r = requests.get(url, stream=True)
@@ -108,8 +103,7 @@ class Pathway(object):
         """
         Return the local kgml xml filename for the pathway.
         """
-        local_filename = os.path.join(self.local_cache,
-                                      self.pathway_id + ".xml")
+        local_filename = os.path.join(self.local_cache, self.pathway_id + ".xml")
         return local_filename
 
     class entry(object):
@@ -127,16 +121,13 @@ class Pathway(object):
     class reaction(object):
         def __init__(self, dom_element):
             self.__dict__.update(dom_element.attributes.items())
-            self.substrates = [node.getAttribute("name") for node in
-                               dom_element.getElementsByTagName("substrate")]
-            self.products = [node.getAttribute("name") for node in
-                             dom_element.getElementsByTagName("product")]
+            self.substrates = [node.getAttribute("name") for node in dom_element.getElementsByTagName("substrate")]
+            self.products = [node.getAttribute("name") for node in dom_element.getElementsByTagName("product")]
 
     class relation(object):
         def __init__(self, dom_element):
             self.__dict__.update(dom_element.attributes.items())
-            self.subtypes = [node.attributes.items() for node in
-                             dom_element.getElementsByTagName("subtype")]
+            self.subtypes = [node.attributes.items() for node in dom_element.getElementsByTagName("subtype")]
 
     @cached_method
     def pathway_attributes(self):
@@ -243,16 +234,12 @@ class Pathway(object):
         """
         Return all elements
         """
-        return reduce(list.__add__,
-                      [self.genes(), self.compounds(),
-                       self.enzmes(), self.reactions()],
-                      [])
+        return reduce(list.__add__, [self.genes(), self.compounds(), self.enzmes(), self.reactions()], [])
 
     def _get_entries_by_type(self, type1):
-        return sorted(reduce(set.union,
-                             [entry.name.split() for entry in self.entries()
-                              if entry.type == type1],
-                             set()))
+        return sorted(
+            reduce(set.union, [entry.name.split() for entry in self.entries() if entry.type == type1], set())
+        )
 
     @cached_method
     def genes(self):

@@ -4,23 +4,23 @@ KEGG Brite
 """
 from __future__ import absolute_import
 
-import os
 import io
+import os
 import re
+
+from orangecontrib.bioinformatics.kegg import conf
 
 try:
     from urllib2 import urlopen
 except ImportError:
     from urllib.request import urlopen
 
-from orangecontrib.bioinformatics.kegg import conf
-
 
 class BriteEntry(object):
     _search_re = {
         "ids": re.compile('(?P<ids>\[.*:.*\])'),
         "title": re.compile(r'(<[Bb]>)?(?P<title>\b[a-zA-Z0-9_/\s,;:.+=\-\[\]{}\(\)]+?)(?(1)</[Bb]>)$'),
-        "links": re.compile('(?P<links><a href=".+?">.*?</a>)')
+        "links": re.compile('(?P<links><a href=".+?">.*?</a>)'),
     }
 
     def __init__(self, line):
@@ -55,7 +55,7 @@ class Brite(BriteEntry):
             with io.open(local_filename, "wb") as f:
                 f.write(brite)
 
-        return io.open(local_filename, "r", )
+        return io.open(local_filename, "r")
 
     def load(self, brite_id):
         lines = self._get_brite(brite_id).read().split("\n!\n")[1].splitlines()
@@ -76,6 +76,4 @@ class Brite(BriteEntry):
                 else:
                     lines.pop(0)
 
-        collect([line for line in lines
-                 if not line.startswith("#") and len(line) > 1], "A",
-                self.entries)
+        collect([line for line in lines if not line.startswith("#") and len(line) > 1], "A", self.entries)
