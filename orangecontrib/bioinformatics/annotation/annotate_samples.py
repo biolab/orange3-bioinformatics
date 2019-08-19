@@ -176,7 +176,8 @@ class AnnotateSamples:
         values = matrix.X
 
         # filter out genes without entrez ID
-        has_entrez_id = current_order is not None
+        has_entrez_id = current_order != None  # noqa
+
         # just in case if Entrez ID not strings
         current_order = np.array([str(x) for x in current_order[has_entrez_id]])
         values = values[:, has_entrez_id]
