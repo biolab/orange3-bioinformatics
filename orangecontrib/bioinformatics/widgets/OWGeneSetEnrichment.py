@@ -23,7 +23,7 @@ from Orange.widgets.gui import (
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Input, Output
 
-from orangecontrib.bioinformatics.widgets import OWGeneSets as gene_sets
+from orangecontrib.bioinformatics.widgets.OWGeneSets import OWGeneSets
 from orangecontrib.bioinformatics.utils.statistics import FDR
 from orangecontrib.bioinformatics.widgets.utils.gui import FilterProxyModel, GeneSetsSelection, NumericalColumnDelegate
 from orangecontrib.bioinformatics.widgets.utils.data import (
@@ -34,7 +34,7 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
 )
 
 
-class OWGeneSetEnrichment(gene_sets.OWGeneSets):
+class OWGeneSetEnrichment(OWGeneSets):
     name = "Gene Set Enrichment"
     description = ""
     icon = "icons/OWGeneSets.svg"
@@ -49,7 +49,7 @@ class OWGeneSetEnrichment(gene_sets.OWGeneSets):
     COUNT, REFERENCE, P_VAL, FDR, ENRICHMENT, GENES, CATEGORY, TERM = range(8)
     DATA_HEADER_LABELS = ["Count", 'Reference', 'p-Value', 'FDR', 'Enrichment', 'Genes In Set', 'Category', 'Term']
 
-    class Inputs(gene_sets.OWGeneSets.Inputs):
+    class Inputs(OWGeneSets.Inputs):
         reference = Input("Reference Genes", Table)
 
     class Outputs:

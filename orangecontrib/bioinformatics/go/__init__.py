@@ -13,7 +13,7 @@ from orangecontrib.bioinformatics.utils import statistics, serverfiles, progress
 from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY, FILENAME_ANNOTATION
 
 intern = sys.intern
-default_database_path = os.path.join(serverfiles.localpath(), "GO")
+default_database_path = os.path.join(serverfiles.localpath(), DOMAIN)
 
 _CVS_REVISION_RE = re.compile(r"^(rev)?(\d+\.\d+)+$")
 

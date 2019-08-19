@@ -1,6 +1,6 @@
 """ Gene Expression Omnibus datasets widget """
 import sys
-from types import SimpleNamespace as namespace
+from types import SimpleNamespace
 from typing import Any, Optional, DefaultDict
 from functools import lru_cache
 from collections import OrderedDict, defaultdict
@@ -42,7 +42,7 @@ from orangecontrib.bioinformatics.geo import is_cached, pubmed_url, local_files
 from orangecontrib.bioinformatics.geo.dataset import GDSInfo, get_samples, dataset_download
 
 
-class Result(namespace):
+class Result(SimpleNamespace):
     gds_dataset: Optional[Table] = None
 
 
@@ -99,7 +99,7 @@ class GEODatasetsModel(itemmodels.PyTableModel):
     def initialize(self, info: OrderedDict):
         self.info = info
 
-        def __gds_to_row(gds: dict):
+        def _gds_to_row(gds: dict):
             gds_id = gds['name']
             title = gds['title']
             organism = gds['sample_organism']
@@ -125,7 +125,7 @@ class GEODatasetsModel(itemmodels.PyTableModel):
                 title,
             ]
 
-        self.table = np.asarray([__gds_to_row(gds) for gds in info.values()])
+        self.table = np.asarray([_gds_to_row(gds) for gds in info.values()])
         self.show_table()
 
     def _argsortData(self, data: np.ndarray, order):
@@ -154,7 +154,7 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         index,
         role,
         _str=str,
-        _Qt_DisplayRole=Qt.DisplayRole,
+        _Qt_DisplayRole=Qt.DisplayRole,  # noqa: N803
         _Qt_EditRole=Qt.EditRole,
         _Qt_FontRole=Qt.FontRole,
         _Qt_ForegroundRole=Qt.ForegroundRole,
@@ -231,9 +231,8 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     search_pattern = Setting('')
     auto_commit = Setting(True)
     genes_as_rows = Setting(False)
-    mergeSpots = Setting(True)
     selected_gds = Setting(None)
-    gdsSelectionStates = Setting({})
+    gds_selection_states = Setting({})
     splitter_settings = Setting(
         (
             b'\x00\x00\x00\xff\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x01'
@@ -361,7 +360,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
                 key = (gds['name'], _type, subset)
                 item = QTreeWidgetItem(parent, [subset, subsets_count.get(subset, '')])
                 item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                item.setCheckState(0, self.gdsSelectionStates.get(key, Qt.Checked))
+                item.setCheckState(0, self.gds_selection_states.get(key, Qt.Checked))
                 item.key = key
 
         self._annotations_updating = False
@@ -416,11 +415,11 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         for i in range(self.annotations_widget.topLevelItemCount()):
             item = self.annotations_widget.topLevelItem(i)
             if 'key' in item.__dict__:
-                self.gdsSelectionStates[item.key] = item.checkState(0)
+                self.gds_selection_states[item.key] = item.checkState(0)
             for j in range(item.childCount()):
                 child = item.child(j)
                 if 'key' in child.__dict__:
-                    self.gdsSelectionStates[child.key] = child.checkState(0)
+                    self.gds_selection_states[child.key] = child.checkState(0)
 
         self.commit()
 
@@ -461,7 +460,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
             all_values = []
             for sval in childiter(stype):
                 value = (str(stype.text(0)), str(sval.text(0)))
-                if self.gdsSelectionStates.get(sval.key, True):
+                if self.gds_selection_states.get(sval.key, True):
                     selected_values.append(value)
                 all_values.append(value)
             if selected_values:
