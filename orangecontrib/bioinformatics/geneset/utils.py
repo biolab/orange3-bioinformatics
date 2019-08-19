@@ -1,11 +1,10 @@
 """ GeneSets utility functions """
-import numpy as np
-
-
 from typing import List, Tuple, NamedTuple
 
-from orangecontrib.bioinformatics.geneset.config import GENE_SET_ATTRIBUTES
+import numpy as np
+
 from orangecontrib.bioinformatics.utils import ensure_type
+from orangecontrib.bioinformatics.geneset.config import GENE_SET_ATTRIBUTES
 from orangecontrib.bioinformatics.utils.statistics import Hypergeometric
 
 
@@ -49,12 +48,9 @@ def filename_parse(fn):  # type: (str) -> (Tuple[Tuple[str, str], str])
 HYPERGEOMETRIC = Hypergeometric()
 
 # change this when python 3.4 is not supported anymore
-enrichment_result = NamedTuple('enrichment_result', [
-    ('query', set),
-    ('reference', set),
-    ('p_value', float),
-    ('enrichment_score', float)
-])
+enrichment_result = NamedTuple(
+    'enrichment_result', [('query', set), ('reference', set), ('p_value', float), ('enrichment_score', float)]
+)
 
 
 class GeneSet:
@@ -109,10 +105,11 @@ class GeneSet:
         enrichment = query_p / ref_p if ref_p else np.nan
 
         return enrichment_result(
-            set(query_mapped), set(reference_mapped),
-            HYPERGEOMETRIC.p_value(len(query_mapped), len(reference),
-                                   len(reference_mapped), len(query)),
-            enrichment)
+            set(query_mapped),
+            set(reference_mapped),
+            HYPERGEOMETRIC.p_value(len(query_mapped), len(reference), len(reference_mapped), len(query)),
+            enrichment,
+        )
 
     def gmt_description(self):
         """ Represent GeneSet as line in GMT file format
@@ -124,19 +121,23 @@ class GeneSet:
         empty_field = '_'
         hierarchy = '-'.join((hier for hier in self.hierarchy)) if self.hierarchy else empty_field
 
-        return ','.join((self.gs_id,
-                         hierarchy,
-                         self.organism,
-                         self.name if self.name else empty_field,
-                         empty_field,
-                         self.description if self.description else empty_field,
-                         self.link if self.link else empty_field))
+        return ','.join(
+            (
+                self.gs_id,
+                hierarchy,
+                self.organism,
+                self.name if self.name else empty_field,
+                empty_field,
+                self.description if self.description else empty_field,
+                self.link if self.link else empty_field,
+            )
+        )
 
 
 class GeneSets(set):
     """ A collection of gene sets: contains :obj:`GeneSet` objects.
     """
-    
+
     def __init__(self, sets=None):
         # type: (List[GeneSet]) -> None
         super().__init__()
@@ -245,13 +246,15 @@ class GeneSets(set):
                 hierarchy = tuple(gs_info[index['hierarchy']].split('-'))
                 genes = set([str(gene) for gene in columns[2:]])
 
-                gene_set = GeneSet(gs_id=columns[0],
-                                   genes=genes,
-                                   hierarchy=hierarchy,
-                                   name=gs_info[index['name']],
-                                   organism=gs_info[index['organism']],
-                                   description=gs_info[index['description']],
-                                   link=gs_info[index['link']])
+                gene_set = GeneSet(
+                    gs_id=columns[0],
+                    genes=genes,
+                    hierarchy=hierarchy,
+                    name=gs_info[index['name']],
+                    organism=gs_info[index['organism']],
+                    description=gs_info[index['description']],
+                    link=gs_info[index['link']],
+                )
 
                 gene_sets.append(gene_set)
 
