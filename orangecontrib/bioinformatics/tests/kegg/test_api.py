@@ -1,7 +1,7 @@
 import shutil
 import tempfile
 import unittest
-from types import SimpleNamespace as namespace
+from types import SimpleNamespace
 from unittest import mock
 
 from orangecontrib.bioinformatics.kegg import api as keggapi
@@ -26,7 +26,7 @@ path             Release 81.0+/01-18, Jan 17
                  479,620 entries
 """
 
-genome_T01001 = """\
+genome_T01001 = """ # noqa \
 ENTRY       T01001            Complete  Genome
 NAME        hsa, HUMAN, 9606
 DEFINITION  Homo sapiens (human)
@@ -46,13 +46,13 @@ STATISTICS  Number of protein genes:       20234
 
 
 def mock_service():
-    s = namespace(
-        list=namespace(
-            organism=namespace(get=lambda: list_organism),
-            pathway=lambda org: {"hsa": namespace(get=lambda: list_pathway_hsa)}[org],
+    s = SimpleNamespace(
+        list=SimpleNamespace(
+            organism=SimpleNamespace(get=lambda: list_organism),
+            pathway=lambda org: {"hsa": SimpleNamespace(get=lambda: list_pathway_hsa)}[org],
         ),
-        info=lambda db: {"pathway": namespace(get=lambda: info_pathway)}[db],
-        get=lambda key: {"genome:T01001": namespace(get=lambda: genome_T01001)}[key],
+        info=lambda db: {"pathway": SimpleNamespace(get=lambda: info_pathway)}[db],
+        get=lambda key: {"genome:T01001": SimpleNamespace(get=lambda: genome_T01001)}[key],
     )
     return s
 
@@ -66,7 +66,7 @@ class TestKeggApi(unittest.TestCase):
         self._mock_ctx = mock.patch("orangecontrib.bioinformatics.kegg.api.web_service", mock_service)
         self._mock_ctx.__enter__()
         s = keggapi.web_service()
-        assert isinstance(s, namespace)
+        assert isinstance(s, SimpleNamespace)
 
     def tearDown(self):
         self._mock_ctx.__exit__(None, None, None)

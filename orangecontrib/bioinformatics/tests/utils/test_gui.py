@@ -6,7 +6,7 @@ from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
 
 
 class TestCompleter(unittest.TestCase):
-    def test_TokenListCompleter(self):
+    def test_token_list_completer(self):
         from Orange.widgets.utils.itemmodels import PyListModel
 
         completer = TokenListCompleter()
