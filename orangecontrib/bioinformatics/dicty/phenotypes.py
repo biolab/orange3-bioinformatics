@@ -1,8 +1,7 @@
 """ Mutant Phenotypes """
 import json
-
-from collections import defaultdict
 from functools import reduce
+from collections import defaultdict
 
 from orangecontrib.bioinformatics.utils import serverfiles
 
@@ -77,16 +76,14 @@ class DictyMutants:
 
     def gene_mutants(self):
         dgm = defaultdict(set)
-        for mutant, genes in [(mutant, self.mutant_genes(mutant))
-                              for mutant in self.mutants()]:
+        for mutant, genes in [(mutant, self.mutant_genes(mutant)) for mutant in self.mutants()]:
             for gene in genes:
                 dgm[gene].add(mutant)
         return dgm
 
     def phenotype_mutants(self):
         dpm = defaultdict(set)
-        for mutant, phenotypes in [(mutant, self.mutant_phenotypes(mutant))
-                                   for mutant in self.mutants()]:
+        for mutant, phenotypes in [(mutant, self.mutant_phenotypes(mutant)) for mutant in self.mutants()]:
             for phenotype in phenotypes:
                 dpm[phenotype].add(mutant)
         return dpm
