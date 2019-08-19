@@ -36,7 +36,7 @@ def transpose_table(table):
     attr = [ContinuousVariable.make(ex['Gene'].value) for ex in table]
     #  Set metas
     new_metas = [
-        StringVariable.make(name) if name is not 'Time' else TimeVariable.make(name)
+        StringVariable.make(name) if name != 'Time' else TimeVariable.make(name)
         for name in sorted(table.domain.variables[0].attributes.keys())
     ]
     domain = Domain(attr, metas=new_metas)

@@ -1,6 +1,8 @@
 """ Resolwe module """
 from .genapi import DEFAULT_EMAIL, DEFAULT_PASSWD, GenAPI, cache_name, cache_backend
 
+__all__ = ('DEFAULT_EMAIL', 'DEFAULT_PASSWD', 'cache_name', 'cache_backend')
+
 
 def connect(username, password, url, server_type):
     """ Connect to Resolwe server
