@@ -1,14 +1,12 @@
 """ Utils """
-import json
 import io
 import os
 import gzip
+import json
 
-
-from Orange.data import ContinuousVariable, StringVariable, TimeVariable, Domain, Table
+from Orange.data import Table, Domain, TimeVariable, StringVariable, ContinuousVariable
 
 from orangecontrib.bioinformatics.utils import local_cache
-
 
 #  Support cache with requests_cache module
 cache_path = os.path.join(local_cache, "resolwe")
@@ -37,8 +35,10 @@ def transpose_table(table):
     attrs = table.domain.attributes
     attr = [ContinuousVariable.make(ex['Gene'].value) for ex in table]
     #  Set metas
-    new_metas = [StringVariable.make(name) if name is not 'Time' else TimeVariable.make(name)
-                 for name in sorted(table.domain.variables[0].attributes.keys())]
+    new_metas = [
+        StringVariable.make(name) if name is not 'Time' else TimeVariable.make(name)
+        for name in sorted(table.domain.variables[0].attributes.keys())
+    ]
     domain = Domain(attr, metas=new_metas)
     meta_values = [[exp.attributes[var.name] for var in domain.metas] for exp in attrs]
 

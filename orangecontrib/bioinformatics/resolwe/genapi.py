@@ -1,12 +1,11 @@
 """ GenAPI """
 import re
+
 import requests
 import requests_cache
+from genesis import GenData, Genesis
 
-from genesis import Genesis, GenData
-
-from .utils import response_to_json, cache_backend, cache_name
-
+from .utils import cache_name, cache_backend, response_to_json
 
 view_model = ['experiment', 'growth', 'genotype', 'treatment', 'strain', 'time', 'replicate']
 DEFAULT_EMAIL = 'anonymous@genialis.com'
@@ -50,9 +49,9 @@ class GenAPI:
             try:
                 # Note: this is hardcoded for now. When we port this module to Resolwe platform
                 #       data retrieval will be different
-                list_of_experiments = self._gen.api.data.get(case_ids__contains='5535115cfad58d5e03006217',
-                                                             status='done',
-                                                             type__startswith='data:etc:')['objects']
+                list_of_experiments = self._gen.api.data.get(
+                    case_ids__contains='5535115cfad58d5e03006217', status='done', type__startswith='data:etc:'
+                )['objects']
                 if callback:
                     callback.emit()
 
