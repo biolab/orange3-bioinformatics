@@ -1,89 +1,36 @@
 #!/usr/bin/env python
-import os
-
-
-from setuptools import setup, find_packages
-
-
-NAME = 'Orange3-Bioinformatics'
-DOCUMENTATION_NAME = 'Orange Bioinformatics'
-VERSION = '3.5.0'
-
-DESCRIPTION = 'Orange Bioinformatics add-on for Orange data mining software package.'
-LONG_DESCRIPTION = open(os.path.join(os.path.dirname(__file__), 'README.md')).read()
-AUTHOR = 'Bioinformatics Laboratory, FRI UL'
-AUTHOR_EMAIL = 'info@biolab.si'
-URL = 'https://github.com/biolab/orange3-bioinformatics'
-LICENSE = 'GPL3+'
-
-KEYWORDS = (
-    # [PyPi](https://pypi.python.org) packages with keyword "orange3 add-on"
-    # can be installed using the Orange Add-on Manager
-    'orange3 add-on'
-)
-
-CLASSIFIERS = (
-    'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
-    'Topic :: Scientific/Engineering :: Artificial Intelligence',
-    'Topic :: Scientific/Engineering :: Visualization',
-    'Topic :: Scientific/Engineering :: Bio-Informatics',
-    'Topic :: Software Development :: Libraries :: Python Modules',
-    'Intended Audience :: Education',
-    'Intended Audience :: Science/Research',
-    'Intended Audience :: Developers',
-    'Development Status :: 1 - Planning',
-    'Programming Language :: Python :: 3 :: Only',
-    'Operating System :: OS Independent'
-)
-
-PACKAGES = find_packages()
-PACKAGE_DATA = {}
-
-requirements = ['requirements.txt']
-
-INSTALL_REQUIRES = sorted(set(
-    line.partition('#')[0].strip()
-    for file in (os.path.join(os.path.dirname(__file__), file)
-                 for file in requirements)
-    for line in open(file)
-) - {''})
-
-
-ENTRY_POINTS = {
-    'orange3.addon': (
-        'bioinformatics = orangecontrib.bioinformatics'
-    ),
-    'orange.widgets': (
-        'Bioinformatics = orangecontrib.bioinformatics.widgets'
-    ),
-    'orange.canvas.help': (
-        'html-index = orangecontrib.bioinformatics.widgets:WIDGET_HELP_PATH'
-    )
-}
-
-NAMESPACE_PACAKGES = ["orangecontrib"]
-
-TEST_SUITE = "orangecontrib.bioinformatics.tests.suite"
+import setuptools
 
 if __name__ == '__main__':
-    setup(
-        name=NAME,
-        version=VERSION,
-        description=DESCRIPTION,
-        long_description=LONG_DESCRIPTION,
-        long_description_content_type='text/markdown',
-        author=AUTHOR,
-        author_email=AUTHOR_EMAIL,
-        url=URL,
-        classifiers=CLASSIFIERS,
-        license=LICENSE,
-        keywords=KEYWORDS,
-        packages=PACKAGES,
-        package_data=PACKAGE_DATA,
-        install_requires=INSTALL_REQUIRES,
-        entry_points=ENTRY_POINTS,
-        namespace_packages=NAMESPACE_PACAKGES,
-        test_suite=TEST_SUITE,
-        include_package_data=True,
-        zip_safe=False,
+    setuptools.setup(
+        use_scm_version=True,
+        setup_requires=[
+            'setuptools-scm',
+            'setuptools>=40.0'
+        ],
+        install_requires=[
+            'serverfiles==0.3.0',
+            'requests==2.22.0',
+            'requests-cache==0.5.2',
+            'genesis-pyapi==1.2.1',
+            'pyclipper==1.1.0.post1',
+            'Orange3>=3.22.0',
+            # Versions are determined by Orange
+            'scipy',
+            'numpy',
+        ],
+        extras_require={
+            'doc': ['sphinx', 'recommonmark'],
+            'test': [
+                'flake8~=3.7.8',
+                'flake8-comprehensions~=2.2.0',
+                'flake8-black~=0.1.0',
+                'pep8-naming~=0.8.2',
+                'isort~=4.3.21',
+                'pytest~=5.1.0',
+                'pytest-cov~=2.7.1',
+                'coverage~=4.5.4',
+                'codecov~=2.0.15'
+            ],
+        },
     )

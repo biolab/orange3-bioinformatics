@@ -1,0 +1,34 @@
+jobs:
+- job: Linting
+  pool:
+    vmImage: 'ubuntu-16.04'
+  strategy:
+    matrix:
+      Python37:
+        python.version: '3.7'
+
+  steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(python.version)'
+
+    - script: |
+        pip install --upgrade pip
+        pip install .[test]
+      displayName: 'Install add-on and testing tools'
+      continueOnError: false
+
+    - script: flake8 orangecontrib/bioinformatics
+      displayName: 'Linting: flake8'
+      continueOnError: true
+
+    - script: isort --recursive --check-only orangecontrib/bioinformatics
+      displayName: 'isort: Check order of imports.'
+      # condition: succeededOrFailed()
+      continueOnError: true
+
+
+    - script: python setup.py check --metadata --strict
+      displayName: 'Verify package metadata'
+      # condition: succeededOrFailed()
+      continueOnError: true

@@ -3,17 +3,37 @@ trigger:
 
 jobs:
 
-- template: .azure-pipelines/jobs.yml
+# Run tests on Linux
+- template: .azure-pipelines/test_job.yml
   parameters:
-    name: Linux
-    vmImage: 'ubuntu-16.04'
+    platform: linux
+    orange_version: stable
 
-- template: .azure-pipelines/jobs.yml
+- template: .azure-pipelines/test_job.yml
   parameters:
-    name: macOS
-    vmImage: 'macOS-10.14'
+    platform: linux
+    orange_version: development
 
-- template: .azure-pipelines/jobs.yml
+# Run tests on macOS
+- template: .azure-pipelines/test_job.yml
   parameters:
-    name: Windows
-    vmImage: 'windows-2019'
+    platform: mac
+    orange_version: stable
+
+- template: .azure-pipelines/test_job.yml
+  parameters:
+    platform: mac
+    orange_version: development
+
+# Run tests on Windows
+- template: .azure-pipelines/test_job.yml
+  parameters:
+    platform: windows
+    orange_version: stable
+
+- template: .azure-pipelines/test_job.yml
+  parameters:
+    platform: windows
+    orange_version: development
+
+- template: .azure-pipelines/lint_job.yml
