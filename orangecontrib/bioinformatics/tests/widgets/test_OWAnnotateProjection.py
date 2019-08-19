@@ -16,7 +16,7 @@ from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 from orangecontrib.bioinformatics.widgets.OWAnnotateProjection import OWAnnotateProjection
 
-test_timeout_setting = 50000
+test_timeout_setting = 100000
 
 
 class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutputsTestMixin):
