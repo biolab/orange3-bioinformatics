@@ -1,12 +1,14 @@
 import unittest
 
 from AnyQt.QtCore import QStringListModel
+
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
 
 
 class TestCompleter(unittest.TestCase):
     def test_TokenListCompleter(self):
         from Orange.widgets.utils.itemmodels import PyListModel
+
         completer = TokenListCompleter()
         completer.setTokenList(["foo", "bar", "baz"])
         completer.setCompletionPrefix("foo b")
@@ -20,8 +22,7 @@ class TestCompleter(unittest.TestCase):
             completer.setCurrentRow(current)
             return items
 
-        self.assertSequenceEqual(completions(completer),
-                                 ["foo bar", "foo baz"])
+        self.assertSequenceEqual(completions(completer), ["foo bar", "foo baz"])
         completer.setModel(None)
         self.assertSequenceEqual(completer.tokenList(), [])
         self.assertSequenceEqual(completions(completer), [])
@@ -32,18 +33,14 @@ class TestCompleter(unittest.TestCase):
         self.assertSequenceEqual(completions(completer), ["a a", "a ab"])
 
         completer.setModel(PyListModel(["a", "aa", "ab", "ad"]))
-        self.assertSequenceEqual(completer.tokenList(),
-                                 ["a", "aa", "ab", "ad"])
+        self.assertSequenceEqual(completer.tokenList(), ["a", "aa", "ab", "ad"])
 
         completer.model()[-1] = "z"
-        self.assertSequenceEqual(completer.tokenList(),
-                                 ["a", "aa", "ab", "z"])
+        self.assertSequenceEqual(completer.tokenList(), ["a", "aa", "ab", "z"])
 
         completer.model()[-2:] = ["ax", "az"]
-        self.assertSequenceEqual(completer.tokenList(),
-                                 ["a", "aa", "ax", "az"])
+        self.assertSequenceEqual(completer.tokenList(), ["a", "aa", "ax", "az"])
 
         completer.setSeparator(",")
         completer.setCompletionPrefix("a, a")
-        self.assertSequenceEqual(completions(completer),
-                                 ["a, a", "a, aa", "a, ax", "a, az"])
+        self.assertSequenceEqual(completions(completer), ["a, a", "a, aa", "a, ax", "a, az"])

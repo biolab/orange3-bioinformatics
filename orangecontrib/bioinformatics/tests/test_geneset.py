@@ -1,8 +1,8 @@
-import unittest
 import os
-
+import unittest
 from tempfile import mkstemp
-from orangecontrib.bioinformatics.geneset import GeneSet, GeneSets, filename, filename_parse, GeneSetException
+
+from orangecontrib.bioinformatics.geneset import GeneSet, GeneSets, GeneSetException, filename, filename_parse
 
 
 class TestGeneSets(unittest.TestCase):
@@ -23,12 +23,14 @@ class TestGeneSets(unittest.TestCase):
 
     def test_gmt_file_format(self):
 
-        gs = GeneSet(gs_id=self.test_gs_id,
-                     name=self.test_name,
-                     genes=self.test_genes,
-                     hierarchy=self.test_hierarchy,
-                     organism=self.test_organism,
-                     link='')
+        gs = GeneSet(
+            gs_id=self.test_gs_id,
+            name=self.test_name,
+            genes=self.test_genes,
+            hierarchy=self.test_hierarchy,
+            organism=self.test_organism,
+            link='',
+        )
 
         fd, file_name = mkstemp()
 
@@ -54,12 +56,14 @@ class TestGeneSets(unittest.TestCase):
 
     def test_gene_set(self):
 
-        gs1 = GeneSet(gs_id=self.test_gs_id,
-                      name=self.test_name,
-                      genes=self.test_genes,
-                      hierarchy=self.test_hierarchy,
-                      organism=self.test_organism,
-                      link='')
+        gs1 = GeneSet(
+            gs_id=self.test_gs_id,
+            name=self.test_name,
+            genes=self.test_genes,
+            hierarchy=self.test_hierarchy,
+            organism=self.test_organism,
+            link='',
+        )
 
         gs2 = GeneSet(gs_id='test2', name='test_name2')
 
@@ -69,12 +73,14 @@ class TestGeneSets(unittest.TestCase):
         self.assertTrue(gs1 == gs1)
 
     def test_gene_sets(self):
-        gs1 = GeneSet(gs_id=self.test_gs_id,
-                      name=self.test_name,
-                      genes=self.test_genes,
-                      hierarchy=self.test_hierarchy,
-                      organism=self.test_organism,
-                      link='')
+        gs1 = GeneSet(
+            gs_id=self.test_gs_id,
+            name=self.test_name,
+            genes=self.test_genes,
+            hierarchy=self.test_hierarchy,
+            organism=self.test_organism,
+            link='',
+        )
 
         gs2 = GeneSet(gs_id='test2', name='test_name2', hierarchy=('Test', 'test'), organism='3702')
         gs3 = GeneSet(gs_id='test3', name='test_name3', hierarchy=('Test', 'test'), organism='3702')

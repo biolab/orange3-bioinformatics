@@ -8,9 +8,7 @@ def suite(loader=None, pattern='test*.py'):
         loader = unittest.TestLoader()
     if pattern is None:
         pattern = 'test*.py'
-    all_tests = [
-        loader.discover(test_dir, pattern),
-    ]
+    all_tests = [loader.discover(test_dir, pattern)]
 
     return unittest.TestSuite(all_tests)
 

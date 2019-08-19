@@ -1,13 +1,11 @@
-import unittest
-import tempfile
 import shutil
-
-from unittest import mock
+import tempfile
+import unittest
 from types import SimpleNamespace as namespace
+from unittest import mock
 
 from orangecontrib.bioinformatics.kegg import api as keggapi
 from orangecontrib.bioinformatics.kegg import conf as keggconf
-
 
 list_organism = """\
 T01001\thsa\tHomo sapiens (human)\tEukaryotes;Animals;Vertebrates;Mammals
@@ -51,15 +49,10 @@ def mock_service():
     s = namespace(
         list=namespace(
             organism=namespace(get=lambda: list_organism),
-            pathway=lambda org: {
-                "hsa": namespace(get=lambda: list_pathway_hsa)
-            }[org],
+            pathway=lambda org: {"hsa": namespace(get=lambda: list_pathway_hsa)}[org],
         ),
-        info=lambda db:
-            {"pathway": namespace(get=lambda: info_pathway)}[db],
-        get=lambda key: {
-            "genome:T01001": namespace(get=lambda: genome_T01001)
-        }[key],
+        info=lambda db: {"pathway": namespace(get=lambda: info_pathway)}[db],
+        get=lambda key: {"genome:T01001": namespace(get=lambda: genome_T01001)}[key],
     )
     return s
 

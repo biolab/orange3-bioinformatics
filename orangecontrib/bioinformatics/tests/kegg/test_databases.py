@@ -1,9 +1,8 @@
 import unittest
+
 import six
 
-
-from orangecontrib.bioinformatics.kegg import databases
-from orangecontrib.bioinformatics.kegg import pathway
+from orangecontrib.bioinformatics.kegg import pathway, databases
 
 
 class TestGenome(unittest.TestCase):
@@ -34,23 +33,21 @@ class TestGenes(unittest.TestCase):
         for gene in keys:
             self.assertTrue(gene in genes)
             entry = genes[gene]
-            self.assertEqual(entry.entry_key,
-                             genes.get(gene).entry_key,
-                             "__getitem__ and get return different result")
+            self.assertEqual(entry.entry_key, genes.get(gene).entry_key, "__getitem__ and get return different result")
 
             self.assertTrue(gene.endswith(entry.entry_key))
 
             self.assertIsInstance(entry, genes.ENTRY_TYPE)
             self.assertIsInstance(entry.aliases(), list)
 
-            self.assertTrue(all(isinstance(a, six.string_types)
-                                for a in entry.aliases()))
+            self.assertTrue(all(isinstance(a, six.string_types) for a in entry.aliases()))
             all_entries.append(entry)
 
         self.assertSequenceEqual(
             [(e.name, e.entry_key) for e in all_entries],
             [(e.name, e.entry_key) for e in genes.batch_get(keys)],
-            "batch_get returns different result")
+            "batch_get returns different result",
+        )
 
     def test_hsa(self):
         self._tester("hsa")
@@ -82,11 +79,8 @@ class TestPathways(unittest.TestCase):
 class TestUtils(unittest.TestCase):
     def test_batch_iter(self):
         iter = range(25)
-        expected = [list(range(10)),
-                    list(range(10, 20)),
-                    list(range(20, 25))]
-        for exp, batch in zip(expected,
-                              databases.batch_iter(iter, 10)):
+        expected = [list(range(10)), list(range(10, 20)), list(range(20, 25))]
+        for exp, batch in zip(expected, databases.batch_iter(iter, 10)):
             self.assertEqual(exp, batch)
 
 

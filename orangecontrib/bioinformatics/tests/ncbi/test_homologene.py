@@ -1,12 +1,10 @@
 import unittest
-
-from os.path import normpath, basename
+from os.path import basename, normpath
 
 from orangecontrib.bioinformatics.ncbi.homologene import HomoloGene
 
 
 class TestHomoloGene(unittest.TestCase):
-
     def setUp(self) -> None:
         self.homology = HomoloGene()
         self.assertEqual(basename(normpath(self.homology.file_path)), 'homologene.tab')
