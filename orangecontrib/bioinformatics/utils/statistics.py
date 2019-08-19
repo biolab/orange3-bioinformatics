@@ -79,22 +79,22 @@ def score_hypergeometric_test(a, b, threshold=1, **kwargs):
     # type: (np.ndarray, np.ndarray, float) -> np.ndarray
 
     # Binary expression matrices
-    A = (a >= threshold).astype(int)
-    B = (b >= threshold).astype(int)
+    _a = (a >= threshold).astype(int)
+    _b = (b >= threshold).astype(int)
     alt = kwargs.get("alternative", ALT_TWO)
     assert alt in ALTERNATIVES
 
     # Test Parameters
-    M = len(A) + len(B)
-    N = len(A)
-    n_expr = A.sum(axis=0) + B.sum(axis=0)  # Number of cells expressing genes (overall)
-    n_expr_clust = A.sum(axis=0)  # Number of cells expressing genes (in cluster)
+    m = len(_a) + len(_b)
+    n = len(_a)
+    n_expr = _a.sum(axis=0) + _b.sum(axis=0)  # Number of cells expressing genes (overall)
+    n_expr_clust = _a.sum(axis=0)  # Number of cells expressing genes (in cluster)
 
     # Test results --- both tails
     # Note: cumulatives do sum to >1 due to overlap at 1 point
-    under = np.fromiter(map(lambda t: hypergeom.cdf(k=t[1], n=t[0], M=M, N=N), zip(n_expr, n_expr_clust)), dtype=float)
+    under = np.fromiter(map(lambda t: hypergeom.cdf(k=t[1], n=t[0], M=m, N=n), zip(n_expr, n_expr_clust)), dtype=float)
     over = np.fromiter(
-        map(lambda t: hypergeom.sf(k=t[1] - 1, n=t[0], M=M, N=N), zip(n_expr, n_expr_clust)), dtype=float
+        map(lambda t: hypergeom.sf(k=t[1] - 1, n=t[0], M=m, N=n), zip(n_expr, n_expr_clust)), dtype=float
     )
     signs = np.sign(under - over)
     if alt == ALT_TWO:
@@ -188,7 +188,7 @@ class Binomial(LogBin):
     of n independent yes/no experiments, each of which yields success
     with probability p. """
 
-    def __call__(self, k, N, m, n):
+    def __call__(self, k, N, m, n):  # noqa
         """ If m out of N experiments are positive return the probability
         that k out of n experiments are positive using the binomial
         distribution: if p = m/N then return bin(n,k)*(p**k + (1-p)**(n-k))
@@ -207,12 +207,12 @@ class Binomial(LogBin):
                 return 0.0
         try:
             return min(math.exp(self._logbin(n, k) + k * math.log(p) + (n - k) * math.log(1.0 - p)), 1.0)
-        except (OverflowError, ValueError) as er:
+        except (OverflowError, ValueError):
             print(k, N, m, n)
             raise
             # return math.exp(self._logbin(n, k) + math.log((p**k) * (1.0 - p)**(n - k)))
 
-    def p_value(self, k, N, m, n):
+    def p_value(self, k, N, m, n):  # noqa: N803
         """ The probability that k or more tests are positive. """
         if n - k + 1 <= k:
             # starting from k gives the shorter list of values
@@ -235,7 +235,7 @@ class Hypergeometric(LogBin):
     from a finite population without replacement.
     """
 
-    def __call__(self, k, N, m, n):
+    def __call__(self, k, N, m, n):  # noqa: N803
         """ If m out of N experiments are positive return the probability
         that k out of n experiments are positive using the hypergeometric
         distribution (i.e. return bin(m, k)*bin(N-m, n-k)/bin(N,n)
@@ -245,11 +245,11 @@ class Hypergeometric(LogBin):
             return 0.0
         try:
             return min(math.exp(self._logbin(m, k) + self._logbin(N - m, n - k) - self._logbin(N, n)), 1.0)
-        except (OverflowError, ValueError) as er:
+        except (OverflowError, ValueError):
             print(k, N, m, n)
             raise
 
-    def p_value(self, k, N, m, n):
+    def p_value(self, k, N, m, n):  # noqa: N803
         """ 
         The probability that k or more tests are positive.
         """
@@ -281,7 +281,7 @@ def is_sorted(l):
     return all(l[i] <= l[i + 1] for i in range(len(l) - 1))
 
 
-def FDR(p_values, dependent=False, m=None, ordered=False):
+def FDR(p_values, dependent=False, m=None, ordered=False):  # noqa: N802
     """ `False Discovery Rate <http://en.wikipedia.org/wiki/False_discovery_rate>`_ correction on a list of p-values.
 
     :param p_values: a list of p-values.
@@ -325,7 +325,7 @@ def FDR(p_values, dependent=False, m=None, ordered=False):
     return fdrs
 
 
-def Bonferroni(p_values, m=None):
+def Bonferroni(p_values, m=None):  # noqa: N802
     """ `Bonferroni correction <http://en.wikipedia.org/wiki/Bonferroni_correction>`_ correction on a list of p-values.
 
     :param p_values: a list of p-values.
