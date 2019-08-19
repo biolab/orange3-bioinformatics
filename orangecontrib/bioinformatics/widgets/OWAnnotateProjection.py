@@ -1,6 +1,6 @@
 # pylint: disable=too-many-ancestors
 from enum import IntEnum
-from types import SimpleNamespace as namespace
+from types import SimpleNamespace
 from typing import Dict, Tuple, Optional
 from itertools import chain
 
@@ -39,7 +39,7 @@ CELL_TYPE = "Cell Type"
 ENTREZ_ID = "Entrez ID"
 
 
-class Result(namespace):
+class Result(SimpleNamespace):
     scores = None  # type: Optional[Table]
     clusters = None  # type: OWAnnotateProjection.Clusters
 
@@ -333,13 +333,13 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     epsilon = Setting(0)
     color_by_cluster = Setting(False)
 
-    class Scores(namespace):
+    class Scores(SimpleNamespace):
         z_vals = None  # type: Optional[Table]
         annotations = None  # type: Optional[Table]
         p_vals = None  # type: Optional[Table]
         table = None  # type: Optional[Table]
 
-    class Clusters(namespace):
+    class Clusters(SimpleNamespace):
         table = None  # type: Optional[Table]
         groups = None  # type: Optional[Dict[str, Tuple]]
         epsilon = None  # type: Optional[float]
