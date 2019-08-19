@@ -78,7 +78,7 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
         class_values = list(map('|'.join, zip(*column_values)))
 
         _class_values = list(set(class_values))
-        map_class_values = dict((value, key) for (key, value) in enumerate(_class_values))
+        map_class_values = {(value, key) for (key, value) in enumerate(_class_values)}
         class_var = DiscreteVariable(name='class', values=_class_values)
         _domain = Domain(table.domain.attributes, table.domain.class_vars + (class_var,), table.domain.metas)
 
