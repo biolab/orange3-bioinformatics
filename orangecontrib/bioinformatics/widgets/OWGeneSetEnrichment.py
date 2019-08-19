@@ -23,9 +23,9 @@ from Orange.widgets.gui import (
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Input, Output
 
+from orangecontrib.bioinformatics.widgets import OWGeneSets as _OWGeneSets
 from orangecontrib.bioinformatics.utils.statistics import FDR
 from orangecontrib.bioinformatics.widgets.utils.gui import FilterProxyModel, GeneSetsSelection, NumericalColumnDelegate
-from orangecontrib.bioinformatics.widgets import OWGeneSets as _OWGeneSets
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID,
     GENE_ID_COLUMN,
