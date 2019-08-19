@@ -10,7 +10,9 @@ from orangecontrib.bioinformatics.geneset.utils import (
     filename,
     filename_parse,
 )
-from orangecontrib.bioinformatics.geneset.config import *
+
+__all__ = (GeneSet, GeneSets, GeneSetException, NoGeneSetsException)
+DOMAIN = 'gene_sets'
 
 
 def list_all(**kwargs):
@@ -32,12 +34,11 @@ def list_all(**kwargs):
 
     organism = kwargs.get("organism", None)
 
-    all_available = set(
-        [
-            filename_parse(f_name)
-            for domain, f_name in serverfiles.ServerFiles().listfiles(DOMAIN) + serverfiles.listfiles(DOMAIN)
-        ]
-    )
+    all_available = {
+        filename_parse(f_name)
+        for domain, f_name in serverfiles.ServerFiles().listfiles(DOMAIN) + serverfiles.listfiles(DOMAIN)
+    }
+
     if organism:
         return [hier for hier, org in all_available if org == organism]
     else:

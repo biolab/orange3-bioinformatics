@@ -39,7 +39,7 @@ from orangecontrib.bioinformatics.geneset import filename
 from orangecontrib.bioinformatics.go.config import DOMAIN as gene_ontology_domain
 from orangecontrib.bioinformatics.go.config import FILENAME_ANNOTATION
 from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids, common_taxid_to_name, species_name_to_taxid
-from orangecontrib.bioinformatics.geneset.config import DOMAIN as gene_sets_domain
+from orangecontrib.bioinformatics.geneset import DOMAIN as gene_sets_domain
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 
