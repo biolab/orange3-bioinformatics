@@ -62,9 +62,9 @@ class Taxonomy:
         except KeyError:
             raise UnknownSpeciesIdentifier(id)
 
-    def search(self, string, onlySpecies=True, exact=False):
+    def search(self, string, only_species=True, exact=False):
         res = self._tax.search(string, exact)
-        if onlySpecies:
+        if only_species:
             res = [taxid for taxid in res if self._tax[taxid].rank == "species"]
         return res
 
@@ -266,7 +266,7 @@ class TaxonomyDB(collections.Mapping):
         """,
             (tax_id,),
         )
-        children = list(str(r[0]) for r in c if r[0] != 1)
+        children = [str(r[0]) for r in c if r[0] != 1]
         return children
 
     def name(self, tax_id):
@@ -331,7 +331,7 @@ class TaxonomyDB(collections.Mapping):
         # take the tax_id, parent_tax_id, rank entries
         nodes = [row[:3] for row in iter_rows(nodes)]
 
-        ranks = list(enumerate(sorted(set(rank for _, _, rank in nodes))))
+        ranks = list(enumerate(sorted({rank for _, _, rank in nodes})))
         rank_id = {rank: i for i, rank in ranks}
 
         cursor.executemany("INSERT INTO ranks VALUES (?, ?)", ranks)
@@ -350,7 +350,7 @@ class TaxonomyDB(collections.Mapping):
                 yield tax_id, name, name_class
 
         names = list(iter_names(iter_rows(names)))
-        name_classes = list(enumerate(set(name_class for _, _, name_class in names)))
+        name_classes = list(enumerate({name_class for _, _, name_class in names}))
         name_class_id = {name_class: i for i, name_class in name_classes}
 
         cursor.executemany("INSERT INTO name_classes VALUES (?, ?)", name_classes)

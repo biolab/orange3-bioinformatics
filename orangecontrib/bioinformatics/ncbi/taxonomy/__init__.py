@@ -133,19 +133,19 @@ def other_names(tax_id):
     return Taxonomy().other_names(tax_id)
 
 
-def search(string, onlySpecies=True, exact=False):
+def search(string, only_species=True, exact=False):
     """ Search the NCBI taxonomy database for an organism.
 
     :param string: Search string.
     :type string: str
 
-    :param onlySpecies: Return only taxids of species (and subspecies).
-    :type onlySpecies: bool
+    :param only_species: Return only taxids of species (and subspecies).
+    :type only_species: bool
 
     :param exact:  Return only taxids of organism that exactly match the string.
     :type exact: bool
     """
-    ids = Taxonomy().search(string, onlySpecies, exact)
+    ids = Taxonomy().search(string, only_species, exact)
     return list(ids)
 
 

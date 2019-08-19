@@ -216,7 +216,7 @@ class GeneMatcher:
 
                         match = cursor.execute(query, (f'synonyms:"{search_param}"',)).fetchall()
                         synonym_matched_rows = [
-                            m for m in match if search_param in [x.lower() for x in json.loads(m[synonyms])]
+                            m for m in match if search_param in (x.lower() for x in json.loads(m[synonyms]))
                         ]
                         # if unique match
                         if len(synonym_matched_rows) == 1:
@@ -225,7 +225,7 @@ class GeneMatcher:
 
                         match = cursor.execute(query, (f'db_refs:"{search_param}"',)).fetchall()
                         db_ref_matched_rows = [
-                            m for m in match if search_param in [x.lower() for x in json.loads(m[db_refs]).values()]
+                            m for m in match if search_param in (x.lower() for x in json.loads(m[db_refs]).values())
                         ]
                         # if unique match
                         if len(db_ref_matched_rows) == 1:
