@@ -17,7 +17,7 @@ class DictyMutant:
 
         :param mutant_entry: A single mutant entry from `curated mutants file
             <http://dictybase.org/db/cgi-bin/dictyBase/download/download.pl?area=mutant_phenotypes&ID=all-mutants.txt>`_.
-        
+
         """
         # dictyBase ID
         self.name = mutant_entry.get('systematic_name', None)
