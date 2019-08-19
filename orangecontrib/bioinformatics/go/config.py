@@ -11,5 +11,3 @@ FILENAME_ANNOTATION = '{}.tab'
 FILENAME_ONTOLOGY = 'gene_ontology.obo'
 ONTOLOGY_TITLE = 'Gene Ontology (GO)'
 ONTOLOGY_TAGS = ['gene', 'ontology', 'GO']
-
-
