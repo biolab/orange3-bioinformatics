@@ -1,11 +1,11 @@
 import numpy as np
-from Orange.data import Domain, ContinuousVariable, Table
-
-from orangecontrib.bioinformatics.ncbi.gene import GeneInfo
-from orangecontrib.bioinformatics.utils import statistics
+from scipy.stats import binom, hypergeom
 from scipy.stats.mstats import rankdata
-from scipy.stats import hypergeom, binom
 
+from Orange.data import Table, Domain, ContinuousVariable
+
+from orangecontrib.bioinformatics.utils import statistics
+from orangecontrib.bioinformatics.ncbi.gene import GeneInfo
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
 SCORING_EXP_RATIO = "scoring_exp_ratio"
@@ -62,6 +62,7 @@ class AnnotateSamples:
     ----------
 
     """
+
     @staticmethod
     def log_cpm(data):
         """
@@ -142,9 +143,7 @@ class AnnotateSamples:
 
         for i in range(data_ge_ranked.shape[1]):
             _, counts = np.unique(data_ge_ranked[:, i], return_counts=True)
-            sigma[i] = np.sqrt(
-                1 * n2 / 12 * ((n + 1) - np.sum((counts ** 3 - counts)) /
-                               (n * (n - 1))))
+            sigma[i] = np.sqrt(1 * n2 / 12 * ((n + 1) - np.sum((counts ** 3 - counts)) / (n * (n - 1))))
 
         # compute z
         z = (u - mu) / (sigma + 1e-16)
@@ -173,9 +172,7 @@ class AnnotateSamples:
         np.ndarray
             Reordered array.
         """
-        current_order = np.array(
-            [x.attributes.get("Entrez ID")
-             for x in matrix.domain.attributes])
+        current_order = np.array([x.attributes.get("Entrez ID") for x in matrix.domain.attributes])
         values = matrix.X
 
         # filter out genes without entrez ID
@@ -252,9 +249,9 @@ class AnnotateSamples:
             raise ScoringNotImplemented()
 
     @staticmethod
-    def assign_annotations(z_values, available_annotations, data, z_threshold=1,
-                           p_value_fun=PFUN_BINOMIAL,
-                           scoring=SCORING_EXP_RATIO):
+    def assign_annotations(
+        z_values, available_annotations, data, z_threshold=1, p_value_fun=PFUN_BINOMIAL, scoring=SCORING_EXP_RATIO
+    ):
         """
         The function gets a set of attributes (e.g. genes) for each cell and
         attributes for each annotation. It returns the annotations significant
@@ -285,11 +282,10 @@ class AnnotateSamples:
         Orange.data.Table
             Annotation fdrs
         """
-        assert TAX_ID in data.attributes, "The input table needs to have a " \
-                                          "tax_id attribute"
+        assert TAX_ID in data.attributes, "The input table needs to have a " "tax_id attribute"
         assert any(
-            "Entrez ID" in x.attributes for x in data.domain.attributes),\
-            "Input data do not contain gene expression data."
+            "Entrez ID" in x.attributes for x in data.domain.attributes
+        ), "Input data do not contain gene expression data."
         tax_id = data.attributes[TAX_ID]
 
         # select function for p-value
@@ -301,20 +297,18 @@ class AnnotateSamples:
         N = len(GeneInfo(tax_id))  # number of genes for organism
 
         # make an attributes order
-        genes_data = [str(x.attributes["Entrez ID"])
-                      for x in z_values.domain.attributes
-                      if "Entrez ID" in x.attributes]
+        genes_data = [
+            str(x.attributes["Entrez ID"]) for x in z_values.domain.attributes if "Entrez ID" in x.attributes
+        ]
         genes_celltypes = [
-            str(x) for x in available_annotations[:, "Entrez ID"].metas.flatten()
-            if x is not None and not x == "?"]
+            str(x) for x in available_annotations[:, "Entrez ID"].metas.flatten() if x is not None and not x == "?"
+        ]
         genes_order = list(set(genes_data) | set(genes_celltypes))
 
         # get marker genes matrix M
-        M, annotations = AnnotateSamples._group_marker_attributes(
-            available_annotations, genes_order)
+        M, annotations = AnnotateSamples._group_marker_attributes(available_annotations, genes_order)
 
-        Z = AnnotateSamples._select_attributes(
-            z_values, genes_order, z_threshold)
+        Z = AnnotateSamples._select_attributes(z_values, genes_order, z_threshold)
 
         x = Z.dot(M)
         k = np.repeat(Z.sum(axis=1).reshape(-1, 1), x.shape[1], axis=1)
@@ -326,19 +320,16 @@ class AnnotateSamples:
         for i, row in enumerate(p_values):
             fdrs[i] = np.array(statistics.FDR(row.tolist()))
 
-        scores = AnnotateSamples._score(
-            scoring, p_values, fdrs, data, M, x, m, genes_order)
+        scores = AnnotateSamples._score(scoring, p_values, fdrs, data, M, x, m, genes_order)
 
-        domain = Domain(
-            [ContinuousVariable(ct) for ct in annotations])
+        domain = Domain([ContinuousVariable(ct) for ct in annotations])
         scores_table = Table(domain, scores)
         fdrs_table = Table(domain, fdrs)
 
         return scores_table, fdrs_table
 
     @staticmethod
-    def filter_annotations(scores, p_values, return_nonzero_annotations=True,
-                           p_threshold=0.05):
+    def filter_annotations(scores, p_values, return_nonzero_annotations=True, p_threshold=0.05):
         """
         This function filters the probabilities on places that do not reach the
         threshold for p-value and filter zero columns
@@ -368,16 +359,21 @@ class AnnotateSamples:
 
         if return_nonzero_annotations:
             col_not_empty = ~np.isnan(scores).all(axis=0)
-            new_domain = Domain(
-                np.array(scores.domain.attributes)[col_not_empty])
+            new_domain = Domain(np.array(scores.domain.attributes)[col_not_empty])
             scores = Table(new_domain, scores)
         return scores
 
     @staticmethod
-    def annotate_samples(data, available_annotations,
-                         return_nonzero_annotations=True, p_threshold=0.05,
-                         p_value_fun=PFUN_BINOMIAL, z_threshold=1,
-                         scoring=SCORING_EXP_RATIO, normalize=False):
+    def annotate_samples(
+        data,
+        available_annotations,
+        return_nonzero_annotations=True,
+        p_threshold=0.05,
+        p_value_fun=PFUN_BINOMIAL,
+        z_threshold=1,
+        scoring=SCORING_EXP_RATIO,
+        normalize=False,
+    ):
         """
         Function marks the data with annotations that are provided. This
         function implements the complete functionality. First select genes,
@@ -412,22 +408,19 @@ class AnnotateSamples:
         Orange.data.Table
             Cell type most important for each cell.
         """
-        assert len(data) > 1, "At least two data items are required for " \
-                              "method to work."
+        assert len(data) > 1, "At least two data items are required for " "method to work."
 
         if normalize:
             data = AnnotateSamples.log_cpm(data)
 
-        z = AnnotateSamples.mann_whitney_test(
-            data)
+        z = AnnotateSamples.mann_whitney_test(data)
 
         annotation_probs, annotation_fdrs = AnnotateSamples.assign_annotations(
-            z, available_annotations, data, z_threshold=z_threshold,
-            p_value_fun=p_value_fun, scoring=scoring)
+            z, available_annotations, data, z_threshold=z_threshold, p_value_fun=p_value_fun, scoring=scoring
+        )
 
         annotation_probs = AnnotateSamples.filter_annotations(
-            annotation_probs, annotation_fdrs, return_nonzero_annotations,
-            p_threshold
+            annotation_probs, annotation_fdrs, return_nonzero_annotations, p_threshold
         )
 
         return annotation_probs

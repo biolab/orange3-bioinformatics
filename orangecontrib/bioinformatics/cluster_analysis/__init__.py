@@ -1,23 +1,21 @@
 """ Cluster analysis module """
-import numpy as np
 import threading
 import concurrent.futures
-
 from typing import Union
 from operator import attrgetter
 from functools import partial
 
+import numpy as np
 
-from AnyQt.QtCore import (
-    Qt, QAbstractListModel, QVariant, Slot, QThread
-)
-from Orange.widgets.utils.concurrent import ThreadExecutor, FutureWatcher, methodinvoke
+from AnyQt.QtCore import Qt, Slot, QThread, QVariant, QAbstractListModel
+
 from Orange.widgets.gui import ProgressBar
+from Orange.widgets.utils.concurrent import FutureWatcher, ThreadExecutor, methodinvoke
 
 from orangecontrib.bioinformatics.geneset import GeneSet
-from orangecontrib.bioinformatics.widgets.utils.gui import gene_scoring_method
-from orangecontrib.bioinformatics.utils.statistics import FDR, ALT_GREATER
 from orangecontrib.bioinformatics.ncbi.gene import Gene
+from orangecontrib.bioinformatics.utils.statistics import FDR, ALT_GREATER
+from orangecontrib.bioinformatics.widgets.utils.gui import gene_scoring_method
 
 DISPLAY_GENE_COUNT = 20
 DISPLAY_GENE_SETS_COUNT = 5
@@ -177,13 +175,13 @@ class Cluster:
             uniq_clusters = {False}
             this_cluster = True
 
-        calculated_p_values = np.ones((table_x.shape[1],      # genes
-                                      len(uniq_clusters),     # other clusters
-                                      len(uniq_batches)))     # batches
+        calculated_p_values = np.ones(
+            (table_x.shape[1], len(uniq_clusters), len(uniq_batches))  # genes  # other clusters
+        )  # batches
 
-        calculated_scores = np.ones((table_x.shape[1],       # genes
-                                     len(uniq_clusters),     # other clusters
-                                     len(uniq_batches)))     # batches
+        calculated_scores = np.ones(
+            (table_x.shape[1], len(uniq_clusters), len(uniq_batches))  # genes  # other clusters
+        )  # batches
 
         for bi, b in enumerate(uniq_batches):
             for ci, c in enumerate(uniq_clusters):
@@ -211,12 +209,17 @@ class Cluster:
         gene_sets = '(no enriched gene sets)'
         if self.filtered_gene_sets:
             sets_to_display = self.filtered_gene_sets[:DISPLAY_GENE_SETS_COUNT]
-            gene_sets = '<br>'.join(['<b>{}</b> (FDR={:0.2e}, n={})'.format(g_set.name, g_set.fdr, g_set.count)
-                                    for g_set in sets_to_display])
+            gene_sets = '<br>'.join(
+                [
+                    '<b>{}</b> (FDR={:0.2e}, n={})'.format(g_set.name, g_set.fdr, g_set.count)
+                    for g_set in sets_to_display
+                ]
+            )
 
             if len(self.filtered_gene_sets) > len(sets_to_display):
-                gene_sets += \
-                    '<br> ... ({} more gene sets)'.format(len(self.filtered_gene_sets) - DISPLAY_GENE_SETS_COUNT)
+                gene_sets += '<br> ... ({} more gene sets)'.format(
+                    len(self.filtered_gene_sets) - DISPLAY_GENE_SETS_COUNT
+                )
 
         genes = '(all genes are filtered out)'
         if self.filtered_genes:
@@ -248,7 +251,9 @@ class Cluster:
         </table>
         </body>
         </html>
-        """.format(self.name, gene_sets, genes)
+        """.format(
+            self.name, gene_sets, genes
+        )
         return html_string
 
 
@@ -264,7 +269,6 @@ class Task:
 
 
 class ClusterModel(QAbstractListModel):
-
     def __init__(self, parent=None):
         QAbstractListModel.__init__(self)
         self.__items = []
@@ -384,10 +388,7 @@ class ClusterModel(QAbstractListModel):
 
         for item in self.get_rows():
             genes = [gene.ncbi_id for gene in item.filtered_genes]
-            item.gene_set_enrichment(gs_object,
-                                     gene_sets,
-                                     set(genes),
-                                     reference_genes)
+            item.gene_set_enrichment(gs_object, gene_sets, set(genes), reference_genes)
 
     def apply_gene_filters(self, p_val=None, fdr=None, count=None):
         [item.filter_enriched_genes(p_val, fdr, max_gene_count=count) for item in self.get_rows()]
@@ -396,7 +397,3 @@ class ClusterModel(QAbstractListModel):
     def apply_gene_sets_filters(self, p_val=None, fdr=None, count=None):
         [item.filter_gene_sets(p_val, fdr, max_set_count=count) for item in self.get_rows()]
         self.dataChanged.emit(self.createIndex(0, 0), self.createIndex(self.rowCount(0), 0))
-
-
-
-

@@ -1,10 +1,9 @@
 import math
-import scipy
 import threading
-import numpy as np
-
 from typing import Tuple, Union
 
+import numpy as np
+import scipy
 from scipy.stats import hypergeom
 
 ALT_TWO = "two-sided"
@@ -60,8 +59,8 @@ def score_mann_whitney(a, b, **kwargs):
 
     alt = kwargs.get("alternative", ALT_TWO)
     assert alt in ALTERNATIVES
-    statistics = np.zeros((a.shape[0]),)
-    p_values = np.zeros((a.shape[0]),)
+    statistics = np.zeros((a.shape[0]))
+    p_values = np.zeros((a.shape[0]))
     for i, (a_, b_) in enumerate(zip(a, b)):
         try:
             s, p = scipy.stats.mannwhitneyu(a_, b_, alternative=alt)
@@ -89,14 +88,14 @@ def score_hypergeometric_test(a, b, threshold=1, **kwargs):
     M = len(A) + len(B)
     N = len(A)
     n_expr = A.sum(axis=0) + B.sum(axis=0)  # Number of cells expressing genes (overall)
-    n_expr_clust = A.sum(axis=0)            # Number of cells expressing genes (in cluster)
+    n_expr_clust = A.sum(axis=0)  # Number of cells expressing genes (in cluster)
 
     # Test results --- both tails
     # Note: cumulatives do sum to >1 due to overlap at 1 point
-    under = np.fromiter(map(lambda t: hypergeom.cdf(k=t[1], n=t[0], M=M, N=N),
-                            zip(n_expr, n_expr_clust)), dtype=float)
-    over = np.fromiter(map(lambda t: hypergeom.sf(k=t[1]-1, n=t[0], M=M, N=N),
-                           zip(n_expr, n_expr_clust)), dtype=float)
+    under = np.fromiter(map(lambda t: hypergeom.cdf(k=t[1], n=t[0], M=M, N=N), zip(n_expr, n_expr_clust)), dtype=float)
+    over = np.fromiter(
+        map(lambda t: hypergeom.sf(k=t[1] - 1, n=t[0], M=M, N=N), zip(n_expr, n_expr_clust)), dtype=float
+    )
     signs = np.sign(under - over)
     if alt == ALT_TWO:
         pvalues = np.minimum(1.0, 2.0 * np.minimum(under, over))
@@ -141,9 +140,9 @@ def _lngamma(z):
     x -= 1259.139216722289 / (z + 1)
     x += 676.5203681218835 / z
     x += 0.9999999999995183
-    
+
     return math.log(x) - 5.58106146679532777 - z + (z - 0.5) * math.log(z + 6.5)
-        
+
 
 class LogBin(object):
     _max = 2
@@ -177,7 +176,7 @@ class LogBin(object):
 
     @staticmethod
     def _logfactorial(n):
-        if (n <= 1):
+        if n <= 1:
             return 0.0
         else:
             return _lngamma(n + 1)
@@ -217,7 +216,7 @@ class Binomial(LogBin):
         """ The probability that k or more tests are positive. """
         if n - k + 1 <= k:
             # starting from k gives the shorter list of values
-            return sum(self.__call__(i, N, m, n) for i in range(k, n+1))
+            return sum(self.__call__(i, N, m, n) for i in range(k, n + 1))
         else:
             value = 1.0 - sum(self.__call__(i, N, m, n) for i in range(k))
             # if the value is small it is probably inexact due to the limited
@@ -225,7 +224,7 @@ class Binomial(LogBin):
             # if so, compute the result without substraction
             if value < 1e-3:  # arbitary threshold
                 # print "INEXACT", value, sum(self.__call__(i, N, m, n) for i in range(k, n+1))
-                return sum(self.__call__(i, N, m, n) for i in range(k, n+1))
+                return sum(self.__call__(i, N, m, n) for i in range(k, n + 1))
             else:
                 return value
 
@@ -257,7 +256,7 @@ class Hypergeometric(LogBin):
 
         if min(n, m) - k + 1 <= k:
             # starting from k gives the shorter list of values
-            return sum(self.__call__(i, N, m, n) for i in range(k, min(n,m)+1))
+            return sum(self.__call__(i, N, m, n) for i in range(k, min(n, m) + 1))
         else:
             value = 1.0 - sum(self.__call__(i, N, m, n) for i in (range(k)))
             # if the value is small it is probably inexact due to the limited
@@ -265,7 +264,7 @@ class Hypergeometric(LogBin):
             # if so, compute the result without substraction
             if value < 1e-3:  # arbitary threshold
                 # print "INEXACT", value, sum(self.__call__(i, N, m, n) for i in range(k, min(n,m)+1))
-                return sum(self.__call__(i, N, m, n) for i in range(k, min(n, m)+1))
+                return sum(self.__call__(i, N, m, n) for i in range(k, min(n, m) + 1))
             else:
                 return value
 
@@ -275,11 +274,11 @@ class Hypergeometric(LogBin):
 # 4.99999157277e-006. (sum([1/i for i in range(1, m+1)])  ~ log(m) + 0.5772..., 0.5572 is an Euler-Mascheroni constant)
 c = [1.0]
 for m in range(2, 100000):
-    c.append(c[-1] + 1.0/m)
+    c.append(c[-1] + 1.0 / m)
 
 
 def is_sorted(l):
-    return all(l[i] <= l[i+1] for i in range(len(l)-1))
+    return all(l[i] <= l[i + 1] for i in range(len(l) - 1))
 
 
 def FDR(p_values, dependent=False, m=None, ordered=False):
@@ -305,16 +304,16 @@ def FDR(p_values, dependent=False, m=None, ordered=False):
     if m <= 0 or not p_values:
         return []
 
-    if dependent: # correct q for dependent tests
-        k = c[m-1] if m <= len(c) else math.log(m) + 0.57721566490153286060651209008240243104215933593992
+    if dependent:  # correct q for dependent tests
+        k = c[m - 1] if m <= len(c) else math.log(m) + 0.57721566490153286060651209008240243104215933593992
         m = m * k
 
-    tmp_fdrs = [p*m/(i+1.0) for (i, p) in enumerate(p_values)]
+    tmp_fdrs = [p * m / (i + 1.0) for (i, p) in enumerate(p_values)]
     fdrs = []
     cmin = tmp_fdrs[-1]
     for f in reversed(tmp_fdrs):
         cmin = min(f, cmin)
-        fdrs.append( cmin)
+        fdrs.append(cmin)
     fdrs.reverse()
 
     if not ordered:
@@ -337,4 +336,4 @@ def Bonferroni(p_values, m=None):
     if m == 0:
         return []
     m = float(m)
-    return [p/m for p in p_values]
+    return [p / m for p in p_values]

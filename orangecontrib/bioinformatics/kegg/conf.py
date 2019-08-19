@@ -8,13 +8,15 @@ from __future__ import absolute_import
 
 import os
 
+from six import StringIO
+
+from orangecontrib.bioinformatics.utils import serverfiles
+
 try:
     import ConfigParser as configparser
 except ImportError:
     import configparser
 
-from six import StringIO
-from orangecontrib.bioinformatics.utils import serverfiles
 kegg_dir = serverfiles.localpath("KEGG2")
 
 default = """
@@ -45,12 +47,7 @@ parser.read([os.path.expanduser("~/.obiKEGG/rc.cfg")])
 
 params = {}
 
-_ALL_PARAMS = [
-    "cache.path",
-    "cache.store",
-    "cache.invalidate",
-    "service.transport"
-]
+_ALL_PARAMS = ["cache.path", "cache.store", "cache.invalidate", "service.transport"]
 
 for p in _ALL_PARAMS:
     section, option = p.split(".")

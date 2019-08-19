@@ -52,25 +52,16 @@ from __future__ import absolute_import
 import os
 import sys
 import threading
-
-from collections import defaultdict
-from itertools import chain
 from datetime import datetime
-from contextlib import contextmanager
-
-from orangecontrib.bioinformatics.utils import statistics
-from orangecontrib.bioinformatics.ncbi import taxonomy
-from orangecontrib.bioinformatics.utils import progress_bar_milestones
-from orangecontrib.bioinformatics.kegg import databases
-from orangecontrib.bioinformatics.kegg import entry
-
-from orangecontrib.bioinformatics.kegg.brite import BriteEntry, Brite
-
-from orangecontrib.bioinformatics.kegg import api
-from orangecontrib.bioinformatics.kegg import conf
-from orangecontrib.bioinformatics.kegg import pathway
-
 from functools import reduce
+from itertools import chain
+from contextlib import contextmanager
+from collections import defaultdict
+
+from orangecontrib.bioinformatics.kegg import api, conf, entry, pathway, databases
+from orangecontrib.bioinformatics.ncbi import taxonomy
+from orangecontrib.bioinformatics.utils import statistics, progress_bar_milestones
+from orangecontrib.bioinformatics.kegg.brite import Brite, BriteEntry
 
 KEGGGenome = databases.Genome
 KEGGGenes = databases.Genes
@@ -102,6 +93,7 @@ class Organism(object):
             Search KEGG for an organism code
 
     """
+
     def __init__(self, org):
         self.org_code = self.organism_name_search(org)
         self.api = api.CachedKeggApi()
@@ -132,7 +124,6 @@ class Organism(object):
         # return [ncbi.split(':')[-1] for ncbi, _ in self.api.conv(self.org_code, "ncbi-geneid")]
         return [ncbi for ncbi in self.kegg_to_ncbi_mapper().values()]
 
-
     def gene_aliases(self):
         """
         Return a list of sets of equal genes (synonyms) in KEGG for
@@ -161,8 +152,7 @@ class Organism(object):
         for source_id, target_id in chain(ncbi_geneid, ncbi_gi):
             aliases[target_id].add(source_id.split(":", 1)[1])
 
-        return [set([entry_id]).union(names)
-                for entry_id, names in aliases.items()]
+        return [set([entry_id]).union(names) for entry_id, names in aliases.items()]
 
     def pathways(self, with_ids=None):
         """
@@ -190,8 +180,7 @@ class Organism(object):
     def enzymes(self, genes=None):
         raise NotImplementedError()
 
-    def get_enriched_pathways(self, genes, reference=None,
-                              prob=statistics.Binomial(), callback=None):
+    def get_enriched_pathways(self, genes, reference=None, prob=statistics.Binomial(), callback=None):
         """
         Return a dictionary with enriched pathways ids as keys
         and (list_of_genes, p_value, num_of_reference_genes) tuples
@@ -213,8 +202,7 @@ class Organism(object):
                 callback(i * 50.0 / len(genes))
 
         # pre-cache for speed
-        pathways_db.pre_cache([pid for pfg in pathways_for_gene
-                               for pid in pfg])
+        pathways_db.pre_cache([pid for pfg in pathways_for_gene for pid in pfg])
         for i, (gene, pathways) in enumerate(zip(genes, pathways_for_gene)):
             for pathway in pathways:
                 if pathways_db.get_entry(pathway).gene:
@@ -227,17 +215,15 @@ class Organism(object):
         for i, (p_id, entry) in enumerate(pItems):
             pathway = pathways_db.get_entry(p_id)
             entry[2].extend(reference.intersection(pathway.gene or []))
-            entry[1] = prob.p_value(len(entry[0]), len(reference),
-                                    len(entry[2]), len(genes))
-        return dict([(pid, (genes, p, len(ref)))
-                     for pid, (genes, p, ref) in allPathways.items()])
+            entry[1] = prob.p_value(len(entry[0]), len(reference), len(entry[2]), len(genes))
+        return dict([(pid, (genes, p, len(ref))) for pid, (genes, p, ref) in allPathways.items()])
 
     def get_genes_by_enzyme(self, enzyme):
         enzyme = KEGGEnzyme().get_entry(enzyme)
         return enzyme.genes.get(self.org_code, []) if enzyme.genes else []
 
     def get_genes_by_pathway(self, pathway_id):
-        #print(len(KEGGPathway(pathway_id).genes()), KEGGPathway(pathway_id).genes()[1])
+        # print(len(KEGGPathway(pathway_id).genes()), KEGGPathway(pathway_id).genes()[1])
         return KEGGPathway(pathway_id).genes()
 
     def get_enzymes_by_pathway(self, pathway_id):
@@ -251,9 +237,9 @@ class Organism(object):
         l = self.api.get_genes_pathway_organism(self.org_code)
         gene_ids = set(gene_ids)
         gtp = defaultdict(set)
-        for a,b in l:
+        for a, b in l:
             gtp[a].add(b)
-        pathways = [ gtp[g] for g in gene_ids ]
+        pathways = [gtp[g] for g in gene_ids]
         pathways = reduce(set.intersection, pathways)
         return sorted(pathways)
 
@@ -261,15 +247,13 @@ class Organism(object):
         enzyme_ids = set(enzyme_ids)
         pathways = [KEGGEnzyme()[id].pathway for id in enzyme_ids]
         pathways = reduce(set.union, pathways, set())
-        return [id for id in pathways
-                if enzyme_ids.issubset(KEGGPathway(id).enzymes())]
+        return [id for id in pathways if enzyme_ids.issubset(KEGGPathway(id).enzymes())]
 
     def get_pathways_by_compounds(self, compound_ids):
         compound_ids = set(compound_ids)
         pathways = [KEGGCompound()[id].pathway for id in compound_ids]
         pathways = reduce(set.union, pathways, set())
-        return [id for id in pathways
-                if compound_ids.issubset(KEGGPathway(id).compounds())]
+        return [id for id in pathways if compound_ids.issubset(KEGGPathway(id).compounds())]
 
     def get_enzymes_by_compound(self, compound_id):
         return KEGGCompound()[compound_id].enzyme
@@ -293,6 +277,7 @@ class Organism(object):
         with _global_genome_instance() as genome:
             info = genome.api.info(name)
             return info.releas
+
 
 KEGGOrganism = Organism
 
@@ -347,7 +332,7 @@ def to_taxid(name):
     Return a NCBI Taxonomy id for a given KEGG Organism name
     """
     with _global_genome_instance() as genome:
-        
+
         if name in genome:  # a T string
             return genome[name].taxid
 

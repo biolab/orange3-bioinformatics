@@ -1,6 +1,7 @@
 import unittest
 
 from Orange.widgets.tests.base import WidgetTest
+
 from orangecontrib.bioinformatics.widgets.OWMarkerGenes import OWMarkerGenes
 
 
@@ -23,10 +24,8 @@ class TestOWMarkerGenes(WidgetTest):
 
         w.handle_source_changed(1)
 
-
         print(w.selected_db_source)
         print(self.panglao_db)
-
 
         self.assertTrue(w.db_source_index == 1)
         self.assertTrue(w.selected_db_source == self.panglao_db)

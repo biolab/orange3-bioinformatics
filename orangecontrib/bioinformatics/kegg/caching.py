@@ -4,17 +4,18 @@ Caching framework for cached kegg api calls.
 """
 import os
 import sqlite3
+from datetime import date, datetime, timedelta
+from contextlib import closing
+
+import six
+
+from orangecontrib.bioinformatics.kegg import conf
+
 try:
     import cPickle as pickle
 except ImportError:
     import pickle
 
-from contextlib import closing
-
-from datetime import datetime, date, timedelta
-from orangecontrib.bioinformatics.kegg import conf
-
-import six
 
 try:
     from UserDict import DictMixin
@@ -37,28 +38,34 @@ class Store(object):
 
 
 class Sqlite3Store(Store, DictMixin):
-
     def __init__(self, filename):
         self.filename = filename
         self.con = sqlite3.connect(filename)
-        self.con.execute("""
+        self.con.execute(
+            """
             CREATE TABLE IF NOT EXISTS cache
                 (key TEXT UNIQUE,
                  value TEXT
                 )
-        """)
-        self.con.execute("""
+        """
+        )
+        self.con.execute(
+            """
             CREATE INDEX IF NOT EXISTS cache_index
             ON cache (key)
-        """)
+        """
+        )
         self.con.commit()
 
     def __getitem__(self, key):
-        cur = self.con.execute("""
+        cur = self.con.execute(
+            """
             SELECT value
             FROM cache
             WHERE key=?
-        """, (key,))
+        """,
+            (key,),
+        )
         r = cur.fetchall()
         if not r:
             raise KeyError(key)
@@ -73,24 +80,32 @@ class Sqlite3Store(Store, DictMixin):
 
     def __setitem__(self, key, value):
         value = pickle.dumps(value)
-        self.con.execute("""
+        self.con.execute(
+            """
             INSERT OR REPLACE INTO cache
             VALUES (?, ?)
-        """, (key, value))
+        """,
+            (key, value),
+        )
         self.con.commit()
 
     def __delitem__(self, key):
-        self.con.execute("""
+        self.con.execute(
+            """
             DELETE FROM cache
             WHERE key=?
-        """, (key,))
+        """,
+            (key,),
+        )
         self.con.commit()
 
     def keys(self):
-        cur = self.con.execute("""
+        cur = self.con.execute(
+            """
             SELECT key
             FROM cache
-        """)
+        """
+        )
         return [str(r[0]) for r in cur.fetchall()]
 
     def close(self):
@@ -101,7 +116,6 @@ class Sqlite3Store(Store, DictMixin):
 
     def __iter__(self):
         return None
-
 
 
 class DictStore(Store, DictMixin):
@@ -118,12 +132,12 @@ class DictStore(Store, DictMixin):
         return None
 
 
-
 class cache_entry(object):
     def __init__(self, value, mtime=None, expires=None):
         self.value = value
         self.mtime = mtime
         self.expires = expires
+
 
 _SESSION_START = datetime.now()
 
@@ -132,8 +146,8 @@ class cached_wrapper(object):
     """
     TODO: needs documentation
     """
-    def __init__(self, function, instance, class_, cache_store,
-                 last_modified=None):
+
+    def __init__(self, function, instance, class_, cache_store, last_modified=None):
         self.function = function
         self.instance = instance
         self.class_ = class_
@@ -203,16 +217,14 @@ class cached_wrapper(object):
         if isinstance(entry.mtime, datetime):
             mtime = entry.mtime
         elif isinstance(entry.mtime, date):
-            mtime = datetime(entry.mtime.year, entry.mtime.month,
-                             entry.mtime.day, 1, 1, 1)
+            mtime = datetime(entry.mtime.year, entry.mtime.month, entry.mtime.day, 1, 1, 1)
         else:
             return False
 
         last_modified = self.last_modified_from_args(args)
 
         if isinstance(last_modified, date):
-            last_modified = datetime(last_modified.year, last_modified.month,
-                                     last_modified.day, 1, 1, 1)
+            last_modified = datetime(last_modified.year, last_modified.month, last_modified.day, 1, 1, 1)
         elif isinstance(last_modified, str):
             # Could have different format
             mtime = mtime.strftime("%Y %m %d %H %M %S")
@@ -223,8 +235,7 @@ class cached_wrapper(object):
             elif conf.params["cache.invalidate"] == "session":
                 last_modified = _SESSION_START
             elif conf.params["cache.invalidate"] == "daily":
-                last_modified = datetime.now().replace(hour=0, minute=0,
-                                                       second=0, microsecond=0)
+                last_modified = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
             elif conf.params["cache.invalidate"] == "weekly":
                 last_modified = datetime.now() - timedelta(7)
             else:  # ???
@@ -238,8 +249,7 @@ class cached_method(object):
 
     def __get__(self, instance, owner):
         if instance is not None:
-            return cached_wrapper(self.function, instance, owner,
-                                  self.get_cache_store(instance, owner))
+            return cached_wrapper(self.function, instance, owner, self.get_cache_store(instance, owner))
         return self
 
     def get_cache_store(self, instance, owner):
@@ -253,9 +263,13 @@ class cached_method(object):
 class bget_cached_method(cached_method):
     def __get__(self, instance, owner):
         if instance is not None:
-            return cached_wrapper(self.function, instance, owner,
-                                  self.get_cache_store(instance, owner),
-                                  self.get_last_modified(instance, owner))
+            return cached_wrapper(
+                self.function,
+                instance,
+                owner,
+                self.get_cache_store(instance, owner),
+                self.get_last_modified(instance, owner),
+            )
         return self
 
     def get_last_modified(self, instance, owner):
@@ -273,10 +287,10 @@ def clear_cache():
     """Clear all locally cached KEGG data.
     """
     import glob
+
     path = conf.params["cache.path"]
     if os.path.realpath(path) != os.path.realpath(conf.kegg_dir):
-        raise Exception("Non default cache path. Please remove the contents "
-                        "of %r manually." % path)
+        raise Exception("Non default cache path. Please remove the contents " "of %r manually." % path)
 
     for cache_filename in glob.glob(os.path.join(path, "*.sqlite3")):
         os.remove(cache_filename)

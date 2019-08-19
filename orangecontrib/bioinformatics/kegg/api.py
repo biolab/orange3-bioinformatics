@@ -1,15 +1,18 @@
 """ KEGG api interface. """
 from __future__ import absolute_import
 
-from datetime import datetime
-from contextlib import closing
-from operator import itemgetter
+import os
 import warnings
+from datetime import datetime
+from operator import itemgetter
+from contextlib import closing
+
 import six
 
+from orangecontrib.bioinformatics.kegg import caching
+from orangecontrib.bioinformatics.kegg.types import Link, BInfo, Definition, OrganismSummary
+from orangecontrib.bioinformatics.kegg.caching import touch_dir, cache_entry, cached_method
 from orangecontrib.bioinformatics.kegg.service import web_service
-from orangecontrib.bioinformatics.kegg.types import OrganismSummary, Definition, BInfo, Link
-
 
 # A list of all databases with names, abbreviations
 DATABASES = [
@@ -28,7 +31,7 @@ DATABASES = [
     ("KEGG Reaction", "reaction", "rn", "R"),
     ("KEGG RPair", "rpair", "rp", "RP"),
     ("KEGG RClass", "rclass", "rc", "RC"),
-    ("KEGG Enzyme", "enzyme", "ec", "E")
+    ("KEGG Enzyme", "enzyme", "ec", "E"),
 ]
 
 
@@ -51,8 +54,7 @@ class KeggApi(object):
         >>> api.list_organisms()  # doctest: +ELLIPSIS
         [OrganismSummary(entry_id='T01001', ...
         """
-        return list(map(OrganismSummary.from_str,
-                        self.service.list.organism.get().splitlines()))
+        return list(map(OrganismSummary.from_str, self.service.list.organism.get().splitlines()))
 
     def list_pathways(self, organism):
         """
@@ -61,15 +63,13 @@ class KeggApi(object):
         >>> api.list_pathways("hsa")  # doctest: +ELLIPSIS
         [Definition(entry_id='path:hsa00010', ...
         """
-        return list(map(Definition.from_str,
-                        self.service.list.pathway(organism).get().splitlines()))
+        return list(map(Definition.from_str, self.service.list.pathway(organism).get().splitlines()))
 
     def list(self, db):
         """
         Return a list of all available entries in database `db`.
         """
-        return list(map(Definition.from_str,
-                        self.service.list(db).get().splitlines()))
+        return list(map(Definition.from_str, self.service.list(db).get().splitlines()))
 
     #######
     # DBGET
@@ -216,26 +216,19 @@ class KeggApi(object):
     def mark_pathway_by_objects(self, pathway_id, object_id_list):
         raise NotImplementedError
 
-    def color_pathway_by_objects(self, pathway_id, object_id_list,
-                                 fg_color_list, bg_color_list):
+    def color_pathway_by_objects(self, pathway_id, object_id_list, fg_color_list, bg_color_list):
         raise NotImplementedError
 
-    def color_pathway_by_elements(self, pathway_id, element_id_list,
-                                  fg_color_list, bg_color_list):
+    def color_pathway_by_elements(self, pathway_id, element_id_list, fg_color_list, bg_color_list):
         raise NotImplementedError
 
-    def get_html_of_marked_pathway_by_objects(self, pathway_id,
-                                              object_id_list):
+    def get_html_of_marked_pathway_by_objects(self, pathway_id, object_id_list):
         raise NotImplementedError
 
-    def get_html_of_colored_pathway_by_objects(self, pathway_id,
-                                               object_id_list, fg_color_list,
-                                               bg_color_list):
+    def get_html_of_colored_pathway_by_objects(self, pathway_id, object_id_list, fg_color_list, bg_color_list):
         raise NotImplementedError
 
-    def get_html_of_colored_pathway_by_elements(self, pathway_id,
-                                                element_id_list, fg_color_list,
-                                                bg_color_list):
+    def get_html_of_colored_pathway_by_elements(self, pathway_id, element_id_list, fg_color_list, bg_color_list):
         raise NotImplementedError
 
     def get_references_by_pathway(self, pathway_id):
@@ -332,10 +325,6 @@ class KeggApi(object):
 KEGG api with caching
 """
 
-import os
-
-from orangecontrib.bioinformatics.kegg import caching
-from orangecontrib.bioinformatics.kegg.caching import cached_method, cache_entry, touch_dir
 
 try:
     from functools import lru_cache
@@ -354,10 +343,10 @@ class CachedKeggApi(KeggApi):
     # Needed API for cached decorator.
     def cache_store(self):
         from . import conf
+
         path = conf.params["cache.path"]
         touch_dir(path)
-        return caching.Sqlite3Store(os.path.join(path,
-                                                 "kegg_api_cache_2.sqlite3"))
+        return caching.Sqlite3Store(os.path.join(path, "kegg_api_cache_2.sqlite3"))
 
     def last_modified(self, args, kwargs=None):
         return getattr(self, "default_release", "")
@@ -431,8 +420,7 @@ class CachedKeggApi(KeggApi):
                 new_uncached, entries = match_by_ids(uncached, entries)
                 unmatched = set(uncached) - set(new_uncached)
                 uncached = new_uncached
-                warnings.warn("Unable to match entries for keys: %s." %
-                              ", ".join(map(repr, unmatched)))
+                warnings.warn("Unable to match entries for keys: %s." % ", ".join(map(repr, unmatched)))
 
             with closing(get.cache_store()) as store:
                 for id, entry in zip(uncached, entries):
@@ -514,18 +502,15 @@ class CachedKeggApi(KeggApi):
 
     @cached_method
     def get_best_best_neighbors_by_gene(self, genes_id, offset, limit):
-        return KeggApi.get_best_best_neighbors_by_gene(self, genes_id, offset,
-                                                       limit)
+        return KeggApi.get_best_best_neighbors_by_gene(self, genes_id, offset, limit)
 
     @cached_method
     def get_best_neighbors_by_gene(self, genes_id, offset, limit):
-        return KeggApi.get_best_neighbors_by_gene(self, genes_id, offset,
-                                                  limit)
+        return KeggApi.get_best_neighbors_by_gene(self, genes_id, offset, limit)
 
     @cached_method
     def get_reverse_best_neighbors_by_gene(self, genes_id, offset, limit):
-        return KeggApi.get_reverse_best_neighbors_by_gene(self, genes_id,
-                                                          offset, limit)
+        return KeggApi.get_reverse_best_neighbors_by_gene(self, genes_id, offset, limit)
 
     @cached_method
     def get_paralogs_by_gene(self, genes_id, offset, limit):
@@ -557,8 +542,7 @@ class CachedKeggApi(KeggApi):
 
     @cached_method
     def get_genes_by_ko_class(self, ko_class_id, org, offset, limit):
-        return KeggApi.get_genes_by_ko_class(self, ko_class_id, org, offset,
-                                             limit)
+        return KeggApi.get_genes_by_ko_class(self, ko_class_id, org, offset, limit)
 
     @cached_method
     def get_genes_by_ko(self, ko_id, org):
@@ -570,8 +554,7 @@ class CachedKeggApi(KeggApi):
 
     @cached_method
     def get_genes_by_organism(self, organism, offset=None, limit=None):
-        return KeggApi.get_genes_by_organism(self, organism, offset=offset,
-                                             limit=limit)
+        return KeggApi.get_genes_by_organism(self, organism, offset=offset, limit=limit)
 
     @cached_method
     def get_number_of_genes_by_organism(self, organism):
@@ -640,7 +623,6 @@ class CachedKeggApi(KeggApi):
     @cached_method
     def get_genes_pathway_organism(self, org):
         return KeggApi.get_genes_pathway_organism(self, org)
-
 
 
 def match_by_ids(ids, entries):

@@ -1,14 +1,12 @@
 import unittest
-
-from os.path import normpath, basename
-
+from os.path import basename, normpath
 
 from Orange.data import Table
-from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher, GeneInfo, Gene, ENTREZ_ID
+
+from orangecontrib.bioinformatics.ncbi.gene import ENTREZ_ID, Gene, GeneInfo, GeneMatcher
 
 
 class TestGene(unittest.TestCase):
-
     def test_load_attributes(self):
         g = Gene()
         g.load_attributes(('Human', '9606', '920', 'CD4'), attributes=('species', 'tax_id', 'gene_id', 'symbol'))
@@ -36,7 +34,6 @@ class TestGene(unittest.TestCase):
 
 
 class TestGeneMatcher(unittest.TestCase):
-
     def test_synonym_multiple_matches(self):
         gm = GeneMatcher('9606')
         gm.genes = ['HB1']
@@ -91,7 +88,6 @@ class TestGeneMatcher(unittest.TestCase):
 
 
 class TestGeneInfo(unittest.TestCase):
-
     def test_gene_info(self):
         gi = GeneInfo('9606')
         gene = gi['6331']

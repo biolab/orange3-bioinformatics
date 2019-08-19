@@ -32,6 +32,7 @@ def entry_decorate(cls):
                 return field._convert()
             else:
                 return None
+
         return property(get, doc=name)
 
     def construct_multiple(name):
@@ -41,6 +42,7 @@ def entry_decorate(cls):
                 return [f._convert() for f in field]
             else:
                 return None
+
         return property(get, doc=name)
 
     for name, field in cls.FIELDS:
@@ -59,6 +61,7 @@ class DBEntry(object):
     """
     A DBGET entry object.
     """
+
     FIELDS = [("ENTRY", fields.DBEntryField)]
     MULTIPLE_FIELDS = []
 
@@ -132,8 +135,8 @@ class DBEntry(object):
             title = field.TITLE
             if title not in registered_fields:
                 import warnings
-                warnings.warn("Nonregisterd field %r in %r" % \
-                              (title, type(self)))
+
+                warnings.warn("Nonregisterd field %r in %r" % (title, type(self)))
 
             if title in multiple_fields:
                 if not hasattr(self, title):
@@ -149,8 +152,7 @@ class DBEntry(object):
         """
         Return a DBGET formated string representation.
         """
-        return "".join(f.format(section_indent)
-                       for f in self.fields)
+        return "".join(f.format(section_indent) for f in self.fields)
 
     def get(self, key, default=None):
         raise NotImplementedError

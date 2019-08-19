@@ -1,20 +1,16 @@
 """  Gene Ontology module """
 import os
-import tarfile
 import re
 import sys
-import six
+import tarfile
 import warnings
+from collections import namedtuple, defaultdict
 
-from collections import defaultdict
-from collections import namedtuple
+import six
 
-
-from orangecontrib.bioinformatics.utils import progress_bar_milestones, serverfiles, statistics
 from orangecontrib.bioinformatics.ncbi import taxonomy
-
-from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ANNOTATION, FILENAME_ONTOLOGY
-
+from orangecontrib.bioinformatics.utils import statistics, serverfiles, progress_bar_milestones
+from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY, FILENAME_ANNOTATION
 
 intern = sys.intern
 default_database_path = os.path.join(serverfiles.localpath(), "GO")
@@ -22,30 +18,30 @@ default_database_path = os.path.join(serverfiles.localpath(), "GO")
 _CVS_REVISION_RE = re.compile(r"^(rev)?(\d+\.\d+)+$")
 
 evidenceTypes = {
-        # Experimental
-        'EXP': 'Inferred from Experiment',
-        'IDA': 'Inferred from Direct Assay',
-        'IPI': 'Inferred from Physical Interaction',  # [with <database:protein_name>]',
-        'IMP': 'Inferred from Mutant Phenotype',
-        'IGI': 'Inferred from Genetic Interaction',  # [with <database:gene_symbol[allele_symbol]>]',
-        'IEP': 'Inferred from Expression Pattern',
-        # Computational Analysis Evidence Codes
-        'ISS': 'Inferred from Sequence Similarity',  # [with <database:sequence_id>] ',
-        'ISA': 'Inferred from Sequence Alignment',
-        'ISO': 'Inferred from Sequence Orthology',
-        'ISM': 'Inferred from Sequence Model',
-        'IGC': 'Inferred from Genomic Context',
-        'RCA': 'Inferred from Reviewed Computational Analysis',
-        # Author Statement Evidence Codes
-        'TAS': 'Traceable author statement',
-        'NAS': 'Non-traceable author statement',
-        # Curatorial Statement Evidence Codes
-        'IC': 'Inferred by curator',
-        'ND': 'No biological data available',
-        # Computationally-assigned Evidence Codes
-        'IEA': 'Inferred from electronic annotation',  # [to <database:id>]',
-        # Obsolete Evidence Codes
-        'NR': 'Not Recorded(Obsolete)'
+    # Experimental
+    'EXP': 'Inferred from Experiment',
+    'IDA': 'Inferred from Direct Assay',
+    'IPI': 'Inferred from Physical Interaction',  # [with <database:protein_name>]',
+    'IMP': 'Inferred from Mutant Phenotype',
+    'IGI': 'Inferred from Genetic Interaction',  # [with <database:gene_symbol[allele_symbol]>]',
+    'IEP': 'Inferred from Expression Pattern',
+    # Computational Analysis Evidence Codes
+    'ISS': 'Inferred from Sequence Similarity',  # [with <database:sequence_id>] ',
+    'ISA': 'Inferred from Sequence Alignment',
+    'ISO': 'Inferred from Sequence Orthology',
+    'ISM': 'Inferred from Sequence Model',
+    'IGC': 'Inferred from Genomic Context',
+    'RCA': 'Inferred from Reviewed Computational Analysis',
+    # Author Statement Evidence Codes
+    'TAS': 'Traceable author statement',
+    'NAS': 'Non-traceable author statement',
+    # Curatorial Statement Evidence Codes
+    'IC': 'Inferred by curator',
+    'ND': 'No biological data available',
+    # Computationally-assigned Evidence Codes
+    'IEA': 'Inferred from electronic annotation',  # [to <database:id>]',
+    # Obsolete Evidence Codes
+    'NR': 'Not Recorded(Obsolete)',
 }
 
 evidenceDict = defaultdict(int, [(e, 2 ** i) for i, e in enumerate(evidenceTypes.keys())])
@@ -73,63 +69,72 @@ evidenceTypesOrdered = [
     # Computationally-assigned Evidence Codes
     'IEA',
     # Obsolete Evidence Codes
-    'NR'
+    'NR',
 ]
 
 multiplicitySet = set(
-    ["alt_id", "is_a", "subset", "synonym", "related_synonym",
-     "exact_synonym", "broad_synonym", "narrow_synonym",
-     "xref_analog", "xref_unknown", "relationship"])
+    [
+        "alt_id",
+        "is_a",
+        "subset",
+        "synonym",
+        "related_synonym",
+        "exact_synonym",
+        "broad_synonym",
+        "narrow_synonym",
+        "xref_analog",
+        "xref_unknown",
+        "relationship",
+    ]
+)
 
 multipleTagSet = multiplicitySet
 
-builtinOBOObjects = ["""
+builtinOBOObjects = [
+    """
 [Typedef]
 id: is_a
 name: is_a
 range: OBO:TERM_OR_TYPE
 domain: OBO:TERM_OR_TYPE
-definition: The basic subclassing relationship [OBO:defs]"""
-,
-"""[Typedef]
+definition: The basic subclassing relationship [OBO:defs]""",
+    """[Typedef]
 id: disjoint_from
 name: disjoint_from
 range: OBO:TERM
 domain: OBO:TERM
-definition: Indicates that two classes are disjoint [OBO:defs]"""
-,
-"""[Typedef]
+definition: Indicates that two classes are disjoint [OBO:defs]""",
+    """[Typedef]
 id: instance_of
 name: instance_of
 range: OBO:TERM
 domain: OBO:INSTANCE
-definition: Indicates the type of an instance [OBO:defs]"""
-,
-"""[Typedef]
+definition: Indicates the type of an instance [OBO:defs]""",
+    """[Typedef]
 id: inverse_of
 name: inverse_of
 range: OBO:TYPE
 domain: OBO:TYPE
-definition: Indicates that one relationship type is the inverse of another [OBO:defs]"""
-,
-"""[Typedef]
+definition: Indicates that one relationship type is the inverse of another [OBO:defs]""",
+    """[Typedef]
 id: union_of
 name: union_of
 range: OBO:TERM
 domain: OBO:TERM
-definition: Indicates that a term is the union of several others [OBO:defs]"""
-,
-"""[Typedef]
+definition: Indicates that a term is the union of several others [OBO:defs]""",
+    """[Typedef]
 id: intersection_of
 name: intersection_of
 range: OBO:TERM
 domain: OBO:TERM
-definition: Indicates that a term is the intersection of several others [OBO:defs]"""]
+definition: Indicates that a term is the intersection of several others [OBO:defs]""",
+]
 
 
 class OBOObject:
     """ Represents a generic OBO object (e.g. Term, Typedef, Instance, ...)
     """
+
     _INTERN_TAGS = ["id", "name", "namespace", "alt_id", "is_a"]
 
     def __init__(self, stanza=None, ontology=None):
@@ -237,6 +242,7 @@ class Ontology:
         >>> term = ontology[term_ids[0]]
 
     """
+
     version = 1
 
     def __init__(self, filename=None, progress_callback=None):
@@ -313,8 +319,7 @@ class Ontology:
             for typeId, parent in term.related:
                 self.terms[parent].related_to.add((typeId, id))
             try:
-                self.alias_mapper.update([(alt_id, id)
-                                          for alt_id in term.alt_id])
+                self.alias_mapper.update([(alt_id, id) for alt_id in term.alt_id])
                 self.reverse_alias_mapper[id].update(term.alt_id)
             except AttributeError:
                 pass
@@ -328,8 +333,7 @@ class Ontology:
         :rtype: :class:`list` of :class:`str`
 
         """
-        return [line.split()[1] for line in self.header.splitlines()
-                if line.startswith("subsetdef:")]
+        return [line.split()[1] for line in self.header.splitlines() if line.startswith("subsetdef:")]
 
     def named_slims_subset(self, subset):
         """
@@ -341,8 +345,7 @@ class Ontology:
         .. seealso:: :func:`defined_slims_subsets`
 
         """
-        return [id for id, term in self.terms.items()
-                if subset in getattr(term, "subset", set())]
+        return [id for id, term in self.terms.items() if subset in getattr(term, "subset", set())]
 
     def set_slims_subset(self, subset):
         """
@@ -377,8 +380,7 @@ class Ontology:
             if term in self.slims_subset:
                 slims.add(term)
             else:
-                queue.update(set(tid for _, tid in self[term].related) -
-                             visited)
+                queue.update(set(tid for _, tid in self[term].related) - visited)
         return slims
 
     def extract_super_graph(self, terms):
@@ -394,8 +396,7 @@ class Ontology:
         while queue:
             term = queue.pop()
             visited.add(term)
-            queue.update(set(tid for _, tid in self[term].related) -
-                         visited)
+            queue.update(set(tid for _, tid in self[term].related) - visited)
         return visited
 
     def extract_sub_graph(self, terms):
@@ -411,8 +412,7 @@ class Ontology:
         while queue:
             term = queue.pop()
             visited.add(term)
-            queue.update(set(tid for _, tid in self[term].related_to) -
-                         visited)
+            queue.update(set(tid for _, tid in self[term].related_to) - visited)
         return visited
 
     def term_depth(self, term, cache_={}):
@@ -423,9 +423,7 @@ class Ontology:
 
         """
         if term not in cache_:
-            cache_[term] = min([self.term_depth(parent) + 1
-                                for _, parent in self[term].related] or
-                               [1])
+            cache_[term] = min([self.term_depth(parent) + 1 for _, parent in self[term].related] or [1])
         return cache_[term]
 
     def __getitem__(self, termid):
@@ -462,15 +460,10 @@ class Ontology:
         return termid in self.terms or termid in self.alias_mapper
 
 
-annotationFields = [
-    "tax_id", "gene_id", "go_id", "evidence", "qualifier", "go_term", "pubMed", "aspect"
-]
+annotationFields = ["tax_id", "gene_id", "go_id", "evidence", "qualifier", "go_term", "pubMed", "aspect"]
 
 
-_AnnotationRecordBase = namedtuple(
-    "AnnotationRecord",
-    annotationFields
-)
+_AnnotationRecordBase = namedtuple("AnnotationRecord", annotationFields)
 
 
 class AnnotationRecord(_AnnotationRecordBase):
@@ -480,6 +473,7 @@ class AnnotationRecord(_AnnotationRecordBase):
     if individual fields under <gene2go> section.
 
     """
+
     def __new__(cls, *args):
         if len(args) == 1 and isinstance(args[0], str):
             args = map(intern, args[0].split("\t"))
@@ -502,6 +496,7 @@ class Annotations:
     :type ontology: :class:`Ontology`
 
     """
+
     def __init__(self, organism, ontology=None, progress_callback=None, filename=None):
         #: A dictionary mapping a gene (gene_id) to a set of all annotations of that gene.
         self.gene_annotations = defaultdict(list)
@@ -523,9 +518,9 @@ class Annotations:
 
         if filename is None:
             try:
-                filename = serverfiles.localpath_download(DOMAIN,
-                                                          FILENAME_ANNOTATION.format(organism),
-                                                          progress_callback=progress_callback)
+                filename = serverfiles.localpath_download(
+                    DOMAIN, FILENAME_ANNOTATION.format(organism), progress_callback=progress_callback
+                )
             except FileNotFoundError:
                 raise taxonomy.UnknownSpeciesIdentifier(organism)
 
@@ -581,8 +576,9 @@ class Annotations:
         """
         if go_id not in self.all_annotations and go_id not in visited:
             if go_id in self.ontology.reverse_alias_mapper:
-                annotations = [self.term_anotations.get(alt_id, [])
-                               for alt_id in self.ontology.reverse_alias_mapper[go_id]] + [self.term_anotations[go_id]]
+                annotations = [
+                    self.term_anotations.get(alt_id, []) for alt_id in self.ontology.reverse_alias_mapper[go_id]
+                ] + [self.term_anotations[go_id]]
             else:
                 annotations = [self.term_anotations[go_id]]  # annotations for this term alone
             visited.add(go_id)
@@ -629,14 +625,17 @@ class Annotations:
     def genes(self):
         return set([ann.gene_id for ann in self.annotations])
 
-    def get_enriched_terms(self, genes,
-                           reference=None,
-                           evidence_codes=None,
-                           slims_only=False,
-                           aspect=None,
-                           prob=statistics.Binomial(),
-                           use_fdr=True,
-                           progress_callback=None):
+    def get_enriched_terms(
+        self,
+        genes,
+        reference=None,
+        evidence_codes=None,
+        slims_only=False,
+        aspect=None,
+        prob=statistics.Binomial(),
+        use_fdr=True,
+        progress_callback=None,
+    ):
         """
         Return a dictionary of enriched terms, with tuples of
         (list_of_genes, p_value, reference_count) for items and term
@@ -655,7 +654,7 @@ class Annotations:
         """
 
         all_genes = set(genes)
-        
+
         if aspect is None:
             aspects_set = {'Process', 'Component', 'Function'}
         elif isinstance(aspect, str):
@@ -667,11 +666,21 @@ class Annotations:
             reference = self.genes()
 
         evidence_codes = set(evidence_codes or evidenceDict.keys())
-        annotations = [ann for gene in genes for ann in self.gene_annotations[gene]
-                       if ann.evidence in evidence_codes and ann.aspect in aspects_set]
+        annotations = [
+            ann
+            for gene in genes
+            for ann in self.gene_annotations[gene]
+            if ann.evidence in evidence_codes and ann.aspect in aspects_set
+        ]
 
-        ref_annotations = set([ann for gene in reference for ann in self.gene_annotations[gene]
-                               if ann.evidence in evidence_codes and ann.aspect in aspects_set])
+        ref_annotations = set(
+            [
+                ann
+                for gene in reference
+                for ann in self.gene_annotations[gene]
+                if ann.evidence in evidence_codes and ann.aspect in aspects_set
+            ]
+        )
 
         annotations_dict = defaultdict(set)
         for ann in annotations:
@@ -688,8 +697,10 @@ class Annotations:
 
         if len(terms) != len(filtered_terms):
             term_diff = set(terms) - set(filtered_terms)
-            warnings.warn("%s terms in the annotations were not found in the "
-                          "ontology." % ",".join(map(repr, term_diff)), UserWarning)
+            warnings.warn(
+                "%s terms in the annotations were not found in the " "ontology." % ",".join(map(repr, term_diff)),
+                UserWarning,
+            )
 
         terms = self.ontology.extract_super_graph(filtered_terms)
         res = {}
@@ -708,21 +719,23 @@ class Annotations:
             else:
                 mapped_reference_genes = all_annotated_genes.intersection(reference)
 
-            res[term] = ([gene for gene in mapped_genes],
-                         prob.p_value(len(mapped_genes),
-                                      len(reference),
-                                      len(mapped_reference_genes),
-                                      len(genes)),
-                                      len(mapped_reference_genes))
+            res[term] = (
+                [gene for gene in mapped_genes],
+                prob.p_value(len(mapped_genes), len(reference), len(mapped_reference_genes), len(genes)),
+                len(mapped_reference_genes),
+            )
 
             if progress_callback and i in milestones:
                 progress_callback(100.0 * i / len(terms))
 
         if use_fdr:
             res = sorted(res.items(), key=lambda x: x[1][1])
-            res = dict([(id, (genes, p, ref))
-                        for (id, (genes, _, ref)), p in
-                        zip(res, statistics.FDR([p for _, (_, p, _) in res]))])
+            res = dict(
+                [
+                    (id, (genes, p, ref))
+                    for (id, (genes, _, ref)), p in zip(res, statistics.FDR([p for _, (_, p, _) in res]))
+                ]
+            )
         return res
 
     def get_annotated_terms(self, genes, direct_annotation_only=False, evidence_codes=None, progress_callback=None):
@@ -745,8 +758,10 @@ class Annotations:
             filtered_terms = [term for term in terms if term in self.ontology]
             if len(terms) != len(filtered_terms):
                 term_diff = set(terms) - set(filtered_terms)
-                warnings.warn("%s terms in the annotations were not found in the " 
-                              "ontology." % ",".join(map(repr, term_diff)), UserWarning)
+                warnings.warn(
+                    "%s terms in the annotations were not found in the " "ontology." % ",".join(map(repr, term_diff)),
+                    UserWarning,
+                )
 
             terms = self.ontology.extract_super_graph(filtered_terms)
             for i, term in enumerate(terms):
@@ -757,8 +772,7 @@ class Annotations:
     def __add__(self, iterable):
         """ Return a new Annotations object with combined annotations
         """
-        return Annotations([a for a in self] + [a for a in iterable],
-                           ontology=self.ontology)
+        return Annotations([a for a in self] + [a for a in iterable], ontology=self.ontology)
 
     def __iadd__(self, iterable):
         """ Add annotations to this instance

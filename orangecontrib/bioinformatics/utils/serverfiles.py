@@ -1,7 +1,7 @@
 """ServerFiles"""
 import os
-import serverfiles
 
+import serverfiles
 
 from orangecontrib.bioinformatics.utils import local_cache
 
@@ -10,7 +10,6 @@ server_url = f'https://download.biolab.si/datasets/bioinformatics/{version}/'
 
 
 class ServerFiles(serverfiles.ServerFiles):
-
     def __init__(self, server=server_url):
         serverfiles.ServerFiles.__init__(self, server)
 
@@ -22,7 +21,7 @@ LOCALFILES = serverfiles.LocalFiles(PATH, serverfiles=ServerFiles())
 def localpath(*args, **kwargs):
     return LOCALFILES.localpath(*args, **kwargs)
 
-    
+
 def listfiles(*args):
     files = serverfiles.LocalFiles(PATH, serverfiles=ServerFiles())
     return files.listfiles(*args)

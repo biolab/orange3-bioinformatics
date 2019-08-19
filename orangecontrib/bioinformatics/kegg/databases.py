@@ -5,13 +5,12 @@ DBGET Database Interface
 """
 from __future__ import absolute_import
 
-import sys
 import re
+import sys
 from contextlib import closing
 
-from orangecontrib.bioinformatics.kegg import entry
+from orangecontrib.bioinformatics.kegg import api, entry
 from orangecontrib.bioinformatics.kegg.entry import fields
-from orangecontrib.bioinformatics.kegg import api
 
 
 def iter_take(source_iter, n):
@@ -58,6 +57,7 @@ class DBDataBase(object):
     Base class for a DBGET database interface.
 
     """
+
     #: ENTRY_TYPE constructor (a :class:`~.entry.DBEntry` subclass). This
     #: should be redefined in subclasses.
     ENTRY_TYPE = entry.DBEntry
@@ -69,17 +69,16 @@ class DBDataBase(object):
 
     def __init__(self, **kwargs):
         if not self.DB:
-            raise TypeError("Cannot make an instance of abstract base "
-                            "class %r." % type(self).__name__)
+            raise TypeError("Cannot make an instance of abstract base " "class %r." % type(self).__name__)
 
         self.api = api.CachedKeggApi()
         self._info = None
-        #TODO invalidate cache by KEGG release
-        #self.api.set_default_release(self.info.release)
+        # TODO invalidate cache by KEGG release
+        # self.api.set_default_release(self.info.release)
         self._keys = []
 
     @property
-    def info(self): #lazy info loading
+    def info(self):  # lazy info loading
         if not self._info:
             self._info = self.api.info(self.DB)
         return self._info
@@ -96,8 +95,7 @@ class DBDataBase(object):
         """
         batch_size = 100
         iterkeys = self.iterkeys()
-        return chain_iter(zip(batch, self.batch_get(batch))
-                          for batch in batch_iter(iterkeys, batch_size))
+        return chain_iter(zip(batch, self.batch_get(batch)) for batch in batch_iter(iterkeys, batch_size))
 
     def itervalues(self):
         """
@@ -105,10 +103,10 @@ class DBDataBase(object):
         """
         batch_size = 100
         iterkeys = self.iterkeys()
-        return chain_iter(self.batch_get(batch)
-                          for batch in batch_iter(iterkeys, batch_size))
+        return chain_iter(self.batch_get(batch) for batch in batch_iter(iterkeys, batch_size))
 
-    if sys.version_info < (3, ):
+    if sys.version_info < (3,):
+
         def keys(self):
             """
             Return a list of database keys. These are unique KEGG identifiers
@@ -130,6 +128,7 @@ class DBDataBase(object):
             return list(zip(self.keys(), self.batch_get(self.keys())))
 
     else:
+
         def keys(self):
             """
             Return an iterator over all database keys. These are unique
@@ -227,15 +226,17 @@ class DBDataBase(object):
         # drop all keys with a valid cache entry to minimize the number
         # of 'get' requests.
         with closing(get.cache_store()) as store:
+
             def is_uncached(key):
                 cache_key = get.key_from_args((key,))
                 return not get.key_has_valid_cache(cache_key, store)
+
             keys = [key for key in keys if is_uncached(key)]
 
         start = 0
 
         while start < len(keys):
-            batch = keys[start: start + batch_size]
+            batch = keys[start : start + batch_size]
             self.api.get(batch)
 
             if progress_callback:
@@ -259,7 +260,7 @@ class DBDataBase(object):
 
         start = 0
         while start < len(keys):
-            batch = keys[start: start + batch_size]
+            batch = keys[start : start + batch_size]
             batch_entries = self.api.get(batch)
             if batch_entries is not None:
                 batch_entries = batch_entries.split("///\n")
@@ -285,6 +286,7 @@ class GenomeEntry(entry.DBEntry):
     """
     Entry for a KEGG Genome database.
     """
+
     FIELDS = [
         ("ENTRY", fields.DBEntryField),
         ("NAME", fields.DBNameField),
@@ -299,7 +301,7 @@ class GenomeEntry(entry.DBEntry):
         ("CHROMOSOME", fields.DBFieldWithSubsections),
         ("PLASMID", fields.DBSimpleField),
         ("STATISTICS", fields.DBSimpleField),
-        ("REFERENCE", fields.DBReference)
+        ("REFERENCE", fields.DBReference),
     ]
 
     MULTIPLE_FIELDS = ["REFERENCE"]
@@ -330,14 +332,15 @@ class Genome(DBDataBase):
     """
     An interface to the A KEGG GENOME database.
     """
+
     DB = "genome"
     ENTRY_TYPE = GenomeEntry
 
     # For obiTaxonomy.common_taxids mapping
     TAXID_MAP = {
-        "562": "511145",   # Escherichia coli K-12 MG1655
+        "562": "511145",  # Escherichia coli K-12 MG1655
         "2104": "272634",  # Mycoplasma pneumoniae M129
-        "4530": "39947",   # Oryza sativa ssp. japonica cultivar Nipponbare (Japanese rice)
+        "4530": "39947",  # Oryza sativa ssp. japonica cultivar Nipponbare (Japanese rice)
         "4932": "559292",  # Saccharomyces cerevisiae S288C
         "4896": "284812",  # Schizosaccharomyces pombe 972h-
     }
@@ -358,9 +361,26 @@ class Genome(DBDataBase):
 
     @classmethod
     def common_organisms(cls):
-        return ['ath', 'bta', 'cel', 'cre', 'dre', 'ddi',
-                'dme', 'eco', 'hsa', 'mmu', 'mpn', 'osa',
-                'pfa', 'rno', 'sce', 'spo', 'zma', 'xla']
+        return [
+            'ath',
+            'bta',
+            'cel',
+            'cre',
+            'dre',
+            'ddi',
+            'dme',
+            'eco',
+            'hsa',
+            'mmu',
+            'mpn',
+            'osa',
+            'pfa',
+            'rno',
+            'sce',
+            'spo',
+            'zma',
+            'xla',
+        ]
 
     @classmethod
     def essential_organisms(cls):
@@ -417,14 +437,15 @@ class GeneEntry(entry.DBEntry):
         ("STRUCTURE", fields.DBSimpleField),
         ("POSITION", fields.DBSimpleField),
         ("AASEQ", fields.DBAASeq),
-        ("NTSEQ", fields.DBNTSeq)
+        ("NTSEQ", fields.DBNTSeq),
     ]
 
     def aliases(self):
-        return [self.entry_key] + \
-               (self.name.split(",") if self.name else []) + \
-               ([link[1][0] for link in self.dblinks.items()]
-                if self.dblinks else [])
+        return (
+            [self.entry_key]
+            + (self.name.split(",") if self.name else [])
+            + ([link[1][0] for link in self.dblinks.items()] if self.dblinks else [])
+        )
 
     @property
     def alt_names(self):
@@ -441,6 +462,7 @@ class Genes(DBDataBase):
     :param str org_code: KEGG organism code (e.g. 'hsa').
 
     """
+
     DB = None  # Needs to be set in __init__
     ENTRY_TYPE = GeneEntry
 
@@ -454,10 +476,7 @@ class Genes(DBDataBase):
     def gene_aliases(self):
         aliases = {}
         for entry in self.itervalues():
-            aliases.update(
-                dict.fromkeys(entry.aliases(),
-                              self.org_code + ":" + entry.entry_key)
-            )
+            aliases.update(dict.fromkeys(entry.aliases(), self.org_code + ":" + entry.entry_key))
 
         return aliases
 
@@ -479,7 +498,7 @@ class CompoundEntry(entry.DBEntry):
         ("REFERENCE", fields.DBSimpleField),
         ("DBLINKS", fields.DBDBLinks),
         ("ATOM", fields.DBSimpleField),
-        ("BOND", fields.DBSimpleField)
+        ("BOND", fields.DBSimpleField),
     ]
 
 
@@ -499,7 +518,7 @@ class ReactionEntry(entry.DBEntry):
         ("NAME", fields.DBNameField),
         ("DEFINITION", fields.DBDefinitionField),
         ("EQUATION", fields.DBSimpleField),
-        ("ENZYME", fields.DBSimpleField)
+        ("ENZYME", fields.DBSimpleField),
     ]
 
 
@@ -540,7 +559,7 @@ class EnzymeEntry(entry.DBEntry):
         ("PATHWAY", fields.DBPathway),
         ("ORTHOLOGY", fields.DBSimpleField),
         ("GENES", fields.DBSimpleField),
-        ("DBLINKS", fields.DBDBLinks)
+        ("DBLINKS", fields.DBDBLinks),
     ]
 
     MULTIPLE_FIELDS = ["REFERENCE"]
@@ -623,14 +642,14 @@ class Pathway(DBDataBase):
         KEGG Organism code ('hsa', ...) or 'map', 'ko', 'ec' or 'rn'
 
     """
+
     DB = "path"
     ENTRY_TYPE = PathwayEntry
 
     def __init__(self, prefix="map"):
         DBDataBase.__init__(self)
         self.prefix = prefix
-        valid = [d.org_code for d in self.api.list_organisms()] + \
-                ["map", "ko", "ec", "rn"]
+        valid = [d.org_code for d in self.api.list_organisms()] + ["map", "ko", "ec", "rn"]
 
         if prefix not in valid:
             raise ValueError("Invalid prefix %r" % prefix)

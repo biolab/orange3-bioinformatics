@@ -1,6 +1,7 @@
 import unittest
-import scipy.stats
+
 import numpy as np
+import scipy.stats
 
 from orangecontrib.bioinformatics.widgets.OWDifferentialExpression import f_oneway
 
@@ -30,8 +31,7 @@ class TestFOneWay(unittest.TestCase):
         self.assertEqual(F.shape, (10,))
         self.assertEqual(P.shape, (10,))
 
-        FP1 = [scipy.stats.f_oneway(g1, g2, g3)
-               for g1, g2, g3 in zip(G1, G2, G3)]
+        FP1 = [scipy.stats.f_oneway(g1, g2, g3) for g1, g2, g3 in zip(G1, G2, G3)]
 
         F1 = [f for f, _ in FP1]
         P1 = [p for _, p in FP1]

@@ -2,7 +2,6 @@ DOMAIN = 'gene_sets'
 GENE_SET_ATTRIBUTES = ('gs_id', 'hierarchy', 'organism', 'name', 'genes', 'description', 'link')
 
 
-
 # cytoband
 CYTOBAND_DOWNLOAD_LINK = 'http://statweb.stanford.edu/~tibs/GSA/cytobands-stanford.gmt'
 

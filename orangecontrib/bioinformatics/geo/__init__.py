@@ -9,9 +9,11 @@ a bioinformatics knowledge base (we can't use bioinformatics.utils.serverfiles m
 import os
 import json
 
-from serverfiles import ServerFiles, LocalFiles
+from serverfiles import LocalFiles, ServerFiles
+
+from Orange.data import Table, Domain, DiscreteVariable
+from Orange.data import filter as table_filter
 from Orange.misc.environ import data_dir
-from Orange.data import Table, DiscreteVariable, Domain, filter as table_filter
 
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
@@ -78,9 +80,7 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
         _class_values = list(set(class_values))
         map_class_values = dict((value, key) for (key, value) in enumerate(_class_values))
         class_var = DiscreteVariable(name='class', values=_class_values)
-        _domain = Domain(table.domain.attributes,
-                         table.domain.class_vars + (class_var, ),
-                         table.domain.metas)
+        _domain = Domain(table.domain.attributes, table.domain.class_vars + (class_var,), table.domain.metas)
 
         table = table.transform(_domain)
         col, _ = table.get_column_view(class_var)

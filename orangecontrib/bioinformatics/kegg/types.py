@@ -4,14 +4,10 @@ Return types from api classes interface for the SOAP kegg api.
 """
 
 from datetime import datetime
-from collections import namedtuple
 from operator import methodcaller
+from collections import namedtuple
 
-Definition = namedtuple(
-    "Definition",
-    ["entry_id",
-     "definition"]
-)
+Definition = namedtuple("Definition", ["entry_id", "definition"])
 
 
 def _Definition_from_items(items):
@@ -40,32 +36,19 @@ Definition.from_items = staticmethod(_Definition_from_items)
 Definition.from_str = staticmethod(_Definition_from_str)
 
 
-OrganismSummary = namedtuple(
-    "OrganismSummary",
-    ["entry_id",
-     "org_code",
-     "name",
-     "lineage"],
-)
+OrganismSummary = namedtuple("OrganismSummary", ["entry_id", "org_code", "name", "lineage"])
 
 
 def OrganismSummary_from_str(string):
-    #string = string.decode("utf8")
+    # string = string.decode("utf8")
     return OrganismSummary(*string.split("\t"))
+
 
 OrganismSummary.from_str = staticmethod(OrganismSummary_from_str)
 
 
 BInfo = namedtuple(
-    'BInfo',
-    ["entry_id",
-    "definition",
-    "name",
-    "release",
-    "curator",
-    "contents",
-    "last_update",
-    "supported_formats"]
+    'BInfo', ["entry_id", "definition", "name", "release", "curator", "contents", "last_update", "supported_formats"]
 )
 
 
@@ -80,8 +63,8 @@ def _BInfo_from_text(text):
     curator = lines[2].strip()
     contents = "\n".join(map(methodcaller("strip"), lines[3:]))
 
-    return BInfo(entry_id, definition, name, release, curator,
-                 contents, None, None)
+    return BInfo(entry_id, definition, name, release, curator, contents, None, None)
+
 
 BInfo.from_text = staticmethod(_BInfo_from_text)
 
@@ -90,57 +73,35 @@ Link = namedtuple("Link", ["entry_id1", "entry_id2"])
 
 
 SSDBRelation = namedtuple(
-    "SSDBRelation", ["genes_id1",
-                     "genes_id2",
-                     "sw_score",
-                     "bit_score",
-                     "identity",
-                     "overlap",
-                     "start_position1",
-                     "end_position1",
-                     "start_position2",
-                     "end_position2",
-                     "best_flag_1to2",
-                     "best_flag_2to1",
-                     "definition1",
-                     "definition2",
-                     "length1",
-                     "length2"
-                     ])
+    "SSDBRelation",
+    [
+        "genes_id1",
+        "genes_id2",
+        "sw_score",
+        "bit_score",
+        "identity",
+        "overlap",
+        "start_position1",
+        "end_position1",
+        "start_position2",
+        "end_position2",
+        "best_flag_1to2",
+        "best_flag_2to1",
+        "definition1",
+        "definition2",
+        "length1",
+        "length2",
+    ],
+)
 
 MotifResult = namedtuple(
-    "MotifResult", ["motif_id",
-                    "definition",
-                    "genes_id",
-                    "start_position",
-                    "end_position",
-                    "score",
-                    "evalue"
-                    ])
+    "MotifResult", ["motif_id", "definition", "genes_id", "start_position", "end_position", "score", "evalue"]
+)
 
-LinkDBRelation = namedtuple(
-    "LinkDBRelation", ["entry_id1",
-                       "entry_id2",
-                       "type",
-                       "path"
-                       ])
+LinkDBRelation = namedtuple("LinkDBRelation", ["entry_id1", "entry_id2", "type", "path"])
 
-PathwayElement = namedtuple(
-    "PathwayElement", ["element_id",
-                       "type",
-                       "names",
-                       "components"
-                       ])
+PathwayElement = namedtuple("PathwayElement", ["element_id", "type", "names", "components"])
 
-PathwayElementRelation = namedtuple(
-    "PathwayElementRelation", ["element_id1",
-                               "element_id2",
-                               "type",
-                               "subtypes"
-                               ])
+PathwayElementRelation = namedtuple("PathwayElementRelation", ["element_id1", "element_id2", "type", "subtypes"])
 
-Subtype = namedtuple(
-    "Subtype", ["element_id",
-                "relation",
-                "type",
-                ])
+Subtype = namedtuple("Subtype", ["element_id", "relation", "type"])

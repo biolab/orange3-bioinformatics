@@ -1,28 +1,25 @@
 # Test methods with long descriptive names can omit docstrings
 # pylint: disable=missing-docstring,arguments-differ
-from itertools import chain
 import unittest
+from itertools import chain
 from unittest.mock import Mock
 
 import numpy as np
 
-from Orange.data import Table, Variable, Domain
-from Orange.data.filter import FilterString, Values
+from Orange.data import Table, Domain, Variable
 from Orange.projection import PCA
-from Orange.widgets.tests.base import WidgetTest, WidgetOutputsTestMixin, \
-    ProjectionWidgetTestMixin, simulate
+from Orange.data.filter import Values, FilterString
+from Orange.widgets.tests.base import WidgetTest, WidgetOutputsTestMixin, ProjectionWidgetTestMixin, simulate
 from Orange.widgets.unsupervised.owtsne import OWtSNE
 
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics.widgets.OWAnnotateProjection import \
-    OWAnnotateProjection
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
+from orangecontrib.bioinformatics.widgets.OWAnnotateProjection import OWAnnotateProjection
 
 test_timeout_setting = 50000
 
 
-class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
-                               WidgetOutputsTestMixin):
+class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutputsTestMixin):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -32,8 +29,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         cls.signal_data = cls.data
         cls.same_input_output_domain = False
 
-        genes_path = serverfiles.localpath_download(
-            "marker_genes", "panglao_gene_markers.tab")
+        genes_path = serverfiles.localpath_download("marker_genes", "panglao_gene_markers.tab")
         filter_ = FilterString("Organism", FilterString.Equal, "Human")
         cls.genes = Values([filter_])(Table(genes_path))
         cls.genes.attributes[TAX_ID] = "9606"
@@ -48,8 +44,11 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         pca = PCA(n_components=2)
         model = pca(ref_data)
         proj = model(ref_data)
-        domain = Domain(ref_data.domain.attributes, ref_data.domain.class_vars,
-                        chain(ref_data.domain.metas, proj.domain.attributes))
+        domain = Domain(
+            ref_data.domain.attributes,
+            ref_data.domain.class_vars,
+            chain(ref_data.domain.metas, proj.domain.attributes),
+        )
         cls.data = ref_data.transform(domain)
         cls.reference_data = ref_data
         cls.secondary_data = table_data[1:200:2]
@@ -62,8 +61,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         self.wait_until_stop_blocking(wait=test_timeout_setting)
 
     def test_input_secondary_data(self):
-        self.send_signal(self.widget.Inputs.secondary_data,
-                         self.secondary_data)
+        self.send_signal(self.widget.Inputs.secondary_data, self.secondary_data)
         self.wait_until_stop_blocking(wait=test_timeout_setting)
         self.assertTrue(self.widget.Error.no_reference_data.is_shown())
 
@@ -162,13 +160,12 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         n_metas = len(self.data.domain.metas)
         self.assertGreater(len(output.domain.metas), n_metas + 4)
         self.assertListEqual(
-            ["Clusters", "Annotation"] +
-            [m.name for m in self.data.domain.metas] + ["Selected"],
-            [m.name for m in output.domain.metas[-n_metas-3:]])
+            ["Clusters", "Annotation"] + [m.name for m in self.data.domain.metas] + ["Selected"],
+            [m.name for m in output.domain.metas[-n_metas - 3 :]],
+        )
         np.testing.assert_array_equal(output.X, self.data.X)
         np.testing.assert_array_equal(output.Y, self.data.Y)
-        np.testing.assert_array_equal(output.metas[:, -n_metas - 1:-1],
-                                      self.data.metas)
+        np.testing.assert_array_equal(output.metas[:, -n_metas - 1 : -1], self.data.metas)
 
     def test_button_no_data(self):
         self.widget.run_button.click()
@@ -212,16 +209,14 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
 
         self.widget.graph.select_by_indices(list(range(0, len(self.data), 10)))
         settings = self.widget.settingsHandler.pack_data(self.widget)
-        widget = self.create_widget(self.widget.__class__,
-                                    stored_settings=settings)
+        widget = self.create_widget(self.widget.__class__, stored_settings=settings)
 
         self.send_signal(widget.Inputs.genes, self.genes)
         self.send_signal(widget.Inputs.data, self.data, widget=widget)
         self.wait_until_stop_blocking(widget=widget, wait=test_timeout_setting)
 
         self.assertEqual(np.sum(widget.graph.selection), 50)
-        np.testing.assert_equal(self.widget.graph.selection,
-                                widget.graph.selection)
+        np.testing.assert_equal(self.widget.graph.selection, widget.graph.selection)
 
     def test_outputs(self, timeout=test_timeout_setting):
         self.send_signal(self.widget.Inputs.genes, self.genes)
@@ -234,20 +229,17 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
         self.assertTrue(self.widget.controls.attr_color.isEnabled())
 
         simulate.combobox_activate_index(self.widget.controls.attr_color, 0)
-        is_grey = [brush.color().name() == "#808080" for brush in
-                   self.widget.graph.scatterplot_item.data['brush']]
+        is_grey = [brush.color().name() == "#808080" for brush in self.widget.graph.scatterplot_item.data['brush']]
         self.assertTrue(all(is_grey))
         self.widget.controls.color_by_cluster.click()
         self.assertFalse(self.widget.controls.attr_color.isEnabled())
-        is_not_grey = [brush.color().name() != "#808080" for brush in
-                       self.widget.graph.scatterplot_item.data['brush']]
+        is_not_grey = [brush.color().name() != "#808080" for brush in self.widget.graph.scatterplot_item.data['brush']]
         self.assertTrue(any(is_not_grey))
 
     def test_attr_label_metas(self, timeout=test_timeout_setting):
         self.send_signal(self.widget.Inputs.data, self.data)
         self.wait_until_stop_blocking(wait=test_timeout_setting)
-        simulate.combobox_activate_item(self.widget.controls.attr_label,
-                                        self.data.domain[-1].name)
+        simulate.combobox_activate_item(self.widget.controls.attr_label, self.data.domain[-1].name)
 
     def test_attr_models(self, timeout=test_timeout_setting):
         self.send_signal(self.widget.Inputs.data, self.data)
@@ -268,8 +260,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
                 self.assertIn(var, controls.attr_shape.model())
 
     def test_subset_data_color(self, timeout=test_timeout_setting):
-        self.assertRaises(AttributeError,
-                          lambda: self.widget.Inputs.data_subset)
+        self.assertRaises(AttributeError, lambda: self.widget.Inputs.data_subset)
 
     def test_sparse_data(self, timeout=test_timeout_setting):
         table = Table("iris").to_sparse()
@@ -293,16 +284,14 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin,
 
     def test_tsne_output(self):
         owtsne = self.create_widget(OWtSNE)
-        self.send_signal(
-            owtsne.Inputs.data, self.reference_data, widget=owtsne)
+        self.send_signal(owtsne.Inputs.data, self.reference_data, widget=owtsne)
         self.wait_until_stop_blocking(widget=owtsne, wait=test_timeout_setting)
         tsne_output = self.get_output(owtsne.Outputs.annotated_data, owtsne)
 
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, tsne_output)
         self.wait_until_stop_blocking(wait=test_timeout_setting)
-        self.send_signal(self.widget.Inputs.secondary_data,
-                         self.secondary_data)
+        self.send_signal(self.widget.Inputs.secondary_data, self.secondary_data)
 
 
 if __name__ == "__main__":

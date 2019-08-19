@@ -3,7 +3,7 @@ import unittest
 
 from Orange.data import Table
 
-from orangecontrib.bioinformatics.geo.dataset import GDSInfo, GDS
+from orangecontrib.bioinformatics.geo.dataset import GDS, GDSInfo
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
 

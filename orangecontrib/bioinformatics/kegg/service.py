@@ -3,6 +3,8 @@
 """
 from __future__ import absolute_import
 
+from . import conf
+
 REST_API = "http://rest.kegg.jp/"
 
 
@@ -11,6 +13,7 @@ def slumber_service():
     Return a rest based service using `slumber` package
     """
     import slumber
+
     if not hasattr(slumber_service, "_cached"):
 
         class DecodeSerializer(slumber.serialize.BaseSerializer):
@@ -21,13 +24,10 @@ def slumber_service():
                 return data
 
         # for python 2/3 compatibility
-        serializer = slumber.serialize.Serializer(
-            default="decode", serializers=[DecodeSerializer()])
+        serializer = slumber.serialize.Serializer(default="decode", serializers=[DecodeSerializer()])
         slumber_service._cached = slumber.API(REST_API, serializer=serializer)
     return slumber_service._cached
 
-
-from . import conf
 
 default_service = slumber_service
 

@@ -1,18 +1,14 @@
-import unittest
 import os
+import unittest
 
-from Orange.widgets.tests.base import WidgetTest
 from Orange.data import Table
-
+from Orange.widgets.tests.base import WidgetTest
 
 from orangecontrib.bioinformatics.widgets.OWGenes import OWGenes
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    TAX_ID, GENE_AS_ATTRIBUTE_NAME, GENE_ID_COLUMN
-)
+from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
 
 
 class TestOWGenes(WidgetTest):
-
     def setUp(self):
         self._path = os.path.join(os.path.dirname(__file__), 'data')
         self.widget = self.create_widget(OWGenes)
