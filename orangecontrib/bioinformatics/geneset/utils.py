@@ -4,7 +4,6 @@ from typing import List, Tuple, NamedTuple
 import numpy as np
 
 from orangecontrib.bioinformatics.utils import ensure_type
-from orangecontrib.bioinformatics.geneset.config import GENE_SET_ATTRIBUTES
 from orangecontrib.bioinformatics.utils.statistics import Hypergeometric
 
 
@@ -45,6 +44,7 @@ def filename_parse(fn):  # type: (str) -> (Tuple[Tuple[str, str], str])
     return hierarchy, org
 
 
+GENE_SET_ATTRIBUTES = ('gs_id', 'hierarchy', 'organism', 'name', 'genes', 'description', 'link')
 HYPERGEOMETRIC = Hypergeometric()
 
 # change this when python 3.4 is not supported anymore
@@ -156,7 +156,7 @@ class GeneSets(set):
         if len(self) == 0:
             raise GeneSetException("Empty gene sets.")
 
-        organisms = set(g_set.organism for g_set in self)
+        organisms = {g_set.organism for g_set in self}
         if not len(organisms) == 1:
             raise GeneSetException("multiple organisms in a set " + str(organisms))
         else:
@@ -165,7 +165,7 @@ class GeneSets(set):
 
     def hierarchies(self):
         """ Return all hierarchies. """
-        return set(g_set.hierarchy for g_set in self)
+        return {g_set.hierarchy for g_set in self}
 
     def common_hierarchy(self):
         """ Return a common hierarchy. """
@@ -244,7 +244,7 @@ class GeneSets(set):
                 columns = [column.strip() for column in line.split('\t')]
                 gs_info = columns[1].split(',')
                 hierarchy = tuple(gs_info[index['hierarchy']].split('-'))
-                genes = set([str(gene) for gene in columns[2:]])
+                genes = {str(gene) for gene in columns[2:]}
 
                 gene_set = GeneSet(
                     gs_id=columns[0],

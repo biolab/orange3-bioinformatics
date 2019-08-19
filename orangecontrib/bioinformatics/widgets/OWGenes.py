@@ -108,7 +108,7 @@ class GeneInfoModel(itemmodels.PyTableModel):
         index,
         role,
         _str=str,
-        _Qt_DisplayRole=Qt.DisplayRole,
+        _Qt_DisplayRole=Qt.DisplayRole,  # noqa: N803
         _Qt_EditRole=Qt.EditRole,
         _Qt_FontRole=Qt.FontRole,
         _Qt_ForegroundRole=Qt.ForegroundRole,

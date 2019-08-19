@@ -74,8 +74,8 @@ class TestTaxonomy(unittest.TestCase):
         self.assertIn('1131344', search_result)
 
         # subnodes are included
-        self.assertIn(neanderthal.tax_id, taxonomy.search('Homo sapiens', onlySpecies=False))
-        self.assertIn(denisovan.tax_id, taxonomy.search('Homo sapiens', onlySpecies=False))
+        self.assertIn(neanderthal.tax_id, taxonomy.search('Homo sapiens', only_species=False))
+        self.assertIn(denisovan.tax_id, taxonomy.search('Homo sapiens', only_species=False))
 
 
 if __name__ == '__main__':

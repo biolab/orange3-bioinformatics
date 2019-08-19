@@ -63,7 +63,6 @@ class OWdictyExpress(OWWidget):
 
     username = settings.Setting('')
     # password = settings.Setting('')
-    setTimeVariable = settings.Setting(False)
     gene_as_attr_name = settings.Setting(0)
 
     selected_item = settings.Setting(None, schema_only=True)
@@ -133,7 +132,7 @@ class OWdictyExpress(OWWidget):
 
         self.experimentsWidget.setItemDelegateForColumn(0, gui.IndicatorItemDelegate(self, role=Qt.DisplayRole))
 
-        self.experimentsWidget.selectionModel().selectionChanged.connect(self.onSelectionChanged)
+        self.experimentsWidget.selectionModel().selectionChanged.connect(self.on_selection_changed)
 
         self.experimentsWidget.setHeaderLabels(self.headerLabels)
         self.mainArea.layout().addWidget(self.experimentsWidget)
@@ -233,7 +232,7 @@ class OWdictyExpress(OWWidget):
             if self.selected_item and item.gen_data_id == self.selected_item:
                 self.experimentsWidget.setCurrentItem(item)
 
-    def onSelectionChanged(self):
+    def on_selection_changed(self):
         self.invalidate()
 
     def invalidate(self):

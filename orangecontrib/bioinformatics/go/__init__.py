@@ -13,11 +13,11 @@ from orangecontrib.bioinformatics.utils import statistics, serverfiles, progress
 from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY, FILENAME_ANNOTATION
 
 intern = sys.intern
-default_database_path = os.path.join(serverfiles.localpath(), "GO")
+default_database_path = os.path.join(serverfiles.localpath(), DOMAIN)
 
 _CVS_REVISION_RE = re.compile(r"^(rev)?(\d+\.\d+)+$")
 
-evidenceTypes = {
+evidence_types = {
     # Experimental
     'EXP': 'Inferred from Experiment',
     'IDA': 'Inferred from Direct Assay',
@@ -44,9 +44,9 @@ evidenceTypes = {
     'NR': 'Not Recorded(Obsolete)',
 }
 
-evidenceDict = defaultdict(int, [(e, 2 ** i) for i, e in enumerate(evidenceTypes.keys())])
+evidence_dict = defaultdict(int, [(e, 2 ** i) for i, e in enumerate(evidence_types.keys())])
 
-evidenceTypesOrdered = [
+evidence_types_ordered = [
     'EXP',
     'IDA',
     'IPI',
@@ -72,25 +72,23 @@ evidenceTypesOrdered = [
     'NR',
 ]
 
-multiplicitySet = set(
-    [
-        "alt_id",
-        "is_a",
-        "subset",
-        "synonym",
-        "related_synonym",
-        "exact_synonym",
-        "broad_synonym",
-        "narrow_synonym",
-        "xref_analog",
-        "xref_unknown",
-        "relationship",
-    ]
-)
+multiplicity_set = {
+    "alt_id",
+    "is_a",
+    "subset",
+    "synonym",
+    "related_synonym",
+    "exact_synonym",
+    "broad_synonym",
+    "narrow_synonym",
+    "xref_analog",
+    "xref_unknown",
+    "relationship",
+}
 
-multipleTagSet = multiplicitySet
+multiple_tag_set = multiplicity_set
 
-builtinOBOObjects = [
+builtin_obo_objects = [
     """
 [Typedef]
 id: is_a
@@ -166,7 +164,7 @@ class OBOObject:
             if tag in intern_tags:
                 value, comment = intern(value), intern(comment)
             self._lines.append((tag, value, modifiers, comment))
-            if tag in multipleTagSet:
+            if tag in multiple_tag_set:
                 self.values.setdefault(tag, []).append(value)
             else:
                 self.values[tag] = value
@@ -177,27 +175,27 @@ class OBOObject:
 
     def related_objects(self):
         """Return a list of tuple pairs where the first element is relationship
-        typeId and the second id of object to whom the relationship applies to.
+        type_id and the second id of object to whom the relationship applies to.
 
         """
         # TODO: add other defined Typedef ids
-        typeIds = [intern("is_a")]
-        result = [(typeId, id) for typeId in typeIds for id in self.values.get(typeId, [])]
+        type_ids = [intern("is_a")]
+        result = [(type_id, id) for type_id in type_ids for id in self.values.get(type_id, [])]
         result = result + [tuple(map(intern, r.split(None, 1))) for r in self.values.get("relationship", [])]
         return result
 
     def __repr__(self):
         """ Return a string representation of the object in OBO format
         """
-        repr = "[%s]\n" % type(self).__name__
+        _repr = "[%s]\n" % type(self).__name__
         for tag, value, modifiers, comment in self._lines:
-            repr = repr + tag + ": " + value
+            _repr = _repr + tag + ": " + value
             if modifiers:
-                repr = repr + "{ " + modifiers + " }"
+                _repr = _repr + "{ " + modifiers + " }"
             if comment:
-                repr = repr + " ! " + comment
-            repr = repr + "\n"
-        return repr
+                _repr = _repr + " ! " + comment
+            _repr = _repr + "\n"
+        return _repr
 
     def __str__(self):
         """ Return the OBO object id entry
@@ -207,8 +205,8 @@ class OBOObject:
     def __iter__(self):
         """ Iterates over sub terms
         """
-        for typeId, id in self.related_to:
-            yield (typeId, self.ontology[id])
+        for type_id, id in self.related_to:
+            yield (type_id, self.ontology[id])
 
 
 class Term(OBOObject):
@@ -295,11 +293,11 @@ class Ontology:
         data = [line.decode() if not isinstance(line, str) else line for line in f.readlines()]
         data = "".join([line for line in data if not line.startswith("!")])
         self.header = data[: data.index("[Term]")]
-        c = re.compile("\[.+?\].*?\n\n", re.DOTALL)
+        c = re.compile(r"\[.+?\].*?\n\n", re.DOTALL)
         data = c.findall(data)
 
         milestones = progress_bar_milestones(len(data), 90)
-        for i, block in enumerate(builtinOBOObjects + data):
+        for i, block in enumerate(builtin_obo_objects + data):
             if block.startswith("[Term]"):
                 term = Term(block, self)
                 self.terms[term.id] = term
@@ -316,8 +314,8 @@ class Ontology:
         self.reverse_alias_mapper = defaultdict(set)
         milestones = progress_bar_milestones(len(self.terms), 10)
         for i, (id, term) in enumerate(six.iteritems(self.terms)):
-            for typeId, parent in term.related:
-                self.terms[parent].related_to.add((typeId, id))
+            for type_id, parent in term.related:
+                self.terms[parent].related_to.add((type_id, id))
             try:
                 self.alias_mapper.update([(alt_id, id) for alt_id in term.alt_id])
                 self.reverse_alias_mapper[id].update(term.alt_id)
@@ -371,7 +369,7 @@ class Ontology:
         :param str term: Term ID.
 
         """
-        queue = set([term])
+        queue = {term}
         visited = set()
         slims = set()
         while queue:
@@ -380,7 +378,7 @@ class Ontology:
             if term in self.slims_subset:
                 slims.add(term)
             else:
-                queue.update(set(tid for _, tid in self[term].related) - visited)
+                queue.update({tid for _, tid in self[term].related} - visited)
         return slims
 
     def extract_super_graph(self, terms):
@@ -396,7 +394,7 @@ class Ontology:
         while queue:
             term = queue.pop()
             visited.add(term)
-            queue.update(set(tid for _, tid in self[term].related) - visited)
+            queue.update({tid for _, tid in self[term].related} - visited)
         return visited
 
     def extract_sub_graph(self, terms):
@@ -412,7 +410,7 @@ class Ontology:
         while queue:
             term = queue.pop()
             visited.add(term)
-            queue.update(set(tid for _, tid in self[term].related_to) - visited)
+            queue.update({tid for _, tid in self[term].related_to} - visited)
         return visited
 
     def term_depth(self, term, cache_={}):
@@ -460,10 +458,10 @@ class Ontology:
         return termid in self.terms or termid in self.alias_mapper
 
 
-annotationFields = ["tax_id", "gene_id", "go_id", "evidence", "qualifier", "go_term", "pubMed", "aspect"]
+annotation_fields = ["tax_id", "gene_id", "go_id", "evidence", "qualifier", "go_term", "pubMed", "aspect"]
 
 
-_AnnotationRecordBase = namedtuple("AnnotationRecord", annotationFields)
+_AnnotationRecordBase = namedtuple("AnnotationRecord", annotation_fields)
 
 
 class AnnotationRecord(_AnnotationRecordBase):
@@ -583,7 +581,7 @@ class Annotations:
                 annotations = [self.term_anotations[go_id]]  # annotations for this term alone
             visited.add(go_id)
 
-            for typeId, child in self.ontology[go_id].related_to:
+            for type_id, child in self.ontology[go_id].related_to:
                 aa = self._collect_annotations(child, visited)
                 if type(aa) == set:
                     annotations.append(aa)  # if it was already reduced in get_all_annotations
@@ -618,12 +616,12 @@ class Annotations:
                List of evidence codes to consider when matching annotations to terms.
 
         """
-        evidence_codes = set(evidence_codes or evidenceDict.keys())
+        evidence_codes = set(evidence_codes or evidence_dict.keys())
         annotations = self.get_annotations_by_go_id(go_id)
-        return list(set([int(ann.gene_id) for ann in annotations if ann.evidence in evidence_codes]))
+        return list({int(ann.gene_id) for ann in annotations if ann.evidence in evidence_codes})
 
     def genes(self):
-        return set([ann.gene_id for ann in self.annotations])
+        return {ann.gene_id for ann in self.annotations}
 
     def get_enriched_terms(
         self,
@@ -665,7 +663,7 @@ class Annotations:
         if reference is None:
             reference = self.genes()
 
-        evidence_codes = set(evidence_codes or evidenceDict.keys())
+        evidence_codes = set(evidence_codes or evidence_dict.keys())
         annotations = [
             ann
             for gene in genes
@@ -673,14 +671,12 @@ class Annotations:
             if ann.evidence in evidence_codes and ann.aspect in aspects_set
         ]
 
-        ref_annotations = set(
-            [
-                ann
-                for gene in reference
-                for ann in self.gene_annotations[gene]
-                if ann.evidence in evidence_codes and ann.aspect in aspects_set
-            ]
-        )
+        ref_annotations = {
+            ann
+            for gene in reference
+            for ann in self.gene_annotations[gene]
+            if ann.evidence in evidence_codes and ann.aspect in aspects_set
+        }
 
         annotations_dict = defaultdict(set)
         for ann in annotations:
@@ -711,7 +707,7 @@ class Annotations:
             if slims_only and term not in self.ontology.slims_subset:
                 continue
             all_annotations = self.get_annotations_by_go_id(term).intersection(ref_annotations)
-            all_annotated_genes = set([ann.gene_id for ann in all_annotations])
+            all_annotated_genes = {ann.gene_id for ann in all_annotations}
             mapped_genes = all_genes.intersection(all_annotated_genes)
 
             if len(reference) > len(all_annotated_genes):
@@ -730,12 +726,10 @@ class Annotations:
 
         if use_fdr:
             res = sorted(res.items(), key=lambda x: x[1][1])
-            res = dict(
-                [
-                    (id, (genes, p, ref))
-                    for (id, (genes, _, ref)), p in zip(res, statistics.FDR([p for _, (_, p, _) in res]))
-                ]
-            )
+            res = {
+                (id, (genes, p, ref))
+                for (id, (genes, _, ref)), p in zip(res, statistics.FDR([p for _, (_, p, _) in res]))
+            }
         return res
 
     def get_annotated_terms(self, genes, direct_annotation_only=False, evidence_codes=None, progress_callback=None):
@@ -743,9 +737,9 @@ class Annotations:
         """
 
         genes = [genes] if type(genes) == str else genes
-        genes = set([gene for gene in genes])
+        genes = {gene for gene in genes}
 
-        evidence_codes = set(evidence_codes or evidenceDict.keys())
+        evidence_codes = set(evidence_codes or evidence_dict.keys())
         annotations = [ann for gene in genes for ann in self.gene_annotations[gene] if ann.evidence in evidence_codes]
 
         dd = defaultdict(set)
@@ -823,9 +817,6 @@ def filter_by_p_value(terms, p_value=0.01):
     the same structure as returned from get_enriched_terms.
     """
     return dict(filter(lambda x: x[1][1] <= p_value, terms.items()))
-
-
-filterByPValue = filter_by_p_value
 
 
 if __name__ == "__main__":

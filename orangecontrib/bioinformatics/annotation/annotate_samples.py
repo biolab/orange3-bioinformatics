@@ -176,7 +176,8 @@ class AnnotateSamples:
         values = matrix.X
 
         # filter out genes without entrez ID
-        has_entrez_id = current_order != None
+        has_entrez_id = current_order != None  # noqa
+
         # just in case if Entrez ID not strings
         current_order = np.array([str(x) for x in current_order[has_entrez_id]])
         values = values[:, has_entrez_id]
@@ -236,7 +237,7 @@ class AnnotateSamples:
         return genes_celltypes, types
 
     @staticmethod
-    def _score(scoring_type, p_values, fdrs, data, M, x, m, genes_order):
+    def _score(scoring_type, p_values, fdrs, data, M, x, m, genes_order):  # noqa: N803
         if scoring_type == SCORING_MARKERS_SUM:
             return AnnotateSamples._reorder_matrix(data, genes_order).dot(M)
         if scoring_type == SCORING_EXP_RATIO:
@@ -290,11 +291,11 @@ class AnnotateSamples:
 
         # select function for p-value
         if p_value_fun == PFUN_HYPERGEOMETRIC:
-            p_fun = lambda x, N, m, k: hypergeom.sf(x, N, m, k)
+            p_fun = lambda x, N, m, k: hypergeom.sf(x, N, m, k)  # noqa: E731
         else:
-            p_fun = lambda x, N, m, k: binom.sf(x, k, m / N)
+            p_fun = lambda x, N, m, k: binom.sf(x, k, m / N)  # noqa: E731
 
-        N = len(GeneInfo(tax_id))  # number of genes for organism
+        N = len(GeneInfo(tax_id))  # noqa: N806 / number of genes for organism
 
         # make an attributes order
         genes_data = [
@@ -306,9 +307,9 @@ class AnnotateSamples:
         genes_order = list(set(genes_data) | set(genes_celltypes))
 
         # get marker genes matrix M
-        M, annotations = AnnotateSamples._group_marker_attributes(available_annotations, genes_order)
+        M, annotations = AnnotateSamples._group_marker_attributes(available_annotations, genes_order)  # noqa: N806
 
-        Z = AnnotateSamples._select_attributes(z_values, genes_order, z_threshold)
+        Z = AnnotateSamples._select_attributes(z_values, genes_order, z_threshold)  # noqa: N806
 
         x = Z.dot(M)
         k = np.repeat(Z.sum(axis=1).reshape(-1, 1), x.shape[1], axis=1)
