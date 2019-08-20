@@ -1,6 +1,6 @@
-=================================
-Resolwe module (:mod:`resolwe`)
-=================================
+========
+Resolwe
+========
 .. automodule:: orangecontrib.bioinformatics.resolwe
 .. autofunction:: orangecontrib.bioinformatics.resolwe.connect
 

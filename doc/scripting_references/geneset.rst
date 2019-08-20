@@ -4,13 +4,12 @@
 .. index:: gene set
 .. index:: gene sets
 
-********************************************************
-Gene sets (:mod:`geneset`)
-********************************************************
+==========
+Gene sets
+==========
 
 This module can load either gene sets distributed with Orange
 or custom gene sets in the `GMT file format <http://www.molmine.com/magma/fileformats.html>`_.
-
 
 
 Loading gene sets

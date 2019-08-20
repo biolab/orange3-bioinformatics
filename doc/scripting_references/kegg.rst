@@ -1,6 +1,6 @@
-============================================================
-KEGG - Kyoto Encyclopedia of Genes and Genomes (:mod:`kegg`)
-============================================================
+==============================================
+KEGG - Kyoto Encyclopedia of Genes and Genomes
+==============================================
 
 .. py:currentmodule:: orangecontrib.bioinformatics.kegg
 

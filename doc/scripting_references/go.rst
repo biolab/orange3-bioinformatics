@@ -1,15 +1,17 @@
 .. py:currentmodule:: orangecontrib.bioinformatics.go
 .. py:module:: orangecontrib.bioinformatics.go
 
-=========================
-Gene Ontology (:mod:`go`)
-=========================
+=============
+Gene Ontology
+=============
 
 
 Provides access to `Gene Ontology`_ and its gene annotations.
 
 .. _Gene Ontology: http://geneontology.org/
 
+Class References
+=================
 
 .. autoclass:: Ontology()
    :members:
@@ -57,8 +59,8 @@ Provides access to `Gene Ontology`_ and its gene annotations.
    :members:
 
 
-Example
--------
+Usage
+=====
 
 Load the ontology and print out some terms::
 

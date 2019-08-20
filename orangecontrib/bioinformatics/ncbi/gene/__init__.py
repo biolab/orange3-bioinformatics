@@ -13,11 +13,21 @@ from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
 
 class Gene:
-    """ Base Gene class. """
+    """ Representation of gene summary. """
 
     __slots__ = gene_info_attributes + ('input_identifier',)
 
-    def __init__(self, input_identifier=None):
+    def __init__(self, input_identifier: Optional[str] = None):
+        """
+        If we want to match gene to it's corresponding Entrez ID we must,
+        upon class initialization, provide some `input identifier`. This way
+        :class:`GeneMatcher` will know what to match it against in Gene Database.
+
+        Parameters
+        ----------
+        input_identifier : str
+            This can be any of the following: symbol, synonym, locus tag, other database id, ...
+        """
         self.input_identifier = input_identifier
 
     def __getattr__(self, attribute):
@@ -32,20 +42,31 @@ class Gene:
             setattr(self, attr, json.loads(val) if attr in ('synonyms', 'db_refs', 'homologs') else val)
 
     def homolog_gene(self, taxonomy_id: str) -> Optional[str]:
-        """ Returns gene homologs.
+        """ Returns gene homolog for given organism.
 
-        :param taxonomy_id: target organism.
-        :return:
+        Parameters
+        ----------
+        taxonomy_id: str
+            Taxonomy id of target organism.
+
+        Returns
+        -------
+        str
+            Entrez ID (if available).
         """
         return self.homologs.get(taxonomy_id, None)
 
 
 class GeneMatcher:
-    def __init__(self, tax_id: str, progress_callback=None, auto_start=True):
-        """ Gene name matching interface
+    """ Gene name matching interface. """
 
-        :param tax_id: Taxonomy id (from NCBI taxonomy database)
-        :type tax_id: str
+    def __init__(self, tax_id: str, progress_callback=None, auto_start=True):
+        """
+
+        Parameters
+        ----------
+        tax_id:: str
+            Taxonomy id of target organism.
 
         """
         self._tax_id: str = tax_id
@@ -74,15 +95,32 @@ class GeneMatcher:
             self._match()
 
     def get_known_genes(self) -> List[Gene]:
-        """ Return genes with known Entrez Id from NCBI gene database
+        """ Return Genes with known Entrez ID
 
-        Unknown genes are not included.
+        Returns
+        -------
+        :class:`list` of :class:`Gene` instances
+            Genes with unique match
 
-        :rtype: :class:`list` of :class:`Gene` instances
         """
         return [gene for gene in self.genes if gene.gene_id]
 
-    def to_data_table(self, selected_genes=None):
+    def to_data_table(self, selected_genes: Optional[List[str]] = None) -> Table:
+        """ Transform GeneMatcher results to Orange data table.
+
+        Optionally we can provide a list of genes (Entrez Ids).
+        The table on the output will be populated only with provided genes.
+
+        Parameters
+        ----------
+        selected_genes: list
+            List of Entrez Ids
+
+        Returns
+        -------
+        Orange.data.Table
+            Summary of Gene info in tabular format
+        """
         data_x = []
         metas = [
             StringVariable('Input gene ID'),
@@ -145,13 +183,28 @@ class GeneMatcher:
     def match_table_column(
         self, data_table: Table, column_name: str, target_column: Optional[StringVariable] = None
     ) -> Table:
-        """ Helper function for gene name matching in data table.
+        """ Helper function for gene name matching with :class:`Orange.data.Table`.
 
-        :param data_table: data table
-        :param column_name: Name of the column where gene symbols are located
-        :param target_column: Column
-        :type data_table: :class:`Orange.data.Table`
+        Give a column of genes, GeneMatcher will try to map genes to their
+        corresponding Entrez Ids.
 
+
+        Parameters
+        ----------
+        data_table: :class:`Orange.data.Table`
+            Data table
+
+        column_name: str
+            Name of the column where gene symbols are located
+
+        target_column: :class:`StringVariable`
+            Column where we store Entrez Ids.
+            Defaults to StringVariable(ncbi.gene.config.NCBI_ID)
+
+        Returns
+        -------
+        :class:`Orange.data.Table`
+            Data table with a column of Gene Ids
         """
 
         if column_name in data_table.domain:
@@ -167,14 +220,21 @@ class GeneMatcher:
             return Table.concatenate([data_table, table])
 
     def match_table_attributes(self, data_table):
-        """ Helper function for gene name matching in data table.
+        """ Helper function for gene name matching with :class:`Orange.data.Table`.
 
-        Match table attributes and if a unique match is found create a new column attribute for Entrez Id.
-        Attribute name is defined here: `orangecontrib.bioinformatics.ncbi.gene.config.NCBI_ID`
+        Match table attributes and if a unique match is found create a new column attribute
+        for Entrez Id. Attribute name is defined here: `orangecontrib.bioinformatics.ncbi.gene.config.NCBI_ID`
 
 
-        :param data_table: data table
-        :type data_table: :class:`Orange.data.Table`
+        Parameters
+        ----------
+        data_table: :class:`Orange.data.Table`
+            Data table
+
+        Returns
+        -------
+        :class:`Orange.data.Table`
+            Data table column attributes are populated with Entrez Ids
 
         """
         input_gene_names = [var.name for var in data_table.domain.attributes]
@@ -235,12 +295,15 @@ class GeneMatcher:
 
 class GeneInfo(dict):
     def __init__(self, tax_id: str):
-        """ Load genes for given organism.
+        """ Loads genes for given organism in a dict.
 
         Each instance of :class:`Gene` is mapped to corresponding Entrez ID
 
-        :param tax_id: Taxonomy id (from NCBI taxonomy database)
-        :type tax_id: str
+        Parameters
+        ----------
+        tax_id: str
+            Taxonomy id of target organism.
+
         """
         super().__init__()
         self.tax_id: str = tax_id

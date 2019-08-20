@@ -5,15 +5,19 @@
 .. index::
    single: D. dictyostelium; mutants
 
-*********************************************************
-D. discoideum Mutant Phenotypes (:mod:`dicty.phenotypes`)
-*********************************************************
+===============================
+D. discoideum Mutant Phenotypes
+===============================
 
 This modules provides an interface to `Dictyostelium mutant
 phenotypes <http://dictybase.org/Downloads/>`_ data from the
 `dictyBase <http://dictybase.org/>`_.  The mutants are presented as
 :obj:`DictyMutant` objects with their respective name, strain descriptor,
 associated genes and associated phenotypes.
+
+
+Usage
+=====
 
 >>> from orangecontrib.bio.dicty.phenotypes import *
 >>> # Create a set of all mutant objects
@@ -25,8 +29,8 @@ associated genes and associated phenotypes.
 >>> print(mutant_phenotypes(dicty_mutants[0]))
   ['decreased lipid binding']
 
-Classes and Functions
-=====================
+Function References
+===================
 
 .. automodule:: orangecontrib.bioinformatics.dicty.phenotypes
    :members:

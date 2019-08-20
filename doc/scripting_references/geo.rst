@@ -5,9 +5,9 @@
 .. index:: Gene Expression Omnibus
 .. index:: microarray data sets
 
-*******************************************************
-NCBI's Gene Expression Omnibus interface (:mod:`geo`)
-*******************************************************
+===============================
+NCBI's Gene Expression Omnibus
+===============================
 
 This module provides an interface to `NCBI
 <http://www.ncbi.nlm.nih.gov/>`_'s `Gene Expression Omnibus
@@ -45,8 +45,8 @@ Class References
    :members:
 
 
-More Examples
-=============
+Usage
+=====
 
 The following script prints out information about a specific data
 set. It does not download the data set, just uses the (local) GEO data
