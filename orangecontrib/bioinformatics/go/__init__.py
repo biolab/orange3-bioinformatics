@@ -727,7 +727,7 @@ class Annotations:
         if use_fdr:
             res = sorted(res.items(), key=lambda x: x[1][1])
             res = {
-                (id, (genes, p, ref))
+                id: (genes, p, ref)
                 for (id, (genes, _, ref)), p in zip(res, statistics.FDR([p for _, (_, p, _) in res]))
             }
         return res
