@@ -14,6 +14,7 @@ if __name__ == '__main__':
             'requests-cache==0.5.2',
             'genesis-pyapi==1.2.1',
             'pyclipper==1.1.0.post1',
+            "pysqlite3==0.3.0",
             'Orange3>=3.22.0',
             # Versions are determined by Orange
             'scipy',
@@ -33,4 +34,7 @@ if __name__ == '__main__':
                 'codecov~=2.0.15'
             ],
         },
+        dependency_links=[
+            'https://download.biolab.si/download/files/wheelhouse/bioinformatics/pysqlite3/'
+        ]
     )

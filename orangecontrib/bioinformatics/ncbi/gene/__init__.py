@@ -1,8 +1,9 @@
 """ NCBI GeneInformation module """
 import json
-import sqlite3
 import contextlib
 from typing import Dict, List, Tuple, Optional
+
+from pysqlite3 import dbapi2 as sqlite3
 
 from Orange.data import Table, Domain, StringVariable
 

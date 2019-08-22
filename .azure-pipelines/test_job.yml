@@ -21,18 +21,17 @@ jobs:
           python.version: ${{ version }}
 
   steps:
-    # use conda python on linux. Temporary fix for sqlite FTS extensions.
-    - ${{ if in(parameters.platform, 'linux') }}:
-      - task: CondaEnvironment@1
-        inputs:
-          packageSpecs: 'python=3.7.3'
-          updateConda: false
-        displayName: Install python and activate conda environment
+#    # use conda python on linux. Temporary fix for sqlite FTS extensions.
+#    - ${{ if in(parameters.platform, 'linux', 'windows') }}:
+#      - task: CondaEnvironment@1
+#        inputs:
+#          packageSpecs: 'python=3.7.3'
+#          updateConda: false
+#        displayName: Install python and activate conda environment
 
-    - ${{ if in(parameters.platform, 'mac', 'windows') }}:
-      - task: UsePythonVersion@0
-        inputs:
-          versionSpec: '$(python.version)'
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(python.version)'
 
     - script: |
         python -m pip install --upgrade pip setuptools wheel
@@ -47,6 +46,7 @@ jobs:
 
     - script: |
         pip install PyQt5~=5.9.0
+        pip install -r requirements.txt
         pip install -e .[test]
       displayName: 'Install Orange3-Bioinformatics'
       continueOnError: false

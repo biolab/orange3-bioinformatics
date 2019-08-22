@@ -1,13 +1,14 @@
 """ Taxonomy utils """
 import os
 import shutil
-import sqlite3
 import tarfile
 import tempfile
 import textwrap
 import collections
 from collections import namedtuple
 from urllib.request import urlopen
+
+import pysqlite3.dbapi2 as sqlite3
 
 from orangecontrib.bioinformatics.utils import serverfiles
 

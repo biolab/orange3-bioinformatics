@@ -1,0 +1,4 @@
+# pre-built dependencies
+--find-links=https://download.biolab.si/download/files/wheelhouse/
+
+pysqlite3==0.3.0
