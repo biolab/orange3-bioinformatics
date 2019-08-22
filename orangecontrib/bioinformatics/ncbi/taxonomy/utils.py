@@ -1,7 +1,8 @@
 """ Taxonomy utils """
 import os
 import shutil
-import sqlite3
+# import sqlite3
+import apsw
 import tarfile
 import tempfile
 import textwrap
@@ -91,7 +92,7 @@ class Taxonomy:
         return res
 
     def taxids(self):
-        return list(self._tax)
+        return list(iter(self._tax))
 
     def lineage(self, taxid):
         return self._tax.lineage(taxid)
@@ -141,11 +142,12 @@ class TaxonomyDB(collections.Mapping):
 
     def __init__(self, taxdb):
         self._db_path = taxdb
-        self._con = sqlite3.connect(taxdb, timeout=15)
-        self._con.execute("CREATE INDEX IF NOT EXISTS index_names_tax_id ON names(tax_id)")
+        self._con = apsw.Connection(taxdb)
+        self._cur = self._con.cursor()
+        self._cur.execute("CREATE INDEX IF NOT EXISTS index_names_tax_id ON names(tax_id)")
 
     def __node_query(self, tax_id):
-        c = self._con.execute(
+        c = self._cur.execute(
             """
             SELECT nodes.tax_id, nodes.parent_tax_id, ranks.rank
             FROM nodes INNER JOIN ranks USING(rank_id)
@@ -162,7 +164,7 @@ class TaxonomyDB(collections.Mapping):
         if not isinstance(tax_id, str):
             raise TypeError("expected a string, got {}".format(type(tax_id).__name__))
 
-        c = self._con.execute(
+        c = self._cur.execute(
             """
             SELECT names.name, name_classes.name_class
             FROM names INNER JOIN name_classes USING (name_class_id)
@@ -184,16 +186,16 @@ class TaxonomyDB(collections.Mapping):
         return Taxon(str(tax_id), str(parent), scientific_name, names, rank)
 
     def __iter__(self):
-        c = self._con.execute("SELECT tax_id FROM nodes")
+        c = self._cur.execute("SELECT tax_id FROM nodes")
         return (str(r[0]) for r in c)
 
     def __len__(self):
-        c = self._con.execute("SELECT COUNT(*) FROM nodes")
+        c = self._cur.execute("SELECT COUNT(*) FROM nodes")
         return next(c)[0]
 
     def search(self, name, exact=True):
         # First ensure the name column is indexed.
-        self._con.execute("CREATE INDEX IF NOT EXISTS index_names_name ON names(name)")
+        self._cur.execute("CREATE INDEX IF NOT EXISTS index_names_name ON names(name)")
 
         if not exact:
             name = "{0}%".format(name)
@@ -201,7 +203,7 @@ class TaxonomyDB(collections.Mapping):
         else:
             operator = "="
 
-        c = self._con.execute(
+        c = self._cur.execute(
             """
             SELECT DISTINCT(tax_id)
             FROM names
@@ -216,7 +218,7 @@ class TaxonomyDB(collections.Mapping):
     def strains(self, tax_id):
         """ recursively select all strains for given organism
         """
-        c = self._con.execute(
+        c = self._cur.execute(
             """
             WITH results as (
                 SELECT tax_id, parent_tax_id, rank_id FROM nodes WHERE parent_tax_id = ?
@@ -258,7 +260,7 @@ class TaxonomyDB(collections.Mapping):
         if not isinstance(tax_id, str):
             raise TypeError("Expected a string")
 
-        c = self._con.execute(
+        c = self._cur.execute(
             """
             SELECT tax_id
             FROM nodes
@@ -309,7 +311,7 @@ class TaxonomyDB(collections.Mapping):
     @classmethod
     def init_db(cls, dbfilename, taxdump):  # pragma: no cover
 
-        con = sqlite3.connect(dbfilename)
+        con = apsw.Connection(dbfilename)
         cursor = con.cursor()
 
         for index in ["index_names_tax_id", "index_names_name"]:
@@ -359,16 +361,20 @@ class TaxonomyDB(collections.Mapping):
             ((int(tax_id), name, name_class_id[name_class]) for tax_id, name, name_class in names),
         )
 
-        con.commit()
+        # con.commit()
+        cursor.execute("commit")
         con.close()
+        cursor.close()
 
 
 if __name__ == "__main__":
 
     def main():
         test = Taxonomy()
+        print(test.taxids())
+        # print(len(test._tax))
         strains = test.get_all_strains("562")
-        print(strains)
+        #  print(strains)
         # print(test.lineage('1005443'))
         # print(test.get_species('1005443'))
 

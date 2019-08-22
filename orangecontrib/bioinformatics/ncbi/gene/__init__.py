@@ -1,6 +1,7 @@
 """ NCBI GeneInformation module """
 import json
-import sqlite3
+# import sqlite3
+import apsw
 import contextlib
 from typing import Dict, List, Tuple, Optional
 
@@ -255,8 +256,8 @@ class GeneMatcher:
     def _match(self):
         synonyms, db_refs = 4, 5
 
-        with contextlib.closing(sqlite3.connect(self.gene_db_path)) as con:
-            with con as cursor:
+        with contextlib.closing(apsw.Connection(self.gene_db_path)) as con:
+            with contextlib.closing(con.cursor()) as cursor:
                 for gene in self.genes:
 
                     if self._progress_callback:
@@ -309,7 +310,7 @@ class GeneInfo(dict):
         self.tax_id: str = tax_id
         self.gene_db_path: str = self._gene_db_path()
 
-        connection = sqlite3.connect(self.gene_db_path)
+        connection = apsw.Connection(self.gene_db_path)
         cursor = connection.cursor()
 
         for gene_info in cursor.execute('SELECT * FROM gene_info').fetchall():
@@ -330,9 +331,8 @@ def load_gene_summary(tax_d: str, genes: List[Optional[str]]) -> List[Optional[G
     # filter NoneTypes
     _genes = [g for g in genes if g]
 
-    with contextlib.closing(sqlite3.connect(gene_db_path)) as con:
-        with con as cur:
-
+    with contextlib.closing(apsw.Connection(gene_db_path)) as con:
+        with contextlib.closing(con.cursor()) as cur:
             gene_map: Dict[str, Gene] = {}
             for gene_info in cur.execute(f'SELECT * FROM gene_info WHERE gene_id in ({",".join(_genes)})').fetchall():
                 gene = Gene()

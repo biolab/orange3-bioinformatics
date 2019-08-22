@@ -14,6 +14,7 @@ if __name__ == '__main__':
             'requests-cache==0.5.2',
             'genesis-pyapi==1.2.1',
             'pyclipper==1.1.0.post1',
+            'apsw-wheels',
             'Orange3>=3.22.0',
             # Versions are determined by Orange
             'scipy',
