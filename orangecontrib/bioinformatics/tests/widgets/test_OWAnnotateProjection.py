@@ -220,7 +220,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
 
     def test_outputs(self, timeout=test_timeout_setting):
         self.send_signal(self.widget.Inputs.genes, self.genes)
-        super().test_outputs()
+        super().test_outputs(timeout=test_timeout_setting)
 
     def test_color_by_cluster(self):
         self.send_signal(self.widget.Inputs.genes, self.genes)
