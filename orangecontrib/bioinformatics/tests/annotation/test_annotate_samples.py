@@ -6,11 +6,13 @@ from Orange.data import Table, Domain, StringVariable, ContinuousVariable
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 from orangecontrib.bioinformatics.annotation.annotate_samples import (
+    PFUN_BINOMIAL,
     SCORING_LOG_FDR,
     SCORING_EXP_RATIO,
     SCORING_LOG_PVALUE,
+    PFUN_HYPERGEOMETRIC,
     SCORING_MARKERS_SUM,
-    AnnotateSamples,
+    AnnotateSamplesMeta,
 )
 
 
@@ -50,10 +52,27 @@ class TestAnnotateSamples(unittest.TestCase):
         )
         self.data.attributes[TAX_ID] = "9606"  # id for a human
 
-        self.annotator = AnnotateSamples()
+        self.annotator = AnnotateSamplesMeta()
+
+    def test_mann_whitney_test(self):
+        d = self.annotator.mann_whitney_test(self.data)
+        self.assertEqual(type(d), Table)
+        self.assertTupleEqual(self.data.X.shape, d.X.shape)
+
+    def annotate_samples(
+        self, data, markers, return_nonzero_annotations=True, scoring=SCORING_EXP_RATIO, p_value_fun=PFUN_BINOMIAL
+    ):
+        """
+        Helper method that performs all operations and returns final results.
+        """
+        z_values = self.annotator.mann_whitney_test(data)
+        scores, fdrs = self.annotator.assign_annotations(
+            z_values, markers, data, scoring=scoring, p_value_fun=p_value_fun
+        )
+        return self.annotator.filter_annotations(scores, fdrs, return_nonzero_annotations)
 
     def test_artificial_data(self):
-        annotations = self.annotator.annotate_samples(self.data, self.markers)
+        annotations = self.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -82,7 +101,7 @@ class TestAnnotateSamples(unittest.TestCase):
         ]
         markers = Table(m_domain, np.empty((len(m_data), 0)), None, m_data)
 
-        annotations = self.annotator.annotate_samples(self.data, markers)
+        annotations = self.annotate_samples(self.data, markers)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -91,7 +110,7 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertLessEqual(np.nanmax(annotations.X), 1)
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
-        annotations = self.annotator.annotate_samples(self.data, markers, return_nonzero_annotations=False)
+        annotations = self.annotate_samples(self.data, markers, return_nonzero_annotations=False)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 3)  # two types in the data
         self.assertGreater(np.nansum(annotations.X), 0)
@@ -102,8 +121,7 @@ class TestAnnotateSamples(unittest.TestCase):
         """
         Test annotations with hypergeom.sf
         """
-        annotator = AnnotateSamples()
-        annotations = annotator.annotate_samples(self.data, self.markers, p_value_fun="TEST_HYPERGEOMETRIC")
+        annotations = self.annotate_samples(self.data, self.markers, p_value_fun=PFUN_HYPERGEOMETRIC)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -113,16 +131,16 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
     def test_two_example(self):
-        self.data.X = self.data.X[:2]
+        self.data = self.data[:2]
 
-        annotations = self.annotator.annotate_samples(self.data, self.markers)
+        annotations = self.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
 
     def test_markers_without_entrez_id(self):
         self.markers[1, "Entrez ID"] = "?"
-        annotations = self.annotator.annotate_samples(self.data, self.markers, return_nonzero_annotations=False)
+        annotations = self.annotate_samples(self.data, self.markers, return_nonzero_annotations=False)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -156,7 +174,7 @@ class TestAnnotateSamples(unittest.TestCase):
             {"211", "212", "213", "214"},
         ]
         exp_ann = np.array([[1, 0], [1 / 2, 1 / 4], [1 / 4, 1 / 2], [0, 1]])
-        annotations, fdrs = self.annotator.assign_annotations(z_table, self.markers, self.data)
+        annotations, fdrs = self.annotator.assign_annotations(z_table, self.markers, self.data[:4])
 
         self.assertEqual(len(attrs), len(annotations))
         self.assertEqual(len(attrs), len(fdrs))
@@ -170,7 +188,7 @@ class TestAnnotateSamples(unittest.TestCase):
 
     def test_scoring(self):
         # scoring SCORING_EXP_RATIO
-        annotations = self.annotator.annotate_samples(self.data, self.markers, scoring=SCORING_EXP_RATIO)
+        annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_EXP_RATIO)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -180,7 +198,7 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
         # scoring SCORING_MARKERS_SUM
-        annotations = self.annotator.annotate_samples(self.data, self.markers, scoring=SCORING_MARKERS_SUM)
+        annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_MARKERS_SUM)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -192,22 +210,18 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(annotations[5, 1].value, self.data.X[5].sum())
 
         # scoring SCORING_LOG_FDR
-        annotations = self.annotator.annotate_samples(self.data, self.markers, scoring=SCORING_LOG_FDR)
+        annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_LOG_FDR)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
 
         # scoring SCORING_LOG_PVALUE
-        annotations = self.annotator.annotate_samples(self.data, self.markers, scoring=SCORING_LOG_PVALUE)
+        annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_LOG_PVALUE)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
-
-    def test_log_cpm(self):
-        norm_data = self.annotator.log_cpm(self.data)
-        self.assertTupleEqual(self.data.X.shape, norm_data.X.shape)
 
     def test_entrez_id_not_string(self):
         """
@@ -218,7 +232,7 @@ class TestAnnotateSamples(unittest.TestCase):
         for i, att in enumerate(self.data.domain.attributes):
             att.attributes["Entrez ID"] = int(att.attributes["Entrez ID"])
 
-        annotations = self.annotator.annotate_samples(self.data, self.markers)
+        annotations = self.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))

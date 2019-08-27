@@ -31,7 +31,7 @@ from orangecontrib.bioinformatics.annotation.annotate_samples import (
     SCORING_EXP_RATIO,
     PFUN_HYPERGEOMETRIC,
     SCORING_MARKERS_SUM,
-    AnnotateSamples,
+    AnnotateSamplesMeta,
 )
 from orangecontrib.bioinformatics.annotation.annotate_projection import annotate_projection, cluster_additional_points
 
@@ -67,14 +67,14 @@ class Runner:
             weights = np.array([15, 75, 10]) * (end - start) / 100
 
             if not result.scores.z_vals:
-                result.scores.z_vals = AnnotateSamples.mann_whitney_test(data)
+                result.scores.z_vals = AnnotateSamplesMeta.mann_whitney_test(data)
                 state.set_partial_result(("scores", result))
             state.set_progress_value(weights[0])
             if state.is_interruption_requested():
                 return
 
             if not result.scores.annotations or not result.scores.p_vals:
-                annot, p_vals = AnnotateSamples.assign_annotations(
+                annot, p_vals = AnnotateSamplesMeta.assign_annotations(
                     result.scores.z_vals, genes, data, p_value_fun=p_value_fun, scoring=scoring
                 )
                 result.scores.annotations = annot
@@ -84,7 +84,7 @@ class Runner:
             if state.is_interruption_requested():
                 return
 
-            result.scores.table = AnnotateSamples.filter_annotations(
+            result.scores.table = AnnotateSamplesMeta.filter_annotations(
                 result.scores.annotations, result.scores.p_vals, p_threshold=p_threshold
             )
 
