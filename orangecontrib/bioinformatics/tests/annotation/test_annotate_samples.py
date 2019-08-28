@@ -1,17 +1,19 @@
 import unittest
 
 import numpy as np
+from cellannotation.annotate_samples import (
+    SCORING_LOG_FDR,
+    SCORING_LOG_PVALUE,
+    PFUN_HYPERGEOMETRIC,
+    SCORING_MARKERS_SUM,
+)
 
 from Orange.data import Table, Domain, StringVariable, ContinuousVariable
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 from orangecontrib.bioinformatics.annotation.annotate_samples import (
     PFUN_BINOMIAL,
-    SCORING_LOG_FDR,
     SCORING_EXP_RATIO,
-    SCORING_LOG_PVALUE,
-    PFUN_HYPERGEOMETRIC,
-    SCORING_MARKERS_SUM,
     AnnotateSamplesMeta,
 )
 
