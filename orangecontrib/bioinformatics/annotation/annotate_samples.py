@@ -1,8 +1,9 @@
+import numpy as np
 import pandas as pd
+from cellannotation.annotate_samples import PFUN_BINOMIAL, SCORING_EXP_RATIO, AnnotateSamples
 
 from Orange.data import Table, Domain, ContinuousVariable
 
-from cellannotation.annotate_samples import *
 from orangecontrib.bioinformatics.ncbi.gene import GeneInfo
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 
@@ -139,7 +140,7 @@ class AnnotateSamplesMeta:
 
         # retrieve number of genes
         tax_id = data.attributes[TAX_ID]
-        N = len(GeneInfo(tax_id))  # number of genes for organism
+        n = len(GeneInfo(tax_id))  # number of genes for organism
 
         # transform data to pandas dataframe
         df_z_values, _ = AnnotateSamplesMeta._to_pandas(z_values, use_entrez_id=True)
@@ -156,7 +157,7 @@ class AnnotateSamplesMeta:
             df_z_values,
             df_available_annotations,
             df_data,
-            N,
+            n,
             z_threshold=z_threshold,
             p_value_fun=p_value_fun,
             scoring=scoring,

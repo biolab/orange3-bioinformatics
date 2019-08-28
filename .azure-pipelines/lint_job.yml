@@ -20,15 +20,15 @@ jobs:
 
     - script: flake8 orangecontrib/bioinformatics
       displayName: 'Linting: flake8'
-      continueOnError: true
+      # continueOnError: true
 
     - script: isort --recursive --check-only orangecontrib/bioinformatics
       displayName: 'isort: Check order of imports.'
-      # condition: succeededOrFailed()
-      continueOnError: true
+      condition: succeededOrFailed()
+      # continueOnError: true
 
 
     - script: python setup.py check --metadata --strict
       displayName: 'Verify package metadata'
-      # condition: succeededOrFailed()
-      continueOnError: true
+      condition: succeededOrFailed()
+      # continueOnError: true

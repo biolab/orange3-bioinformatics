@@ -28,6 +28,7 @@ if __name__ == '__main__':
                 'flake8-black~=0.1.0',
                 'pep8-naming~=0.8.2',
                 'isort~=4.3.21',
+                'pre-commit~=1.18.3',
                 'pytest~=5.1.0',
                 'pytest-cov~=2.7.1',
                 'coverage~=4.5.4',

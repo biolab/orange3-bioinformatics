@@ -70,13 +70,13 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
             return table, table
 
         self.patcher1 = patch(
-            "orangecontrib.bioinformatics.annotation."
-            "annotate_samples.AnnotateSamples.mann_whitney_test",
-            Mock(side_effect=mann_whitney_test))
+            "orangecontrib.bioinformatics.annotation." "annotate_samples.AnnotateSamples.mann_whitney_test",
+            Mock(side_effect=mann_whitney_test),
+        )
         self.patcher2 = patch(
-            "orangecontrib.bioinformatics.annotation."
-            "annotate_samples.AnnotateSamples.assign_annotations",
-            Mock(side_effect=assign_annotations))
+            "orangecontrib.bioinformatics.annotation." "annotate_samples.AnnotateSamples.assign_annotations",
+            Mock(side_effect=assign_annotations),
+        )
 
         self.patcher1.start()
         self.patcher2.start()
