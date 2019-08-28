@@ -253,7 +253,8 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
     def test_outputs(self, timeout=TIMEOUT):
         self._restore_annotation_functions()
         self.send_signal(self.widget.Inputs.genes, self.genes)
-        super().test_outputs(timeout=test_timeout_setting)
+        super().test_outputs(timeout=timeout)
+        self._patch_annotation_functions()
 
     def test_color_by_cluster(self):
         self._restore_annotation_functions()
