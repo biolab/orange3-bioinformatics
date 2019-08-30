@@ -21,10 +21,11 @@ jobs:
         versionSpec: '$(python.version)'
 
     - script: |
-        python -m pip install --upgrade pip setuptools wheel twine sphinx recommonmark
+        python -m pip install --upgrade pip setuptools wheel twine
       displayName: 'Install requirements'
 
-    - script: 'pip install twine'
+    - script: pip install .[doc]
+      displayName: 'Install Orange3-bioinformatics'
 
     - script: cd doc && make htmlhelp && cd ..
       displayName: 'Build docs'
