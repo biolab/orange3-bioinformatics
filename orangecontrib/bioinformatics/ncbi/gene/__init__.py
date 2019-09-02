@@ -144,7 +144,8 @@ class GeneMatcher:
 
         genes: List[Gene] = self.genes
         if selected_genes is not None:
-            genes = [gene for gene in self.genes if str(gene.gene_id) in selected_genes]
+            selected_genes_set = set(selected_genes)
+            genes = [gene for gene in self.genes if str(gene.gene_id) in selected_genes_set]
 
         for gene in genes:
             db_refs = (

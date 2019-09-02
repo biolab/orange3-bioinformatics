@@ -549,8 +549,10 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                 col[:] = gene_ids
 
                 # filter selected rows
+                selected_genes_set = set(selected_genes)
                 selected_rows = [
-                    row_index for row_index, row in enumerate(table) if str(row[gene_var]) in selected_genes
+                    row_index for row_index, row in enumerate(table)
+                    if str(row[gene_var]) in selected_genes_set
                 ]
 
                 # handle table attributes
@@ -587,11 +589,12 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                                 pass
 
                 # filter selected columns
+                selected_genes_set = set(selected_genes)
                 selected = [
                     column
                     for column in table.domain.attributes
                     if self.target_database in column.attributes
-                    and str(column.attributes[self.target_database]) in selected_genes
+                    and str(column.attributes[self.target_database]) in selected_genes_set
                 ]
 
                 output_attrs = table.domain.attributes
@@ -600,7 +603,11 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                     output_attrs = selected
 
                 if self.exclude_unmatched:
-                    output_attrs = [col for col in output_attrs if col.attributes[self.target_database] in known_genes]
+                    known_genes_set = set(known_genes)
+                    output_attrs = [
+                        col for col in output_attrs
+                        if col.attributes[self.target_database] in known_genes_set
+                    ]
 
                 domain = Domain(output_attrs, table.domain.class_vars, table.domain.metas)
 
@@ -632,9 +639,13 @@ if __name__ == "__main__":
 
     def main_test():
         from AnyQt.QtWidgets import QApplication
+        import sys
 
         app = QApplication([])
         w = OWGenes()
+        if len(sys.argv) > 1:
+            data = Table(sys.argv[1])
+            w.handle_input(data)
         w.show()
         w.raise_()
         r = app.exec_()
