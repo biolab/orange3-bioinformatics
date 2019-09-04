@@ -5,6 +5,7 @@ from functools import partial
 from collections import defaultdict
 
 import numpy as np
+import requests
 
 from AnyQt.QtGui import QFont, QColor
 from AnyQt.QtCore import Qt, QSize, QTimer, QModelIndex, QItemSelection, QItemSelectionModel, QItemSelectionRange
@@ -18,18 +19,6 @@ from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
 
 serverfiles_domain = 'marker_genes'
-
-
-def get_available_db_sources():
-    found_sources = {}
-
-    try:
-        found_sources.update(serverfiles.ServerFiles().allinfo(serverfiles_domain))
-    except ConnectionError:
-        raise ConnectionError('Can not connect to {}. Using only local files.'.format(serverfiles.server_url))
-    finally:
-        found_sources.update(serverfiles.allinfo(serverfiles_domain))
-        return {item.get('title').split(': ')[-1]: item for item in found_sources.values()}
 
 
 # todo: this is ugly, refactor this in the future.
@@ -132,6 +121,9 @@ class OWMarkerGenes(widget.OWWidget):
     priority = 170
 
     replaces = ['orangecontrib.single_cell.widgets.owmarkergenes.OWMarkerGenes']
+
+    class Warning(widget.OWWidget.Warning):
+        using_local_files = widget.Msg("Can't connect to serverfiles. Using cached files.")
 
     class Outputs:
         genes = widget.Output("Genes", Table)
@@ -258,17 +250,33 @@ class OWMarkerGenes(widget.OWWidget):
             self.set_group_index(self.group_index)
 
     def _load_data(self):
-        self.available_db_sources = get_available_db_sources()
-        file_name = self.available_db_sources[self.selected_db_source]['filename']
+        self.Warning.using_local_files.clear()
 
+        found_sources = {}
         try:
-            serverfiles.update(serverfiles_domain, file_name)
-        except ConnectionError:
-            raise ConnectionError('Can not connect to {}. ' 'Using only local files.'.format(serverfiles.server_url))
-        finally:
-            file_path = serverfiles.localpath_download(serverfiles_domain, file_name)
-            data = Table(file_path)
+            found_sources.update(serverfiles.ServerFiles().allinfo(serverfiles_domain))
+        except requests.exceptions.ConnectionError:
+            found_sources.update(serverfiles.allinfo(serverfiles_domain))
+            self.Warning.using_local_files()
 
+        self.available_db_sources = {item.get('title').split(': ')[-1]: item for item in found_sources.values()}
+
+        if self.available_db_sources:
+            file_name = self.available_db_sources[self.selected_db_source]['filename']
+
+            try:
+                serverfiles.update(serverfiles_domain, file_name)
+            except requests.exceptions.ConnectionError:
+                # try to update file. Ignore network errors.
+                pass
+
+            try:
+                file_path = serverfiles.localpath_download(serverfiles_domain, file_name)
+            except requests.exceptions.ConnectionError as err:
+                # Unexpected error.
+                raise err
+
+            data = Table(file_path)
             # enforce order
             old_domain = data.domain
             new_domain = Domain(
