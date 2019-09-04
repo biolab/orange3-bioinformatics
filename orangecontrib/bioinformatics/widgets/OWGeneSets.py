@@ -638,7 +638,7 @@ class OWGeneSets(OWWidget):
                     set(gene_set.genes), Qt.UserRole
                 )  # store genes to get then on output on selection
 
-                model_items.append([count_column, genes_column, term_column, category_column])
+                model_items.append([count_column, genes_column, category_column, term_column])
 
         return model_items
 
