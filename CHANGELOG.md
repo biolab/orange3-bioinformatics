@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - [#203](https://github.com/biolab/orange3-bioinformatics/pull/203): Correct column data in GeneSets widget.
+- [#205](https://github.com/biolab/orange3-bioinformatics/pull/205): Fix issue where widget crashed on network error. Display friendly warning that cached files are used.
 
 ### Changed
 - [#168](https://github.com/biolab/orange3-bioinformatics/pull/168): 
