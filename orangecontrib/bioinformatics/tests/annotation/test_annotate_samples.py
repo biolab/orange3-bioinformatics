@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from cellannotation.annotate_samples import (
+from pointannotator.annotate_samples import (
     SCORING_LOG_FDR,
     SCORING_LOG_PVALUE,
     PFUN_HYPERGEOMETRIC,

@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [#168](https://github.com/biolab/orange3-bioinformatics/pull/168): 
 Overhaul of gene module. We no longer use pickled dictionaries to map gene names to their corresponding Entrez Ids. 
 We use SQLite tables that are indexed using FTS5 SQLite extension.
+- [#204](https://github.com/biolab/orange3-bioinformatics/pull/204):
+Package cellannotation replaced with point-annotator 
 
 ### Added
 - [13b54e7](https://github.com/biolab/orange3-bioinformatics/pull/168/commits/13b54e7d93e09283ca5edfae4f11468fc2c0b12b): HomoloGene module (Wrapper around NCBI HomoloGene database)
