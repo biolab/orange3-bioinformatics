@@ -6,7 +6,6 @@ from itertools import chain
 
 import numpy as np
 import pyqtgraph as pg
-from cellannotation.annotate_samples import SCORING_LOG_FDR, PFUN_HYPERGEOMETRIC, SCORING_MARKERS_SUM
 
 from AnyQt.QtGui import QColor
 from AnyQt.QtCore import Qt, QRectF, QObject
@@ -28,7 +27,10 @@ from Orange.widgets.visualize.owscatterplotgraph import OWScatterPlotBase
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 from orangecontrib.bioinformatics.annotation.annotate_samples import (
     PFUN_BINOMIAL,
+    SCORING_LOG_FDR,
     SCORING_EXP_RATIO,
+    PFUN_HYPERGEOMETRIC,
+    SCORING_MARKERS_SUM,
     AnnotateSamplesMeta,
 )
 from orangecontrib.bioinformatics.annotation.annotate_projection import annotate_projection, cluster_additional_points

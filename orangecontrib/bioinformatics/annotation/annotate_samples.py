@@ -1,11 +1,27 @@
 import numpy as np
 import pandas as pd
-from cellannotation.annotate_samples import PFUN_BINOMIAL, SCORING_EXP_RATIO, AnnotateSamples
+from pointannotator.annotate_samples import (
+    PFUN_BINOMIAL,
+    SCORING_LOG_FDR,
+    SCORING_EXP_RATIO,
+    PFUN_HYPERGEOMETRIC,
+    SCORING_MARKERS_SUM,
+    AnnotateSamples,
+)
 
 from Orange.data import Table, Domain, ContinuousVariable
 
 from orangecontrib.bioinformatics.ncbi.gene import GeneInfo
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
+
+__all__ = [
+    "PFUN_BINOMIAL",
+    "PFUN_HYPERGEOMETRIC",
+    "SCORING_EXP_RATIO",
+    "SCORING_LOG_FDR",
+    "SCORING_MARKERS_SUM",
+    "AnnotateSamplesMeta",
+]
 
 
 class ScoringNotImplemented(Exception):
@@ -17,7 +33,7 @@ class AnnotateSamplesMeta:
     AnnotateSamples is a meta class used for the annotation of data items with
     the labels Mann-Whitney U test for selecting important values and
     the Hyper-geometric for assigning the labels. This class is a proxy to the
-    external library - cell-annotation.
+    external library - point-annotator.
 
     Example for full annotation:
 

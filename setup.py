@@ -15,7 +15,7 @@ if __name__ == '__main__':
             'genesis-pyapi==1.2.1',
             'pyclipper==1.1.0.post1',
             'Orange3>=3.22.0',
-            'cellannotation',
+            'point-annotator~=1.0',
             # Versions are determined by Orange
             'scipy',
             'numpy',
