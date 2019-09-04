@@ -6,6 +6,7 @@ from functools import lru_cache
 from collections import OrderedDict, defaultdict
 
 import numpy as np
+import requests
 
 from AnyQt.QtGui import QFont, QColor
 from AnyQt.QtCore import Qt, QSize, QVariant, QModelIndex
@@ -33,7 +34,7 @@ from Orange.widgets.gui import (
     radioButtonsInBox,
 )
 from Orange.widgets.utils import itemmodels
-from Orange.widgets.widget import OWWidget
+from Orange.widgets.widget import Msg, OWWidget
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
@@ -225,6 +226,12 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     icon = "icons/OWGEODatasets.svg"
     priority = 2
 
+    class Warning(OWWidget.Warning):
+        using_local_files = Msg("Can't connect to serverfiles. Using cached files.")
+
+    class Error(OWWidget.Error):
+        no_connection = Msg("Widget can't connect to serverfiles.")
+
     class Outputs:
         gds_data = Output("Expression Data", Table)
 
@@ -246,7 +253,13 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         OWWidget.__init__(self)
         ConcurrentWidgetMixin.__init__(self)
 
-        self.gds_info: Optional[GDSInfo] = GDSInfo()  # TODO: handle possible exceptions
+        try:
+            self.gds_info: Optional[GDSInfo] = GDSInfo()
+        except requests.exceptions.ConnectionError:
+            self.gds_info = {}
+            self.Error.no_connection()
+            return
+
         self.gds_data: Optional[Table] = None
 
         # Control area
@@ -287,7 +300,6 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.table_model = GEODatasetsModel()
         self.table_model.initialize(self.gds_info)
         self.table_view.setModel(self.table_model)
-        self.table_model.show_table()
 
         self.table_view.horizontalHeader().setStretchLastSection(True)
         self.table_view.resizeColumnsToContents()
@@ -399,6 +411,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
             self.update_info()
 
     def _run(self):
+        self.Warning.using_local_files.clear()
         if self.selected_gds is not None:
             self.gds_data = None
             self.start(
@@ -478,6 +491,9 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
     def commit(self):
         self._run()
+
+    def on_exception(self, ex: Exception):
+        self.Warning.using_local_files()
 
     def on_done(self, result: Result):
         assert isinstance(result.gds_dataset, Table)
