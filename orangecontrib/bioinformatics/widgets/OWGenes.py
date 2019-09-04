@@ -551,8 +551,7 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                 # filter selected rows
                 selected_genes_set = set(selected_genes)
                 selected_rows = [
-                    row_index for row_index, row in enumerate(table)
-                    if str(row[gene_var]) in selected_genes_set
+                    row_index for row_index, row in enumerate(table) if str(row[gene_var]) in selected_genes_set
                 ]
 
                 # handle table attributes
@@ -605,8 +604,7 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                 if self.exclude_unmatched:
                     known_genes_set = set(known_genes)
                     output_attrs = [
-                        col for col in output_attrs
-                        if col.attributes[self.target_database] in known_genes_set
+                        col for col in output_attrs if col.attributes[self.target_database] in known_genes_set
                     ]
 
                 domain = Domain(output_attrs, table.domain.class_vars, table.domain.metas)
