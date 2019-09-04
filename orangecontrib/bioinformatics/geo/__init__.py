@@ -57,9 +57,9 @@ def dataset_all_info():
 
 def dataset_download(gds_id, samples=None, transpose=False, callback=None):
     file_name = '{}.tab'.format(gds_id)
-    local_files.update(file_name, extract=True, callback=callback)
+    file_path = local_files.localpath_download(file_name, extract=True, callback=callback)
 
-    table = Table(local_files.localpath_download(file_name))
+    table = Table(file_path)
     title = table.name
     gds_info = local_files.info(file_name)
     table_annotations = {TableAnnotation.tax_id: gds_info['taxid']}
