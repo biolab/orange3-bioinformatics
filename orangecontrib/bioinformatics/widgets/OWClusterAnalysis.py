@@ -686,7 +686,7 @@ class OWClusterAnalysis(OWWidget):
             p_vals = [gene.p_val for gene in cluster.filtered_genes]
             fdr_vals = [gene.fdr for gene in cluster.filtered_genes]
             gene_names = [gene.input_identifier for gene in cluster.filtered_genes]
-            gene_ids = [gene.ncbi_id for gene in cluster.filtered_genes]
+            gene_ids = [gene.gene_id for gene in cluster.filtered_genes]
             rank = rankdata(p_vals, method='min')
 
             if len(self.new_cluster_profile):
@@ -756,7 +756,7 @@ class OWClusterAnalysis(OWWidget):
             cluster = sel_row.data()
             selected_clusters.append(cluster)
             selected_cluster_indexes.add(cluster.index)
-            [selected_cluster_genes.add(gene.ncbi_id) for gene in cluster.filtered_genes]
+            [selected_cluster_genes.add(gene.gene_id) for gene in cluster.filtered_genes]
 
         # get columns of selected clusters
         selected_columns = [
