@@ -8,7 +8,7 @@ from pointannotator.annotate_samples import (
     SCORING_MARKERS_SUM,
 )
 
-from Orange.data import Table, Domain, StringVariable, ContinuousVariable
+from Orange.data import Table, Domain, StringVariable, DiscreteVariable, ContinuousVariable
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 from orangecontrib.bioinformatics.annotation.annotate_samples import (
@@ -235,6 +235,60 @@ class TestAnnotateSamples(unittest.TestCase):
             att.attributes["Entrez ID"] = int(att.attributes["Entrez ID"])
 
         annotations = self.annotate_samples(self.data, self.markers)
+
+        self.assertEqual(type(annotations), Table)
+        self.assertEqual(len(annotations), len(self.data))
+        self.assertEqual(len(annotations[0]), 2)  # two types in the data
+        self.assertGreater(np.nansum(annotations.X), 0)
+        self.assertLessEqual(np.nanmax(annotations.X), 1)
+        self.assertGreaterEqual(np.nanmin(annotations.X), 0)
+
+    def test_celltypes_as_feature(self):
+        """
+        Test case when cell type or genes appears as a feature
+        """
+        ct_values = self.markers.get_column_view("Cell Type")[0].tolist()
+        entrezid = self.markers.get_column_view("Entrez ID")[0].tolist()
+        ct_variable = DiscreteVariable("Cell Type", values=list(set(ct_values)))
+        entrez_variable = DiscreteVariable("Entrez ID", values=list(set(entrezid)))
+
+        markers = Table(
+            Domain([ct_variable, entrez_variable]),
+            list(
+                zip(
+                    [ct_variable.values.index(x) for x in ct_values],
+                    [entrez_variable.values.index(x) for x in entrezid],
+                )
+            ),
+        )
+        annotations = self.annotate_samples(self.data, markers)
+
+        self.assertEqual(type(annotations), Table)
+        self.assertEqual(len(annotations), len(self.data))
+        self.assertEqual(len(annotations[0]), 2)  # two types in the data
+        self.assertGreater(np.nansum(annotations.X), 0)
+        self.assertLessEqual(np.nanmax(annotations.X), 1)
+        self.assertGreaterEqual(np.nanmin(annotations.X), 0)
+
+    def test_celltypes_as_feature_and_meta(self):
+        """
+        Test case when cell type is a feature and Entrez id is in metas
+        """
+        ct_values = self.markers.get_column_view("Cell Type")[0].tolist()
+        entrezid = self.markers.get_column_view("Entrez ID")[0].tolist()
+        ct_variable = DiscreteVariable("Cell Type", values=list(set(ct_values)))
+        entrez_variable = DiscreteVariable("Entrez ID", values=list(set(entrezid)))
+
+        markers = Table(
+            Domain([ct_variable], metas=[entrez_variable]),
+            list(
+                zip(
+                    [ct_variable.values.index(x) for x in ct_values],
+                    [entrez_variable.values.index(x) for x in entrezid],
+                )
+            ),
+        )
+        annotations = self.annotate_samples(self.data, markers)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
