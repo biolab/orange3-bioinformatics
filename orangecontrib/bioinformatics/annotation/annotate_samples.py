@@ -115,6 +115,27 @@ class AnnotateSamplesMeta:
         return z_table
 
     @staticmethod
+    def _prepare_annotations(ann):
+        """
+        This function prepares annotation to be acceptable by the method.
+        """
+        # transform to string if discrete else keep string
+        ct_values = (
+            list(map(ann.domain["Cell Type"].repr_val, ann.get_column_view("Cell Type")[0]))
+            if ann.domain["Cell Type"].is_discrete
+            else ann.get_column_view("Cell Type")[0]
+        )
+        entrez_values = (
+            list(map(ann.domain["Entrez ID"].repr_val, ann.get_column_view("Entrez ID")[0]))
+            if ann.domain["Entrez ID"].is_discrete
+            else ann.get_column_view("Entrez ID")[0]
+        )
+
+        # the framework recognizes Gene instead of Entrez ID
+        df_available_annotations = pd.DataFrame(list(zip(ct_values, entrez_values)), columns=["Cell Type", "Gene"])
+        return df_available_annotations
+
+    @staticmethod
     def assign_annotations(
         z_values, available_annotations, data, z_threshold=1, p_value_fun=PFUN_BINOMIAL, scoring=SCORING_EXP_RATIO
     ):
@@ -161,11 +182,7 @@ class AnnotateSamplesMeta:
         # transform data to pandas dataframe
         df_z_values, _ = AnnotateSamplesMeta._to_pandas(z_values, use_entrez_id=True)
         df_data, _ = AnnotateSamplesMeta._to_pandas(data, use_entrez_id=True)
-        # transform marker genes
-        columns = list(map(str, available_annotations.domain.metas))
-        # the framework recognizes Gene instead of Entrez ID
-        columns[columns.index("Entrez ID")] = "Gene"
-        df_available_annotations = pd.DataFrame(available_annotations.metas, columns=columns)
+        df_available_annotations = AnnotateSamplesMeta._prepare_annotations(available_annotations)
         df_available_annotations = df_available_annotations[df_available_annotations["Gene"] != "?"]
 
         # call the method
@@ -178,7 +195,6 @@ class AnnotateSamplesMeta:
             p_value_fun=p_value_fun,
             scoring=scoring,
         )
-
         # create orange tables
         domain = Domain([ContinuousVariable(ct) for ct in scores.columns.values])
         scores_table = Table(domain, scores.values)
