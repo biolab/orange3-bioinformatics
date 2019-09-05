@@ -26,8 +26,8 @@ class ClusterGene(Gene):
 
     def __init__(self, gene_name, gene_id):
         super().__init__()
-        self.input_name = gene_name
-        self.ncbi_id = gene_id
+        self.input_identifier = gene_name
+        self.gene_id = gene_id
 
         # default values
         self.fdr = 1
@@ -223,7 +223,7 @@ class Cluster:
 
         genes = '(all genes are filtered out)'
         if self.filtered_genes:
-            genes_to_display = [gene.input_name for gene in self.filtered_genes[:DISPLAY_GENE_COUNT]]
+            genes_to_display = [gene.input_identifier for gene in self.filtered_genes[:DISPLAY_GENE_COUNT]]
 
             genes = ', '.join(genes_to_display)
             if len(self.filtered_genes) > len(genes_to_display):
@@ -387,7 +387,7 @@ class ClusterModel(QAbstractListModel):
         """
 
         for item in self.get_rows():
-            genes = [gene.ncbi_id for gene in item.filtered_genes]
+            genes = [gene.gene_id for gene in item.filtered_genes]
             item.gene_set_enrichment(gs_object, gene_sets, set(genes), reference_genes)
 
     def apply_gene_filters(self, p_val=None, fdr=None, count=None):

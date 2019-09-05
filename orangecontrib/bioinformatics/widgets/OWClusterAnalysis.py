@@ -685,7 +685,7 @@ class OWClusterAnalysis(OWWidget):
             scores = [gene.score for gene in cluster.filtered_genes]
             p_vals = [gene.p_val for gene in cluster.filtered_genes]
             fdr_vals = [gene.fdr for gene in cluster.filtered_genes]
-            gene_names = [gene.input_name for gene in cluster.filtered_genes]
+            gene_names = [gene.input_identifier for gene in cluster.filtered_genes]
             gene_ids = [gene.ncbi_id for gene in cluster.filtered_genes]
             rank = rankdata(p_vals, method='min')
 
