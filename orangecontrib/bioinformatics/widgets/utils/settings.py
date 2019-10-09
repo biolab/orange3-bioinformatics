@@ -1,4 +1,31 @@
+from Orange.data import Table
 from Orange.widgets import settings
+
+from orangecontrib.bioinformatics.widgets.components.gene_scoring import GeneScoringComponent
+
+
+class GeneScoringComponentSettings(settings.ContextHandler):
+    """
+    Context settings for GeneScoring component. Setting are dependent only on
+    column group candidates. See GeneScoringComponent.group_candidates for more details.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def new_context(self, data: Table):
+        context = super().new_context()
+        context.column_groups, _ = GeneScoringComponent.group_candidates(data)
+        return context
+
+    def match(self, context, data):
+
+        column_groups, _ = GeneScoringComponent.group_candidates(data)
+
+        if context.column_groups == column_groups:
+            return self.PERFECT_MATCH
+
+        return self.NO_MATCH
 
 
 class SetContextHandler(settings.ContextHandler):

@@ -12,8 +12,9 @@ ALT_GREATER = "greater"
 ALTERNATIVES = [ALT_GREATER, ALT_TWO, ALT_LESS]
 
 
-def score_t_test(a, b, axis=0, alternative=ALT_TWO):
-    # type: (np.array, np.array, int, str) -> Tuple[Union[float, np.array], Union[float, np.array]]
+def score_t_test(
+    a: np.array, b: np.array, axis: int = 0, **kwargs
+) -> Tuple[Union[float, np.array], Union[float, np.array]]:
     """ Run t-test. Enable setting different alternative hypothesis.
     Probabilities are exact due to symmetry of the test.
 
@@ -24,7 +25,7 @@ def score_t_test(a, b, axis=0, alternative=ALT_TWO):
     scipy.stats.ttest_ind
 
     """
-    # alt = kwargs.get("alternative", ALT_TWO)
+    alternative = kwargs.get("alternative", ALT_TWO)
     assert alternative in ALTERNATIVES
     scores, pvalues = scipy.stats.ttest_ind(a, b, axis=axis)
 
@@ -41,7 +42,7 @@ def score_t_test(a, b, axis=0, alternative=ALT_TWO):
         return scores, 1.0 - pvalues
 
 
-def score_mann_whitney(a, b, **kwargs):
+def score_mann_whitney(a: np.array, b: np.array, **kwargs) -> Tuple[np.array, np.array]:
     axis = kwargs.get('axis', 0)
     a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
 
@@ -71,12 +72,15 @@ def score_mann_whitney(a, b, **kwargs):
     return np.array(statistics), np.array(p_values)
 
 
-def score_hypergeometric_test(a, b, threshold=1, **kwargs):
+def score_hypergeometric_test(a: np.array, b: np.array, threshold: float = 1.0, **kwargs) -> Tuple[np.array, np.array]:
     """
     Run a hypergeometric test. The probability in a two-sided test is approximated
     with the symmetric distribution with more extreme of the tails.
     """
-    # type: (np.ndarray, np.ndarray, float) -> np.ndarray
+    axis = kwargs.get('axis', 0)
+
+    if axis == 1:
+        a, b = a.T, b.T
 
     # Binary expression matrices
     _a = (a >= threshold).astype(int)
