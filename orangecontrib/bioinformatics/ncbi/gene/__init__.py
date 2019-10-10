@@ -214,11 +214,14 @@ class GeneMatcher:
             if target_column is None:
                 target_column = StringVariable(ENTREZ_ID)
 
-            domain = Domain([], metas=[target_column])
-            data = [[str(gene.gene_id) if gene.gene_id else '?'] for gene in self.genes]
-            table = Table(domain, data)
+            new_domain = Domain(
+                data_table.domain.attributes, data_table.domain.class_vars, data_table.domain.metas + (target_column,)
+            )
 
-            return Table.concatenate([data_table, table])
+            new_data = data_table.transform(new_domain)
+            new_data[:, target_column] = [[str(gene.gene_id) if gene.gene_id else '?'] for gene in self.genes]
+
+            return new_data
 
     def match_table_attributes(self, data_table):
         """ Helper function for gene name matching with :class:`Orange.data.Table`.
