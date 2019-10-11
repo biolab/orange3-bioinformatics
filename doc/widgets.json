@@ -1,0 +1,107 @@
+[
+ [
+  "Bioinformatics",
+  [
+   {
+    "text": "Databases Update",
+    "doc": "widgets/databases_update.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWDatabasesUpdate.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "GEO Data Sets",
+    "doc": "widgets/geo_data_sets.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGEODatasets.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "dictyExpress",
+    "doc": "widgets/dicty_express.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWdictyExpress.png",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Genes",
+    "doc": "widgets/genes.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGeneInfo.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Differential Expression",
+    "doc": "widgets/differential_expression.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWDifferentialExpression.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "GO Browser",
+    "doc": "widgets/go_browser.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGOBrowser.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "KEGG Pathways",
+    "doc": "widgets/kegg_pathways.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWKEGGPathwayBrowser.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Gene Set Enrichment",
+    "doc": "widgets/gene_set_enrichment.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGeneSets.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Gene Sets",
+    "doc": null,
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGeneSets.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Cluster Analysis",
+    "doc": "widgets/cluster_analysis.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWClusterAnalysis.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Volcano Plot",
+    "doc": "widgets/volcano_plot.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWVolcanoPlot.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Homologs",
+    "doc": null,
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWHomologs.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Marker Genes",
+    "doc": "widgets/marker_genes.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWMarkerGenes.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Annotator",
+    "doc": "widgets/annotate_projection.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWAnnotateProjection.svg",
+    "background": "light-grass",
+    "keywords": [
+     "annotate"
+    ]
+   }
+  ]
+ ]
+]
