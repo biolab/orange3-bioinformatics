@@ -41,6 +41,27 @@ class TestOWGEODatasets(WidgetTest):
         # check if taxonomy is correct
         self.assertTrue(table_annotations[TableAnnotation.tax_id] == self.test_organism)
 
+    def test_filter_no_match(self):
+        filter_input = 'this will not match'
+        self.widget.filter.setText(filter_input)
+        self.assertEqual(self.widget.table_model._table.size, 0)
+        self.assertEqual(self.widget.search_pattern, filter_input)
+
+    def test_filter_match(self):
+        filter_input = 'Embryonic stem cell-derived cardiomyocytes'
+        gds_id = 'GDS3513'
+
+        # set filter
+        self.widget.filter.setText(filter_input)
+        self.assertEqual(len(self.widget.table_model._table), 1)
+        self.assertEqual(self.widget.search_pattern, filter_input)
+        self.assertEqual(self.widget.table_model.get_row_index(gds_id), 0)
+        self.assertTrue(gds_id in self.widget.table_model._table)
+
+        # remove filter
+        self.widget.filter.clear()
+        self.assertEqual(self.widget.table_model._table.shape, self.widget.table_model.table.shape)
+
 
 if __name__ == '__main__':
     unittest.main()

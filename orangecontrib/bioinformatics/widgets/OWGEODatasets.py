@@ -129,7 +129,10 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         self.table = np.asarray([_gds_to_row(gds) for gds in info.values()])
         self.show_table()
 
-    def _argsortData(self, data: np.ndarray, order):
+    def _argsortData(self, data: np.ndarray, order) -> Optional[np.ndarray]:
+        if not data.size:
+            return
+
         # store order choice.
         self._sort_column = column = self.sortColumn()
         self._sort_order = self.sortOrder()
@@ -138,7 +141,7 @@ class GEODatasetsModel(itemmodels.PyTableModel):
             data = np.char.replace(data, 'GDS', '')
             data = data.astype(int)
 
-        if column in (self.samples_col, self.features_col, self.genes_col, self.subsets_col, self.pubmed_id_col):
+        elif column in (self.samples_col, self.features_col, self.genes_col, self.subsets_col, self.pubmed_id_col):
             data[data == ''] = '0'
             data = data.astype(int)
 
