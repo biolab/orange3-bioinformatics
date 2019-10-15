@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.sparse import issparse
 from pointannotator.annotate_samples import (
     PFUN_BINOMIAL,
     SCORING_LOG_FDR,
@@ -85,12 +86,17 @@ class AnnotateSamplesMeta:
         if use_entrez_id:
             entrez_ids = [x.attributes.get("Entrez ID") for x in data.domain.attributes]
             has_entrez_id = np.array([x is not None for x in entrez_ids])
-            return (
-                pd.DataFrame(data.X[:, has_entrez_id], columns=map(str, np.array(entrez_ids)[has_entrez_id])),
-                has_entrez_id.tolist(),
-            )
+            columns = list(map(str, np.array(entrez_ids)))
+            columns_subset = has_entrez_id.tolist()
         else:
-            return pd.DataFrame(data.X, columns=map(str, data.domain.attributes)), None
+            columns = list(map(str, data.domain.attributes))
+            columns_subset = None
+
+        if issparse(data.X):
+            df = pd.DataFrame.sparse.from_spmatrix(data.X, columns=columns)
+        else:
+            df = pd.DataFrame(data.X, columns=columns)
+        return (df if columns_subset is None else df.loc[:, columns_subset], columns_subset)
 
     @staticmethod
     def mann_whitney_test(data):
@@ -190,7 +196,9 @@ class AnnotateSamplesMeta:
             df_z_values,
             df_available_annotations,
             df_data,
-            n,
+            num_all_attributes=n,
+            attributes_col="Gene",
+            annotations_col="Cell Type",
             z_threshold=z_threshold,
             p_value_fun=p_value_fun,
             scoring=scoring,
