@@ -82,7 +82,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.patcher2.start()
 
     def tearDown(self):
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         self.widget.cancel()
         self._restore_annotation_functions()
 
@@ -205,7 +205,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
         self.assertEqual(self.widget.run_button.text(), "Stop")
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertEqual(self.widget.run_button.text(), "Start")
 
     def test_button_toggle(self):
@@ -260,7 +260,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self._restore_annotation_functions()
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         self.assertTrue(self.widget.controls.attr_color.isEnabled())
 
         simulate.combobox_activate_index(self.widget.controls.attr_color, 0)
