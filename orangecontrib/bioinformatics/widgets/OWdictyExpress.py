@@ -8,7 +8,7 @@ from AnyQt.QtGui import QFont
 from AnyQt.QtCore import Qt, QSize, QThreadPool
 from AnyQt.QtWidgets import QFrame, QLabel, QLineEdit, QTreeWidget, QApplication, QTreeWidgetItem
 
-from Orange.data import Table, Domain, StringVariable
+from Orange.data import Table, StringVariable
 from Orange.widgets import gui, settings
 from Orange.widgets.widget import Msg, OWWidget
 from Orange.widgets.utils.signals import Output
@@ -257,15 +257,7 @@ class OWdictyExpress(OWWidget):
 
         if not bool(self.gene_as_attr_name):
             if 'Gene' in data.domain:
-                gene_column = data.domain['Gene']
-                gene_names = data.get_column_view(gene_column)[0]
-                gene_matcher.genes = gene_names
-
-                domain_ids = Domain([], metas=[StringVariable(ENTREZ_ID)])
-                data_ids = [[str(gene.gene_id) if gene.gene_id else '?'] for gene in gene_matcher.genes]
-                table_ids = Table(domain_ids, data_ids)
-                data = Table.concatenate([data, table_ids])
-
+                data = gene_matcher.match_table_column(data, 'Gene', StringVariable(ENTREZ_ID))
             data.attributes[GENE_ID_COLUMN] = ENTREZ_ID
         else:
             gene_matcher.match_table_attributes(data)
