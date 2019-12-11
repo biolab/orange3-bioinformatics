@@ -1,0 +1,8 @@
+Orange3 Bioinformatics
+======================
+
+Orange Bioinformatics provides access to publicly available data, like GEO data
+sets, GO and KEGG. It enables gene enrichment analysis, clustering,
+classification, gene identification and provides several common visualizations.
+All features can be combined with other widgets from the Orange data mining
+framework.
