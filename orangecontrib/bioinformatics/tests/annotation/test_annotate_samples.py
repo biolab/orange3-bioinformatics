@@ -1,4 +1,5 @@
 import unittest
+import functools
 
 import numpy as np
 from pointannotator.annotate_samples import (
@@ -9,6 +10,7 @@ from pointannotator.annotate_samples import (
 )
 
 from Orange.data import Table, Domain, StringVariable, DiscreteVariable, ContinuousVariable
+from Orange.tests.test_statistics import dense_sparse
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 from orangecontrib.bioinformatics.annotation.annotate_samples import (
@@ -56,7 +58,9 @@ class TestAnnotateSamples(unittest.TestCase):
 
         self.annotator = AnnotateSamplesMeta()
 
-    def test_mann_whitney_test(self):
+    @dense_sparse
+    def test_mann_whitney_test(self, array):
+        self.data.X = array(self.data.X)
         d = self.annotator.mann_whitney_test(self.data)
         self.assertEqual(type(d), Table)
         self.assertTupleEqual(self.data.X.shape, d.X.shape)
@@ -73,7 +77,9 @@ class TestAnnotateSamples(unittest.TestCase):
         )
         return self.annotator.filter_annotations(scores, fdrs, return_nonzero_annotations)
 
-    def test_artificial_data(self):
+    @dense_sparse
+    def test_artificial_data(self, array):
+        self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
@@ -83,7 +89,8 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertLessEqual(np.nanmax(annotations.X), 1)
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
-    def test_remove_empty_column(self):
+    @dense_sparse
+    def test_remove_empty_column(self, array):
         """
         Type 3 column must be removed here
         """
@@ -103,6 +110,7 @@ class TestAnnotateSamples(unittest.TestCase):
         ]
         markers = Table(m_domain, np.empty((len(m_data), 0)), None, m_data)
 
+        self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, markers)
 
         self.assertEqual(type(annotations), Table)
@@ -119,10 +127,12 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertLessEqual(np.nanmax(annotations.X), 1)
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
-    def test_sf(self):
+    @dense_sparse
+    def test_sf(self, array):
         """
         Test annotations with hypergeom.sf
         """
+        self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers, p_value_fun=PFUN_HYPERGEOMETRIC)
 
         self.assertEqual(type(annotations), Table)
@@ -132,16 +142,20 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertLessEqual(np.nanmax(annotations.X), 1)
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
-    def test_two_example(self):
+    @dense_sparse
+    def test_two_example(self, array):
         self.data = self.data[:2]
 
+        self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
 
-    def test_markers_without_entrez_id(self):
+    @dense_sparse
+    def test_markers_without_entrez_id(self, array):
         self.markers[1, "Entrez ID"] = "?"
+        self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers, return_nonzero_annotations=False)
 
         self.assertEqual(type(annotations), Table)
@@ -151,7 +165,9 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertLessEqual(np.nanmax(annotations.X), 1)
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
-    def test_select_attributes(self):
+    @dense_sparse
+    def test_select_attributes(self, array):
+        self.data.X = array(self.data.X)
         z = self.annotator.mann_whitney_test(self.data)
 
         self.assertEqual(z.X.shape, self.data.X.shape)
@@ -159,7 +175,8 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertGreaterEqual(z.X[0, 1], 1)
         self.assertGreaterEqual(z.X[0, 3], 1)
 
-    def test_assign_annotations(self):
+    @dense_sparse
+    def test_assign_annotations(self, array):
         z = np.array(
             [
                 [1.1, 1.1, 1.1, 1.1, 0, 0, 0, 0],
@@ -176,6 +193,7 @@ class TestAnnotateSamples(unittest.TestCase):
             {"211", "212", "213", "214"},
         ]
         exp_ann = np.array([[1, 0], [1 / 2, 1 / 4], [1 / 4, 1 / 2], [0, 1]])
+        self.data.X = array(self.data.X)
         annotations, fdrs = self.annotator.assign_annotations(z_table, self.markers, self.data[:4])
 
         self.assertEqual(len(attrs), len(annotations))
@@ -188,8 +206,14 @@ class TestAnnotateSamples(unittest.TestCase):
 
         np.testing.assert_array_less(fdrs, exp_fdrs_smaller)
 
-    def test_scoring(self):
+    @dense_sparse
+    def test_scoring(self, array):
         # scoring SCORING_EXP_RATIO
+        # last two cases with explicit zero are skipped due to pandas issue
+        # https://github.com/pandas-dev/pandas/issues/28992
+        if isinstance(array, functools.partial):
+            return
+        self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_EXP_RATIO)
 
         self.assertEqual(type(annotations), Table)
@@ -225,7 +249,8 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
 
-    def test_entrez_id_not_string(self):
+    @dense_sparse
+    def test_entrez_id_not_string(self, array):
         """
         It seems that some datasets (e.g. AML dataset) have Entrez ID as int
         although they should be strings. Here we add the test for those cases.
@@ -234,6 +259,7 @@ class TestAnnotateSamples(unittest.TestCase):
         for i, att in enumerate(self.data.domain.attributes):
             att.attributes["Entrez ID"] = int(att.attributes["Entrez ID"])
 
+        self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
@@ -243,7 +269,8 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertLessEqual(np.nanmax(annotations.X), 1)
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
-    def test_celltypes_as_feature(self):
+    @dense_sparse
+    def test_celltypes_as_feature(self, array):
         """
         Test case when cell type or genes appears as a feature
         """
@@ -261,6 +288,7 @@ class TestAnnotateSamples(unittest.TestCase):
                 )
             ),
         )
+        self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, markers)
 
         self.assertEqual(type(annotations), Table)
@@ -270,7 +298,8 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertLessEqual(np.nanmax(annotations.X), 1)
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
-    def test_celltypes_as_feature_and_meta(self):
+    @dense_sparse
+    def test_celltypes_as_feature_and_meta(self, array):
         """
         Test case when cell type is a feature and Entrez id is in metas
         """
@@ -288,6 +317,7 @@ class TestAnnotateSamples(unittest.TestCase):
                 )
             ),
         )
+        self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, markers)
 
         self.assertEqual(type(annotations), Table)
