@@ -37,7 +37,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
 
     @classmethod
     def _init_data(cls):
-        data_path = "https://datasets.orange.biolab.si/sc/aml-1k.tab.gz"
+        data_path = "https://datasets.biolab.si/sc/aml-1k.tab.gz"
         table_data = Table(data_path)
         table_data.attributes[TAX_ID] = "9606"
 
