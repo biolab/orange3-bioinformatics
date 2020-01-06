@@ -3,6 +3,7 @@ import threading
 import concurrent.futures
 from typing import Optional
 from functools import partial
+from urllib.parse import urlparse
 
 from AnyQt.QtGui import QColor, QStandardItem, QStandardItemModel
 from AnyQt.QtCore import (
@@ -627,8 +628,11 @@ class OWGeneSets(OWWidget):
                 category_column.setData(", ".join(gene_set.hierarchy), Qt.DisplayRole)
                 term_column.setData(gene_set.name, Qt.DisplayRole)
                 term_column.setData(gene_set.name, Qt.ToolTipRole)
-                term_column.setData(gene_set.link, LinkRole)
-                term_column.setForeground(QColor(Qt.blue))
+
+                # there was some cases when link string was not empty string but not valid (e.g. "_")
+                if gene_set.link and urlparse(gene_set.link).scheme:
+                    term_column.setData(gene_set.link, LinkRole)
+                    term_column.setForeground(QColor(Qt.blue))
 
                 count_column.setData(matched_set, Qt.UserRole)
                 count_column.setData(len(matched_set), Qt.DisplayRole)
