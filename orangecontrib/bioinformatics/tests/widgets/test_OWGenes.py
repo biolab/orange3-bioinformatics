@@ -34,7 +34,7 @@ class TestOWGenes(WidgetTest):
         genes, _ = self.widget.input_data.get_column_view(self.widget.selected_gene_col)
         self.assertEqual(len(self.widget.input_genes), len(genes))
 
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         # wait for gene matcher to finish
         # self.widget.threadpool.waitForDone()
         # self.process_events()

@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from Orange.data import Table, Domain, Variable
+from Orange.data import Table, Domain
 from Orange.projection import PCA
 from Orange.data.filter import Values, FilterString
 from Orange.widgets.tests.base import WidgetTest, WidgetOutputsTestMixin, ProjectionWidgetTestMixin, simulate
@@ -24,7 +24,6 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        Variable._clear_all_caches()
         cls._init_data()
         cls.signal_name = "Reference Data"
         cls.signal_data = cls.data
@@ -82,7 +81,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.patcher2.start()
 
     def tearDown(self):
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         self.widget.cancel()
         self._restore_annotation_functions()
 
@@ -92,11 +91,11 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
 
     def test_input_secondary_data(self):
         self.send_signal(self.widget.Inputs.secondary_data, self.secondary_data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertTrue(self.widget.Error.no_reference_data.is_shown())
 
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertFalse(self.widget.Error.no_reference_data.is_shown())
         opts = self.widget.graph.ref_scatterplot_item.opts
         self.assertEqual(opts["pen"].color().name(), "#c8c8c8")
@@ -105,23 +104,23 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.assertTrue(self.widget.graph.scatterplot_item.isVisible())
 
         self.send_signal(self.widget.Inputs.data, None)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertTrue(self.widget.Error.no_reference_data.is_shown())
 
         self.send_signal(self.widget.Inputs.secondary_data, None)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertFalse(self.widget.Error.no_reference_data.is_shown())
 
     def test_input_genes(self):
         self.send_signal(self.widget.Inputs.data, self.data)
         self.assertTrue(self.widget.Warning.no_genes.is_shown())
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.assertFalse(self.widget.Warning.no_genes.is_shown())
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.send_signal(self.widget.Inputs.genes, None)
         self.assertTrue(self.widget.Warning.no_genes.is_shown())
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.send_signal(self.widget.Inputs.data, None)
         self.assertFalse(self.widget.Warning.no_genes.is_shown())
 
@@ -129,12 +128,12 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self._restore_annotation_functions()
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         output1 = self.get_output(self.widget.Outputs.annotated_data)
         cbox = self.widget.controls.scoring_method
         simulate.combobox_activate_index(cbox, 2)
         self.widget.run_button.click()
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         output2 = self.get_output(self.widget.Outputs.annotated_data)
         np.testing.assert_array_equal(output1.X, output2.X)
         np.testing.assert_array_equal(output1.Y, output2.Y)
@@ -144,12 +143,12 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self._restore_annotation_functions()
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         output1 = self.get_output(self.widget.Outputs.annotated_data)
         cbox = self.widget.controls.statistical_test
         simulate.combobox_activate_index(cbox, 1)
         self.widget.run_button.click()
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         output2 = self.get_output(self.widget.Outputs.annotated_data)
         np.testing.assert_array_equal(output1.X, output2.X)
         np.testing.assert_array_equal(output1.Y, output2.Y)
@@ -160,11 +159,11 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self._restore_annotation_functions()
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         output1 = self.get_output(self.widget.Outputs.annotated_data)
         self.widget.controls.p_threshold.valueChanged.emit(0.1)
         self.widget.run_button.click()
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         output2 = self.get_output(self.widget.Outputs.annotated_data)
         np.testing.assert_array_equal(output1.X, output2.X)
         np.testing.assert_array_equal(output1.Y, output2.Y)
@@ -172,7 +171,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
 
     def test_epsilon_control(self):
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertFalse(self.widget.epsilon_spin.isEnabled())
         self.widget.controls.use_user_epsilon.click()
         self.assertTrue(self.widget.epsilon_spin.isEnabled())
@@ -184,7 +183,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self._restore_annotation_functions()
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         output = self.get_output(self.widget.Outputs.annotated_data)
         n_metas = len(self.data.domain.metas)
         self.assertGreater(len(output.domain.metas), n_metas + 4)
@@ -205,7 +204,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
         self.assertEqual(self.widget.run_button.text(), "Stop")
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertEqual(self.widget.run_button.text(), "Start")
 
     def test_button_toggle(self):
@@ -222,14 +221,14 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.widget.setup_plot.reset_mock()
         self.widget.send_data.assert_called_once()
         self.widget.send_data.reset_mock()
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.send_signal(self.widget.Inputs.data, self.data)
         self.widget.setup_plot.assert_called_once()
         self.widget.send_data.assert_called_once()
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.widget.setup_plot.reset_mock()
         self.widget.send_data.reset_mock()
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.send_signal(self.widget.Inputs.secondary_data, self.secondary_data)
         self.widget.setup_plot.assert_called_once()
         self.widget.send_data.assert_called_once()
@@ -237,7 +236,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
     def test_saved_selection(self):
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
 
         self.widget.graph.select_by_indices(list(range(0, len(self.data), 10)))
         settings = self.widget.settingsHandler.pack_data(self.widget)
@@ -245,7 +244,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
 
         self.send_signal(widget.Inputs.genes, self.genes, widget=widget)
         self.send_signal(widget.Inputs.data, self.data, widget=widget)
-        self.wait_until_stop_blocking(widget=widget)
+        self.wait_until_finished(widget=widget)
 
         self.assertEqual(np.sum(widget.graph.selection), 50)
         np.testing.assert_equal(self.widget.graph.selection, widget.graph.selection)
@@ -260,7 +259,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self._restore_annotation_functions()
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking(wait=TIMEOUT)
+        self.wait_until_finished(timeout=TIMEOUT)
         self.assertTrue(self.widget.controls.attr_color.isEnabled())
 
         simulate.combobox_activate_index(self.widget.controls.attr_color, 0)
@@ -274,12 +273,12 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
 
     def test_attr_label_metas(self):
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         simulate.combobox_activate_item(self.widget.controls.attr_label, self.data.domain[-1].name)
 
     def test_attr_models(self):
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         controls = self.widget.controls
         self.assertEqual(len(controls.attr_color.model()), 1008)
         self.assertEqual(len(controls.attr_shape.model()), 5)
@@ -306,17 +305,17 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
     def test_missing_embedding_data(self):
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, self.secondary_data[::2])
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         secondary_data = self.secondary_data[1::2]
         self.send_signal(self.widget.Inputs.secondary_data, secondary_data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertFalse(self.widget.Warning.missing_compute_value.is_shown())
         secondary_data = secondary_data[:, 2:]
         self.send_signal(self.widget.Inputs.secondary_data, secondary_data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertTrue(self.widget.Warning.missing_compute_value.is_shown())
         self.send_signal(self.widget.Inputs.secondary_data, None)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertFalse(self.widget.Warning.missing_compute_value.is_shown())
 
     @patch("Orange.projection.manifold.TSNE", DummyTSNE)
@@ -324,12 +323,12 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
     def test_tsne_output(self):
         owtsne = self.create_widget(OWtSNE)
         self.send_signal(owtsne.Inputs.data, self.reference_data, widget=owtsne)
-        self.wait_until_stop_blocking(widget=owtsne, wait=TIMEOUT)
+        self.wait_until_finished(widget=owtsne, timeout=TIMEOUT)
         tsne_output = self.get_output(owtsne.Outputs.annotated_data, owtsne)
 
         self.send_signal(self.widget.Inputs.genes, self.genes)
         self.send_signal(self.widget.Inputs.data, tsne_output)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.send_signal(self.widget.Inputs.secondary_data, self.secondary_data)
 
 
