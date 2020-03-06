@@ -1,6 +1,6 @@
 """ NCBI Taxonomy browser module """
 
-from orangecontrib.bioinformatics.ncbi.taxonomy.utils import Taxonomy
+from orangecontrib.bioinformatics.ncbi.taxonomy.utils import Taxonomy, UnknownSpeciesIdentifier
 
 COMMON_NAMES = (
     ("6500", "Aplysia californica"),
