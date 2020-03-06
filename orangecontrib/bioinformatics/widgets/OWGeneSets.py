@@ -3,6 +3,7 @@ import threading
 import concurrent.futures
 from typing import Optional
 from functools import partial
+from urllib.parse import urlparse
 
 from AnyQt.QtGui import QColor, QStandardItem, QStandardItemModel
 from AnyQt.QtCore import (
@@ -366,21 +367,30 @@ class OWGeneSets(OWWidget):
             self.invalidate()
 
     def update_info_box(self):
-        info_string = ''
+        input_string = ''
+        input_number = ""
         if self.input_genes:
-            info_string += '{} unique gene names on input.\n'.format(len(self.input_genes))
-            info_string += '{} genes on output.\n'.format(self.num_of_sel_genes)
+            input_string += '{} unique gene names on input.\n'.format(len(self.input_genes))
+            input_number += str(len(self.input_genes))
+            self.info.set_output_summary(
+                str(self.num_of_sel_genes), '{} genes on output.\n'.format(self.num_of_sel_genes)
+            )
+        elif self.input_data:
+            if not any([self.gene_id_column, self.gene_id_attribute]):
+                input_number += "0"
+                input_string += 'Input data with incorrect meta data.\nUse Gene Name Matcher widget.'
+            self.info.set_output_summary(self.info.NoOutput)
         else:
-            if self.input_data:
-                if not any([self.gene_id_column, self.gene_id_attribute]):
-                    info_string += 'Input data with incorrect meta data.\nUse Gene Name Matcher widget.'
-            else:
-                info_string += 'No data on input.\n'
+            self.info.set_output_summary(self.info.NoOutput)
 
         if self.custom_data:
-            info_string += '{} marker genes in {} sets\n'.format(self.custom_data.X.shape[0], self.num_of_custom_sets)
+            input_number += f"{'' if input_number else '0'}|{self.custom_data.X.shape[0]}"
+            input_string += '{} marker genes in {} sets\n'.format(self.custom_data.X.shape[0], self.num_of_custom_sets)
 
-        self.input_info.setText(info_string)
+        if not input_number:
+            self.info.set_input_summary(self.info.NoInput)
+        else:
+            self.info.set_input_summary(input_number, input_string)
 
     def create_partial(self):
         return partial(
@@ -419,6 +429,7 @@ class OWGeneSets(OWWidget):
         )
 
         self.progress_bar = ProgressBar(self, iterations=progress_iterations)
+        self.setBlocking(True)
 
         self._task.future = self._executor.submit(f)
 
@@ -447,6 +458,7 @@ class OWGeneSets(OWWidget):
             self.update_info_box()
         except Exception as ex:
             print(ex)
+        self.setBlocking(False)
 
     def create_filters(self):
         search_term = self.search_pattern.lower().strip().split()
@@ -574,7 +586,6 @@ class OWGeneSets(OWWidget):
 
     def setup_control_area(self):
         # Control area
-        self.input_info = widgetLabel(widgetBox(self.controlArea, "Info", addSpace=True), 'No data on input.\n')
         self.custom_gs_col_box = box = vBox(self.controlArea, 'Custom Gene Set Term Column')
         box.hide()
 
@@ -627,8 +638,11 @@ class OWGeneSets(OWWidget):
                 category_column.setData(", ".join(gene_set.hierarchy), Qt.DisplayRole)
                 term_column.setData(gene_set.name, Qt.DisplayRole)
                 term_column.setData(gene_set.name, Qt.ToolTipRole)
-                term_column.setData(gene_set.link, LinkRole)
-                term_column.setForeground(QColor(Qt.blue))
+
+                # there was some cases when link string was not empty string but not valid (e.g. "_")
+                if gene_set.link and urlparse(gene_set.link).scheme:
+                    term_column.setData(gene_set.link, LinkRole)
+                    term_column.setForeground(QColor(Qt.blue))
 
                 count_column.setData(matched_set, Qt.UserRole)
                 count_column.setData(len(matched_set), Qt.DisplayRole)
