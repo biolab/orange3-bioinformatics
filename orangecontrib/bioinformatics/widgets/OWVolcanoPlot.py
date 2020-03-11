@@ -1,13 +1,17 @@
+from typing import Optional
+
 import numpy as np
 
+from Orange.data import Table
 from Orange.widgets import gui, settings
 from Orange.widgets.widget import Msg
-from Orange.widgets.settings import SettingProvider
+from Orange.widgets.settings import ContextSetting, SettingProvider, DomainContextHandler, PerfectDomainContextHandler
 from Orange.widgets.visualize.owscatterplot import OWScatterPlotBase, OWDataProjectionWidget
 
-from orangecontrib.bioinformatics.utils.statistics import score_t_test, score_fold_change
-from orangecontrib.bioinformatics.widgets.utils.gui import label_selection
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
+from orangecontrib.bioinformatics.utils.statistics import score_fold_change
+from orangecontrib.bioinformatics.widgets.components import GeneScoringComponent
+from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
+from orangecontrib.bioinformatics.widgets.utils.settings import GeneScoringComponentSettings
 
 
 class VolcanoGraph(OWScatterPlotBase):
@@ -28,117 +32,129 @@ class OWVolcanoPlot(OWDataProjectionWidget):
             'Insufficient data to compute statistics.' 'More than one measurement per class should be provided '
         )
 
-        gene_enrichment = Msg('{}, {}.')
-        no_selected_gene_sets = Msg('No gene set selected, select them from Gene Sets box.')
-
     class Error(OWDataProjectionWidget.Error):
         exclude_error = Msg('Target labels most exclude/include at least one value.')
         negative_values = Msg('Negative values in the input. The inputs cannot be in ratio scale.')
-        data_not_annotated = Msg('The input date is not annotated as expexted. Please refer to documentation.')
+        data_not_annotated = Msg('The input date is not annotated as expected. Please refer to documentation.')
         gene_column_id_missing = Msg('Can not identify genes column. Please refer to documentation.')
 
-    GRAPH_CLASS = VolcanoGraph
+    settingsHandler = GeneScoringComponentSettings()
+
+    # graph settings
     graph = SettingProvider(VolcanoGraph)
+    GRAPH_CLASS = VolcanoGraph
     embedding_variables_names = ('log2 (ratio)', '-log10 (P_value)')
 
-    stored_selections = settings.ContextSetting([])
-    current_group_index = settings.ContextSetting(0)
+    # component settings
+    scoring_component = SettingProvider(GeneScoringComponent)
 
     def __init__(self):
         super().__init__()
+        self.original_data: Optional[Table] = None
+        self.genes_in_columns: Optional[str] = None
+        self.gene_id_column: Optional[str] = None
+        self.gene_id_attribute: Optional[str] = None
+
+        self.fold: Optional[np.array] = None
+        self.log_p_values: Optional[np.array] = None
+        self.valid_data: Optional[np.array] = None
 
     def _add_controls(self):
-        box = gui.vBox(self.controlArea, "Target Labels")
-        self.group_selection_widget = label_selection.LabelSelectionWidget()
-        self.group_selection_widget.groupChanged.connect(self.on_target_values_changed)
-        self.group_selection_widget.groupSelectionChanged.connect(self.on_target_values_changed)
-        box.layout().addWidget(self.group_selection_widget)
+        box = gui.vBox(self.controlArea, True, margin=0)
+        self.scoring_component = GeneScoringComponent(self, box)
+        self.scoring_component.controls_changed.connect(self.setup_plot)
 
         super()._add_controls()
         self.gui.add_widgets([self.gui.ShowGridLines], self._plot_box)
 
-    def get_embedding(self):
+    def _compute(self):
         self.Error.exclude_error.clear()
+        self.fold = None
+        self.log_p_values = None
 
-        group, target_indices = self.group_selection_widget.selected_split()
+        if self.data:
+            x = self.data.X
+            score_method = self.scoring_component.get_score_method()
 
-        if self.data and group is not None and target_indices:
-            X = self.data.X
-            I1 = label_selection.group_selection_mask(self.data, group, target_indices)
-            I2 = ~I1
+            i1 = self.scoring_component.get_selection_mask()
+            i2 = ~i1
 
-            # print(group)
-            if isinstance(group, label_selection.RowGroup):
-                X = X.T
-
-            N1, N2 = np.count_nonzero(I1), np.count_nonzero(I2)
-
-            if not N1 or not N2:
+            n1, n2 = np.count_nonzero(i1), np.count_nonzero(i2)
+            if not n1 or not n2:
                 self.Error.exclude_error()
                 return
 
-            if N1 < 2 and N2 < 2:
+            if n1 < 2 and n2 < 2:
                 self.Warning.insufficient_data()
 
-            X1, X2 = X[:, I1], X[:, I2]
-
-            if np.any(X1 < 0.0) or np.any(X2 < 0):
+            x1, x2 = x[:, i1], x[:, i2]
+            if np.any(x1 < 0.0) or np.any(x2 < 0):
                 self.Error.negative_values()
-                X1 = np.full_like(X1, np.nan)
-                X2 = np.full_like(X2, np.nan)
+                x1 = np.full_like(x1, np.nan)
+                x2 = np.full_like(x2, np.nan)
 
-            with np.errstate(divide="ignore", invalid="ignore"):
-                fold = score_fold_change(X1, X2, axis=1, log=True)
-                _, p_values = score_t_test(X1, X2, axis=1)
-                log_p_values = np.log10(p_values)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                self.fold = score_fold_change(x1, x2, axis=1, log=True)
+                _, p_values = score_method(x1, x2, axis=1, threshold=self.scoring_component.get_expression_threshold())
+                self.log_p_values = np.log10(p_values)
 
-            self.valid_data = np.isfinite(fold) & np.isfinite(p_values)
-            return np.array([fold, -log_p_values]).T
+    def get_embedding(self):
+        if self.data is None:
+            return None
+
+        if self.fold is None or self.log_p_values is None:
+            return
+
+        self.valid_data = np.isfinite(self.fold) & np.isfinite(self.log_p_values)
+        return np.array([self.fold, -self.log_p_values]).T
+
+    def send_data(self):
+        group_sel, data, graph = None, self._get_projection_data(), self.graph
+        if graph.selection is not None:
+            group_sel = np.zeros(len(data), dtype=int)
+            group_sel[self.valid_data] = graph.selection
+
+        selected_data = self._get_selected_data(data, graph.get_selection(), group_sel)
+
+        if self.genes_in_columns and selected_data:
+            selected_data = Table.transpose(selected_data, feature_names_column=self.scoring_component.feature_name)
+
+        self.Outputs.selected_data.send(selected_data)
 
     def setup_plot(self):
+        self._compute()
         super().setup_plot()
         for axis, var in (("bottom", 'log<sub>2</sub> (ratio)'), ("left", '-log<sub>10</sub> (P_value)')):
             self.graph.set_axis_title(axis, var)
 
-    def on_target_values_changed(self, index):
-        # Save the current selection to persistent settings
-        self.current_group_index = index
-        selected_indices = [ind.row() for ind in self.group_selection_widget.currentGroupSelection().indexes()]
-
-        if self.current_group_index != -1 and selected_indices:
-            self.stored_selections[self.current_group_index] = selected_indices
-
-        self.setup_plot()
-
     def set_data(self, data):
         self.Warning.clear()
         self.Error.clear()
-        super().set_data(data)
-        self.group_selection_widget.set_data(self, self.data)
 
-        if self.data:
-            if not self.stored_selections:
-                self.stored_selections = [[0] for _ in self.group_selection_widget.targets]
-            self.group_selection_widget.set_selection()
+        self.genes_in_columns = data.attributes.get(TableAnnotation.gene_as_attr_name, None)
+        self.gene_id_column = data.attributes.get(TableAnnotation.gene_id_column, None)
+        self.gene_id_attribute = data.attributes.get(TableAnnotation.gene_id_attribute, None)
+
+        if self.genes_in_columns:
+            self.original_data = data
+            # override default meta_attr_name value to avoid unexpected changes.
+            data = Table.transpose(data, meta_attr_name=self.scoring_component.feature_name)
+
+        super().set_data(data)
+        self.scoring_component.initialize(data)
 
     def check_data(self):
         self.clear_messages()
-        use_attr_names = self.data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
-        gene_id_column = self.data.attributes.get(GENE_ID_COLUMN, None)
-
         if self.data is not None and (len(self.data) == 0 or len(self.data.domain) == 0):
             self.data = None
 
-        if use_attr_names is None:
+        if self.genes_in_columns is None:
             # Note: input data is not annotated properly.
             self.Error.data_not_annotated()
             self.data = None
 
-        if gene_id_column is None:
-            # Note: Can not identify genes column.
-            self.Error.gene_column_id_missing()
-            self.data = None
-
 
 if __name__ == "__main__":
-    pass
+    from Orange.widgets.utils.widgetpreview import WidgetPreview
+
+    WidgetPreview(OWVolcanoPlot).run()
