@@ -1,3 +1,5 @@
+from typing import Tuple
+
 from Orange.widgets import settings
 
 
@@ -60,3 +62,20 @@ class OrganismContextHandler(settings.ContextHandler):
 
         # get taxonomy id from the widget
         context.organism = widget.tax_id
+
+
+class MarkerGroupContextHandler(settings.ContextHandler):
+    """
+    Class used for restoring the context-selection. In case of marker genes the context is restored when selected
+    organism and selected database source is matching.
+    """
+
+    def match(self, context, group_source: Tuple[str, str], *args) -> str:
+        if not context.group_source == group_source:
+            return self.NO_MATCH
+        return self.PERFECT_MATCH
+
+    def new_context(self, group_source: Tuple[str, str]):
+        context = super().new_context()
+        context.group_source = group_source
+        return context
