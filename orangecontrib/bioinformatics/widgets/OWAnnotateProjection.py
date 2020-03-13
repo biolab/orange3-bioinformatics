@@ -421,7 +421,6 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             'labelWidth': 100,
             'orientation': Qt.Horizontal,
             'sendSelectedValue': True,
-            'valueType': str,
             'contentsLength': 14,
         }
         box = gui.vBox(self.controlArea, True)
@@ -783,7 +782,12 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             return super().get_palette()
 
         colors = self.clusters.table.domain["Clusters"].colors
-        return ColorPaletteGenerator(number_of_colors=len(colors), rgb_colors=colors)
+        # the second option is to keep widget backward compatible (Orange < 3.25)
+        return (
+            self.clusters.table.domain["Clusters"].palette
+            if hasattr(self.clusters.table.domain["Clusters"], "palette")
+            else ColorPaletteGenerator(number_of_colors=len(colors), rgb_colors=colors)
+        )
 
     def get_cluster_hulls(self):
         if not self.clusters.groups:
@@ -812,7 +816,12 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
             selection = graph.get_selection() + len(ref_proj_data)
             self.Outputs.selected_data.send(self._get_selected_data(data, selection, group_sel))
-            self.Outputs.annotated_data.send(self._get_annotated_data(data, selection, group_sel, graph.selection))
+
+            # keeping backward compatible - versions of Orange < 3.25 fails on first call
+            try:
+                self.Outputs.annotated_data.send(self._get_annotated_data(data, group_sel, graph.selection))
+            except TypeError:
+                self.Outputs.annotated_data.send(self._get_annotated_data(data, selection, group_sel, graph.selection))
         else:
             super().send_data()
 
@@ -893,7 +902,7 @@ if __name__ == "__main__":
     from Orange.projection import PCA
     from orangecontrib.bioinformatics.utils import serverfiles
 
-    data_path = "https://datasets.orange.biolab.si/sc/aml-1k.tab.gz"
+    data_path = "https://datasets.biolab.si/sc/aml-1k.tab.gz"
     table_data = Table(data_path)
     table_data.attributes[TAX_ID] = "9606"
 

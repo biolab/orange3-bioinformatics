@@ -24,6 +24,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        WidgetOutputsTestMixin.init(cls)
         cls._init_data()
         cls.signal_name = "Reference Data"
         cls.signal_data = cls.data
