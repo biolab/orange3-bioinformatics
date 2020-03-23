@@ -9,9 +9,10 @@ a bioinformatics knowledge base (we can't use bioinformatics.utils.serverfiles m
 import os
 import json
 
+import numpy as np
 from serverfiles import LocalFiles, ServerFiles
 
-from Orange.data import Table, Domain, DiscreteVariable
+from Orange.data import Table, Domain, StringVariable, DiscreteVariable
 from Orange.data import filter as table_filter
 from Orange.misc.environ import data_dir
 
@@ -88,7 +89,22 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
 
     if transpose:
         table = Table.transpose(table, feature_names_column='sample_id', meta_attr_name='genes')
-        table.name = title  # table name is lost after transpose
+
+        # When transposing a table, variable.attributes get picked up as numerical values instead of strings.
+        # We need to convert from Continuous to StringVariable
+        _genes = [
+            [str(int(gene)) if not np.isnan(gene) else '?']
+            for gene in table.get_column_view('Entrez ID')[0].astype(np.float64)
+        ]
+        new_var = StringVariable('Entrez ID')
+        metas = [var for var in table.domain.metas if var.name != 'Entrez ID'] + [new_var]
+        new_domain = Domain(table.domain.attributes, table.domain.class_vars, metas)
+        table = table.transform(new_domain)
+        table[:, new_var] = _genes
+
+        # table name is lost after transpose
+        table.name = title
+
         table_annotations[TableAnnotation.gene_as_attr_name] = not gds_info[TableAnnotation.gene_as_attr_name]
         table_annotations[TableAnnotation.gene_id_column] = gds_info[TableAnnotation.gene_id_attribute]
     else:
