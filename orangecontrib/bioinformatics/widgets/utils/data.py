@@ -73,7 +73,7 @@ def check_table_annotation(f):
                 widget.Error.unable_to_locate_genes()
                 data = None
 
-            elif TableAnnotation.gene_as_attr_name in attributes:
+            elif gene_as_attr_name in attributes:
                 if (attributes[gene_as_attr_name] and gene_id_attribute not in attributes) or (
                     not attributes[gene_as_attr_name] and gene_id_column not in attributes
                 ):
