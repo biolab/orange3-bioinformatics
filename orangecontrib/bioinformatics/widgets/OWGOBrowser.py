@@ -36,7 +36,7 @@ from Orange.widgets import gui, widget, settings
 from Orange.widgets.utils.concurrent import Task, FutureWatcher, ThreadExecutor, methodinvoke
 
 from orangecontrib.bioinformatics import go
-from orangecontrib.bioinformatics.ncbi import taxonomy
+from orangecontrib.bioinformatics.ncbi import gene, taxonomy
 from orangecontrib.bioinformatics.utils import statistics, serverfiles
 from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY, FILENAME_ANNOTATION
 from orangecontrib.bioinformatics.widgets.utils.data import (
@@ -159,6 +159,7 @@ class OWGOBrowser(widget.OWWidget):
         super().__init__(self, parent)
 
         self.input_data = None
+        self.gene_info = None
         self.ref_data = None
         self.ontology = None
         self.annotations = None
@@ -438,6 +439,8 @@ class OWGOBrowser(widget.OWWidget):
                 # raise ValueError('Taxonomy {} not supported.'.format(self.tax_id))
                 return
 
+            self.gene_info = gene.GeneInfo(self.tax_id)
+
             self.__invalidate()
 
     def set_reference_dataset(self, data=None):
@@ -649,8 +652,7 @@ class OWGOBrowser(widget.OWWidget):
         if not self.use_reference_dataset or self.ref_data is None:
             self.information(2)
             self.information(1)
-            self.ref_genes = self.annotations.genes()
-            self.ref_genes = set(self.ref_genes)
+            self.ref_genes = set(self.gene_info.keys())
 
         elif self.ref_data is not None:
             self.__get_ref_genes()

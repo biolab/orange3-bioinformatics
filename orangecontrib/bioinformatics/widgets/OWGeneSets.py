@@ -39,6 +39,7 @@ from Orange.widgets.utils.concurrent import FutureWatcher, ThreadExecutor, metho
 from Orange.widgets.utils.itemmodels import DomainModel
 
 from orangecontrib.bioinformatics import geneset
+from orangecontrib.bioinformatics.ncbi import gene
 from orangecontrib.bioinformatics.widgets.utils.gui import FilterProxyModel, GeneSetsSelection, NumericalColumnDelegate
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID,
@@ -113,6 +114,7 @@ class OWGeneSets(OWWidget):
         self.progress_bar_iterations = None
 
         # data
+        self.gene_info = None
         self.input_data = None
         self.input_genes = []
         self.tax_id = None
@@ -358,6 +360,7 @@ class OWGeneSets(OWWidget):
                 return
 
             self.gs_widget.load_gene_sets(self.tax_id)
+            self.gene_info = gene.GeneInfo(self.tax_id)
 
             # if input data change, we need to refresh custom sets
             if self.custom_data:

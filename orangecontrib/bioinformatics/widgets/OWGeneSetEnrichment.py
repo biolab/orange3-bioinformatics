@@ -157,9 +157,7 @@ class OWGeneSetEnrichment(_OWGeneSets.OWGeneSets):
 
     def create_partial(self):
         reference_genes = (
-            self.reference_genes
-            if (self.use_reference_data and self.reference_data)
-            else self.gs_widget.gs_object.genes()
+            self.reference_genes if (self.use_reference_data and self.reference_data) else self.gene_info.keys()
         )
 
         return partial(
