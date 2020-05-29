@@ -215,13 +215,6 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         self.wrap(self.table[self.filter_table(filter_pattern).any(axis=1), :])
         self.sort(self._sort_column, self._sort_order)
 
-    def wrap(self, table):
-        self.beginResetModel()
-        self._table = table
-        self._roleData = self._RoleData()
-        self.resetSorting()
-        self.endResetModel()
-
 
 class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     name = "GEO Data Sets"
