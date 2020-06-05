@@ -741,6 +741,8 @@ class OWMarkerGenes(widget.OWWidget):
     settingsHandler = MarkerGroupContextHandler()  # noqa: N815
     selected_genes = settings.ContextSetting([])
 
+    settings_version = 2
+
     _data = None
     _available_sources = None
 
