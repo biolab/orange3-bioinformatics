@@ -6,3 +6,17 @@ sets, GO and KEGG. It enables gene enrichment analysis, clustering,
 classification, gene identification and provides several common visualizations.
 All features can be combined with other widgets from the Orange data mining
 framework.
+See [documentation](http://orange3-bioinformatics.readthedocs.org/).
+
+Features
+--------
+#### Data access
+* access to GEO data sets
+* access to GO database
+* access to KEGG pathways database
+
+#### Bioinformatics analysis
+* plot differential gene expression
+* visualize diagrams of molecular interactions, reactions, and relations
+* enrich gene sets
+* cluster analysis
