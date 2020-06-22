@@ -71,9 +71,13 @@ class MarkerGroupContextHandler(settings.ContextHandler):
     """
 
     def match(self, context, group_source: Tuple[str, str], *args) -> str:
-        if not context.group_source == group_source:
-            return self.NO_MATCH
-        return self.PERFECT_MATCH
+        if hasattr(context, "group_source") and context.group_source == group_source:
+            return self.PERFECT_MATCH
+        elif (
+            hasattr(context, "group") and context.group == group_source[0]
+        ):  # backward compatibility (in old widget only group was saved)
+            return self.PERFECT_MATCH
+        return self.NO_MATCH
 
     def new_context(self, group_source: Tuple[str, str]):
         context = super().new_context()
