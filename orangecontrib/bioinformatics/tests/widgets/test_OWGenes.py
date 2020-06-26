@@ -12,11 +12,11 @@ class TestOWGenes(WidgetTest):
     def setUp(self):
         self._path = os.path.join(os.path.dirname(__file__), 'data')
         self.widget = self.create_widget(OWGenes)
-        self.markers_file = 'markers.tab.gz'
+        self.markers_file = 'genes.tab'
 
         file_name = os.path.join(self._path, self.markers_file)
 
-        # gene names are stored in "Name" attribute.
+        # gene names are stored in "Name" column.
         # we expect widget to detect this on its own.
         self.markers_column = 'Name'
         self.target_db = 'Entrez ID'
@@ -65,7 +65,7 @@ class TestOWGenes(WidgetTest):
         self.assertTrue(table_annotations[TAX_ID] == self.widget.tax_id)
 
     def test_filtered_output_data(self):
-        self.widget.search_pattern = 'interferon'
+        self.widget.search_pattern = 'tubulin gamma'
         self.widget._apply_filter()
 
         # get output data
@@ -76,7 +76,7 @@ class TestOWGenes(WidgetTest):
 
         # we expect filtered data table on the output
         ids, _ = out_data.get_column_view(self.target_db)
-        self.assertTrue(len(ids) == 35)
+        self.assertTrue(len(ids) == 2)
 
         # test if table on the output is properly annotated
         table_annotations = out_data.attributes
