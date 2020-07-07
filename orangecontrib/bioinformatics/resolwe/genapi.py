@@ -5,7 +5,7 @@ import requests
 import requests_cache
 from genesis import GenData, Genesis
 
-from .utils import cache_name, cache_backend, response_to_json
+from orangecontrib.bioinformatics.resolwe.utils import GENAPI_CACHE, CACHE_BACKEND, response_to_json
 
 view_model = ['experiment', 'growth', 'genotype', 'treatment', 'strain', 'time', 'replicate']
 DEFAULT_EMAIL = 'anonymous@genialis.com'
@@ -25,7 +25,7 @@ class GenAPI:
         self._data_endpoint = url + '/data/'
 
     def get_cached_ids(self):
-        with requests_cache.enabled(cache_name=cache_name, backend=cache_backend):
+        with requests_cache.enabled(cache_name=GENAPI_CACHE, backend=CACHE_BACKEND):
             cached_object = requests_cache.core.get_cache()
             responses = [cached_object.get_response_and_time(response) for response in cached_object.responses]
             gen_ids = []
@@ -45,7 +45,7 @@ class GenAPI:
         """
 
         callback = kwargs.get("progress_callback", None)
-        with requests_cache.enabled(cache_name=cache_name, backend=cache_backend):
+        with requests_cache.enabled(cache_name=GENAPI_CACHE, backend=CACHE_BACKEND):
             try:
                 # Note: this is hardcoded for now. When we port this module to Resolwe platform
                 #       data retrieval will be different
@@ -76,7 +76,7 @@ class GenAPI:
         callback = kwargs.get("progress_callback", None)
         table_name = kwargs.get("table_name", '')
 
-        with requests_cache.enabled(cache_name=cache_name, backend=cache_backend):
+        with requests_cache.enabled(cache_name=GENAPI_CACHE, backend=CACHE_BACKEND):
             try:
 
                 response = next(self._gen.download([gen_data_id], 'output.etcfile'))
