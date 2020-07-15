@@ -3,16 +3,21 @@ from typing import Dict, List
 from urllib.parse import urljoin
 
 import requests
+import requests_cache
 from resdk import Resolwe
 from requests import Response
 from resdk.resources.data import Data
+
+from orangecontrib.bioinformatics.resolwe.utils import CACHE_BACKEND, RESOLWEAPI_CACHE
 
 DEFAULT_URL: str = 'https://app.genialis.com'
 RESOLWE_URLS: List[str] = [DEFAULT_URL, 'https://imaps.genialis.com', 'https://bcm.genialis.com']
 
 SAMPLE_DESCRIPTOR_LABELS = ['species', 'genotype', 'biosample_source', 'biosample_treatment']
 
-# requests_cache.install_cache(cache_name=RESOLWEAPI_CACHE, backend=CACHE_BACKEND, include_get_headers=True)
+requests_cache.install_cache(
+    cache_name=RESOLWEAPI_CACHE, backend=CACHE_BACKEND, include_get_headers=True, expire_after=3600
+)
 
 
 class ResolweAPI:
@@ -29,6 +34,7 @@ class ResolweAPI:
         'contributor__first_name',
         'contributor__last_name',
         'contributor__username',
+        'tags',
     )
 
     def __init__(self, username=None, password=None, url=DEFAULT_URL):
