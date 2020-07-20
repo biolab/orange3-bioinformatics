@@ -110,11 +110,32 @@ class ItemsPerPage(IntEnum):
         return [20, 50, 100]
 
 
-class HeaderIndex(IntEnum):
+class TableHeader(IntEnum):
     id = 0
     slug = 1
     name = 2
+    samples = 3
     species = 4
+    created = 5
+    modified = 6
+    contributor = 7
+    description = 8
+    tags = 9
+
+    @staticmethod
+    def labels():
+        return [
+            'Id',
+            'Slug',
+            'Name',
+            'Samples',
+            'Species',
+            'Created',
+            'Modified',
+            'Contributor',
+            'Description',
+            'Tags',
+        ]
 
 
 class CollapsibleFilterComponent(OWComponent, QObject):
@@ -403,11 +424,15 @@ class SignInForm(QDialog):
 
 
 class GenialisExpressionsModel(PyTableModel):
-    HEADER_LABELS = ['Id', 'Slug', 'Name', 'Samples', 'Species', 'Created', 'Modified', 'Contributor', 'Description']
-
     def __init__(self, parent_widget, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.collection_url = parent_widget.res.collection_url
+        self.parent = parent_widget
+
+    def flags(self, index):
+        """
+        Disable the row selection by clicking on the first column.
+        """
+        return Qt.ItemIsEnabled if index.column() == 0 else Qt.ItemIsEnabled | Qt.ItemIsSelectable
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
@@ -421,26 +446,33 @@ class GenialisExpressionsModel(PyTableModel):
 
         try:
             value = self[row][column]
+            tag = self[row][TableHeader.tags]
+            slug = self[row][TableHeader.slug]
+            url = f'{self.parent.res.url}/{tag}/search/collection/{slug}'
         except IndexError:
             return
 
         if role == Qt.DisplayRole:
             if isinstance(value, datetime):
                 return str(value.date().strftime('%m/%d/%Y'))
+            elif column == TableHeader.description:
+                if value:
+                    return f'{str(value[:100])} ...'
             return str(value)
 
         elif role == Qt.ToolTipRole:
             if isinstance(value, datetime):
                 return str(value.strftime('%b %d, %Y %H:%M'))
-            if column == HeaderIndex.name:
-                return f'{self.collection_url}{self[row][HeaderIndex.slug]}'
+            if tag and column == TableHeader.id:
+                return url
             return str(value)
 
         elif role == Qt.TextAlignmentRole and isinstance(value, Number):
             return Qt.AlignRight | Qt.AlignVCenter
 
         elif role == gui.LinkRole:
-            return f'{self.collection_url}{self[row][HeaderIndex.slug]}'
+            if tag:
+                return url
 
     def set_data(self, collections: List[Dict[str, str]], col_to_species: Dict[str, str]):
         def model_row(collection: Dict[str, str]) -> List[Any]:
@@ -448,6 +480,13 @@ class GenialisExpressionsModel(PyTableModel):
             last_name = collection.get('contributor', {}).get('last_name', '')
             user_name = collection.get('contributor', {}).get('username', '')
             contributor = f'{first_name} {last_name}'.strip()
+
+            tags = collection.get('tags', [])
+            tags = [tag for tag in tags if 'community' in tag]
+            if len(tags) == 1:
+                _, tag = tags[0].split(':')
+            else:
+                tag = ''
 
             return [
                 collection['id'],
@@ -459,6 +498,7 @@ class GenialisExpressionsModel(PyTableModel):
                 datetime.strptime(collection.get('modified', ''), '%Y-%m-%dT%H:%M:%S.%f%z'),
                 contributor if contributor else user_name,
                 collection.get('description', ''),
+                tag,
             ]
 
         self.wrap([model_row(result) for result in collections])
@@ -571,7 +611,7 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     z_score_norm = settings.Setting(False, schema_only=True)
 
     auto_commit: bool
-    auto_commit = settings.Setting(True, schema_only=True)
+    auto_commit = settings.Setting(False, schema_only=True)
 
     class Outputs:
         table = Output('Expressions', Table)
@@ -605,6 +645,7 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         gui.rubber(self.controlArea)
         self.commit_button = gui.auto_commit(self.controlArea, self, 'auto_commit', '&Commit', box=False)
+        self.commit_button.button.setAutoDefault(False)
 
         # Main area
         self.table_view = QTableView()
@@ -616,9 +657,10 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.table_view.horizontalHeader().setStretchLastSection(True)
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table_view.setSelectionMode(QAbstractItemView.SingleSelection)
+        # self.table_view.setStyleSheet('QTableView::item:selected{background-color: palette(highlight); color: palette(highlightedText);};')
 
         self.model = GenialisExpressionsModel(self)
-        self.model.setHorizontalHeaderLabels(self.model.HEADER_LABELS)
+        self.model.setHorizontalHeaderLabels(TableHeader.labels())
         self.table_view.setModel(self.model)
         self.table_view.selectionModel().selectionChanged.connect(self.on_selection_changed)
 
@@ -634,7 +676,6 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     def __invalidate(self):
         self.data_objects = None
-        self.Outputs.table.send(None)
         self.Warning.no_expressions.clear()
         self.info.set_output_summary(StateInfo.NoOutput)
 
@@ -664,6 +705,7 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             self.update_user_status()
             self.update_collections_view()
             self.__invalidate()
+            self.Outputs.table.send(None)
 
     def update_user_status(self):
         user = self.res.get_currently_logged_user()
@@ -722,9 +764,9 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         # Pass the results to data model
         self.model.set_data(collections.get('results', []), collection_to_species)
-        self.table_view.setItemDelegateForColumn(HeaderIndex.name, gui.LinkStyledItemDelegate(self.table_view))
-        self.table_view.setColumnHidden(HeaderIndex.id, True)
-        self.table_view.setColumnHidden(HeaderIndex.slug, True)
+        self.table_view.setItemDelegateForColumn(TableHeader.id, gui.LinkStyledItemDelegate(self.table_view))
+        self.table_view.setColumnHidden(TableHeader.slug, True)
+        self.table_view.setColumnHidden(TableHeader.tags, True)
 
         # Check pagination parameters and emit pagination_availability signal
         next_page = True if collections.get('next') else False
@@ -732,10 +774,12 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.pagination_availability.emit(next_page, previous_page)
 
     def commit(self):
-        exp_type: str = 'rc' if self.exp_type == 0 else self.exp_type_options.group.checkedButton().text()
-        collection_species: str = self.get_selected_row_data(HeaderIndex.species)
+        self.cancel()
 
         if self.data_objects:
+            exp_type: str = 'rc' if self.exp_type == 0 else self.exp_type_options.group.checkedButton().text()
+            collection_species: str = self.get_selected_row_data(TableHeader.species)
+
             self.start(
                 runner,
                 self.res,
@@ -757,7 +801,7 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     def on_selection_changed(self):
         self.__invalidate()
 
-        collection_id: str = self.get_selected_row_data(HeaderIndex.id)
+        collection_id: str = self.get_selected_row_data(TableHeader.id)
         if not collection_id:
             return
 
