@@ -18,4 +18,5 @@ class ZScore(Preprocess):
     def __call__(self, data):
         _data = data.copy()
         _data.X = zscore(data.X, axis=self.axis)
+        _data.X[np.isnan(_data.X)] = 0
         return _data
