@@ -315,7 +315,7 @@ class PaginationComponent(OWComponent, QObject):
         self.page_left_btn.setEnabled(previous_page)
         self.page_right_btn.setEnabled(next_page)
 
-    def _reset_pagination(self):
+    def reset_pagination(self):
         self.offset = 0
         self.current_page = 1
         self.offset_label.setText(str(self.current_page))
@@ -337,7 +337,7 @@ class PaginationComponent(OWComponent, QObject):
         self.options_changed.emit()
 
     def on_limit_changed(self):
-        self._reset_pagination()
+        self.reset_pagination()
         self.options_changed.emit()
 
 
@@ -466,8 +466,8 @@ class GenialisExpressionsModel(PyTableModel):
                 return url
             return str(value)
 
-        elif role == Qt.TextAlignmentRole and isinstance(value, Number):
-            return Qt.AlignRight | Qt.AlignVCenter
+        # elif role == Qt.TextAlignmentRole and isinstance(value, Number):
+        #     return Qt.AlignRight | Qt.AlignVCenter
 
         elif role == gui.LinkRole:
             if tag:
@@ -658,7 +658,7 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.table_view.selectionModel().selectionChanged.connect(self.on_selection_changed)
 
         self.filter_component = CollapsibleFilterComponent(self, self.mainArea)
-        self.filter_component.options_changed.connect(self.update_collections_view)
+        self.filter_component.options_changed.connect(self.on_filter_changed)
         self.mainArea.layout().addWidget(self.table_view)
         self.pagination_component = PaginationComponent(self, self.mainArea)
         self.pagination_component.options_changed.connect(self.update_collections_view)
@@ -723,6 +723,10 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     def sign_out(self):
         self.res = connect(url=DEFAULT_URL)
+
+    def on_filter_changed(self):
+        self.pagination_component.reset_pagination()
+        self.update_collections_view()
 
     def get_query_parameters(self) -> Dict[str, str]:
         params = {
