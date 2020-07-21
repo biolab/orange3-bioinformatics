@@ -5,9 +5,7 @@ from numbers import Number
 from datetime import datetime
 from collections import defaultdict
 
-import numpy as np
 import pandas as pd
-from scipy.stats import zscore
 from resdk.resources.data import Data
 from dateutil.relativedelta import relativedelta
 from resdk.resources.sample import Sample
@@ -47,6 +45,7 @@ from Orange.widgets.utils.itemmodels import PyTableModel
 
 from orangecontrib.bioinformatics.resolwe import ResolweAPI, ResolweAuthException, connect
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
+from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
 from orangecontrib.bioinformatics.resolwe.resapi import DEFAULT_URL, RESOLWE_URLS, SAMPLE_DESCRIPTOR_LABELS
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
@@ -504,15 +503,7 @@ class GenialisExpressionsModel(PyTableModel):
         self.wrap([model_row(result) for result in collections])
 
 
-def runner(
-    res: ResolweAPI,
-    data_objects: List[Data],
-    exp_type: str,
-    species: str,
-    state: TaskState,
-    log_norm=False,
-    z_score_norm=False,
-) -> Table:
+def runner(res: ResolweAPI, data_objects: List[Data], exp_type: str, species: str, state: TaskState) -> Table:
     data_frames = []
     metadata = defaultdict(list)
 
@@ -554,15 +545,6 @@ def runner(
 
     state.set_status('Concatenating samples ...')
     df = pd.concat(data_frames, axis=0)
-
-    if log_norm:
-        state.set_status('Applying log2 normalization ...')
-        df = np.log2(df + 1)
-
-    if z_score_norm:
-        state.set_status('Applying z-score normalization ...')
-        columns = df.select_dtypes(include=[np.number]).columns
-        df[columns] = zscore(df[columns], axis=1)
 
     state.set_status('To data table ...')
     table = table_from_frame(df)
@@ -610,6 +592,9 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     z_score_norm: bool
     z_score_norm = settings.Setting(False, schema_only=True)
 
+    z_score_axis: int
+    z_score_axis = settings.Setting(0, schema_only=True)
+
     auto_commit: bool
     auto_commit = settings.Setting(False, schema_only=True)
 
@@ -641,7 +626,15 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         box = gui.widgetBox(self.controlArea, 'Normalization')
         gui.checkBox(box, self, 'log_norm', 'log2(x+1)', callback=self.on_normalization_changed)
-        gui.checkBox(box, self, 'z_score_norm', 'z-score', callback=self.on_normalization_changed)
+        gui.checkBox(box, self, 'z_score_norm', 'z-score', callback=self.on_z_score_selected)
+        self.z_score_axis_btn = gui.radioButtons(
+            gui.indentedBox(box),
+            self,
+            'z_score_axis',
+            btnLabels=['Columns', 'Rows'],
+            callback=self.on_normalization_changed,
+        )
+        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
 
         gui.rubber(self.controlArea)
         self.commit_button = gui.auto_commit(self.controlArea, self, 'auto_commit', '&Commit', box=False)
@@ -671,11 +664,13 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.pagination_component.options_changed.connect(self.update_collections_view)
 
         self.data_objects: Optional[List[Data]] = None
+        self.data_table: Optional[Table] = None
         self.update_collections_view()
         self.update_user_status()
 
     def __invalidate(self):
         self.data_objects = None
+        self.data_table = None
         self.Warning.no_expressions.clear()
         self.info.set_output_summary(StateInfo.NoOutput)
 
@@ -773,30 +768,40 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         previous_page = True if collections.get('previous') else False
         self.pagination_availability.emit(next_page, previous_page)
 
+    def normalize(self, table: Table) -> Table:
+        if self.log_norm:
+            table = LogarithmicScale()(table)
+
+        if self.z_score_norm:
+            table = ZScore(axis=self.z_score_axis)(table)
+
+        return table
+
     def commit(self):
         self.cancel()
 
-        if self.data_objects:
+        if self.data_objects and not self.data_table:
             exp_type: str = 'rc' if self.exp_type == 0 else self.exp_type_options.group.checkedButton().text()
             collection_species: str = self.get_selected_row_data(TableHeader.species)
 
-            self.start(
-                runner,
-                self.res,
-                self.data_objects,
-                exp_type,
-                collection_species,
-                log_norm=self.log_norm,
-                z_score_norm=self.z_score_norm,
-            )
+            self.start(runner, self.res, self.data_objects, exp_type, collection_species)
+
+        else:
+            self.Outputs.table.send(self.normalize(self.data_table))
 
     def on_exp_type_changed(self):
+        self.data_table = None
+
         if self.data_objects:
             self.commit()
 
     def on_normalization_changed(self):
-        if self.data_objects:
+        if self.data_table:
             self.commit()
+
+    def on_z_score_selected(self):
+        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
+        self.on_normalization_changed()
 
     def on_selection_changed(self):
         self.__invalidate()
@@ -826,7 +831,8 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         if table:
             samples, genes = table.X.shape
             self.info.set_output_summary(f'Samples: {samples} Genes: {genes}')
-            self.Outputs.table.send(table)
+            self.data_table = table
+            self.Outputs.table.send(self.normalize(table))
 
     def on_partial_result(self, result: Any) -> None:
         pass
