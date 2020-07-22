@@ -13,6 +13,7 @@ if __name__ == '__main__':
             'pyclipper==1.1.0.post1',
             'Orange3>=3.22.0',
             'point-annotator~=2.0',
+            'resdk~=12.1.1',
             # Versions are determined by Orange
             'scipy',
             'numpy',
