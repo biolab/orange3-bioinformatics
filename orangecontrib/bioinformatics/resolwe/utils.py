@@ -69,7 +69,7 @@ def etc_to_table(etc_json, time_var=False):
 
     table = []
     for row in etc_json['etc']['genes']:
-        gene_expression = [exp for exp in etc_json['etc']['genes'][row]]
+        gene_expression = list(etc_json['etc']['genes'][row])
         gene_expression.append(row)
         table.append(gene_expression)
 
