@@ -44,7 +44,7 @@ from Orange.widgets.utils.itemmodels import PyTableModel
 
 from orangecontrib.bioinformatics.resolwe import ResolweAPI, ResolweAuthException, connect
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
-from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale
+from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale, QuantileTransform
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
 from orangecontrib.bioinformatics.resolwe.resapi import DEFAULT_URL, RESOLWE_URLS, SAMPLE_DESCRIPTOR_LABELS
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
@@ -106,6 +106,15 @@ class ItemsPerPage(IntEnum):
     @staticmethod
     def values():
         return [20, 50, 100]
+
+
+class QuantileTransformDist(IntEnum):
+    normal = 0
+    uniform = 1
+
+    @staticmethod
+    def values():
+        return ['normal', 'uniform']
 
 
 class TableHeader(IntEnum):
@@ -354,9 +363,19 @@ class NormalizationComponent(OWComponent, QObject):
     z_score_axis: int
     z_score_axis = settings.Setting(0, schema_only=True)
 
+    quantile_transform: bool
+    quantile_transform = settings.Setting(False, schema_only=True)
+
+    quantile_transform_axis: int
+    quantile_transform_axis = settings.Setting(0, schema_only=True)
+
+    quantile_transform_dist: int
+    quantile_transform_dist = settings.Setting(0, schema_only=True)
+
     BOX_TITLE = 'Normalization'
-    LOG_NORM_LABEL = 'log2(x+1)'
-    Z_SCORE_LABEL = 'z-score'
+    LOG_NORM_LABEL = 'Log2(x+1)'
+    Z_SCORE_LABEL = 'Z-score'
+    QUANTILE_TRANSFORM_LABEL = 'Quantile transform'
 
     def __init__(self, parent_widget, parent_component):
         QObject.__init__(self)
@@ -369,14 +388,46 @@ class NormalizationComponent(OWComponent, QObject):
             gui.indentedBox(box),
             self,
             'z_score_axis',
-            btnLabels=['Columns', 'Rows'],
+            btnLabels=['columns', 'rows'],
             callback=self.options_changed.emit,
             orientation=Qt.Horizontal,
         )
         self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
 
+        gui.checkBox(
+            box,
+            self,
+            'quantile_transform',
+            self.QUANTILE_TRANSFORM_LABEL,
+            callback=self.on_quantile_transform_selected,
+        )
+        self.quantile_transform_axis_btn = gui.radioButtons(
+            gui.indentedBox(box),
+            self,
+            'quantile_transform_axis',
+            btnLabels=['columns', 'rows'],
+            callback=self.options_changed.emit,
+            orientation=Qt.Horizontal,
+        )
+        self.quantile_transform_dist_btn = gui.radioButtons(
+            gui.indentedBox(box),
+            self,
+            'quantile_transform_dist',
+            btnLabels=QuantileTransformDist.values(),
+            callback=self.options_changed.emit,
+            orientation=Qt.Horizontal,
+        )
+
+        self.quantile_transform_axis_btn.setHidden(not bool(self.quantile_transform))
+        self.quantile_transform_dist_btn.setHidden(not bool(self.quantile_transform))
+
     def on_z_score_selected(self):
         self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
+        self.options_changed.emit()
+
+    def on_quantile_transform_selected(self):
+        self.quantile_transform_axis_btn.setHidden(not bool(self.quantile_transform))
+        self.quantile_transform_dist_btn.setHidden(not bool(self.quantile_transform))
         self.options_changed.emit()
 
 
@@ -656,7 +707,7 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.set_exp_type_options()
 
         self.norm_component = NormalizationComponent(self, self.controlArea)
-        self.norm_component.options_changed.connect(self.commit)
+        self.norm_component.options_changed.connect(self.on_normalization_changed)
 
         gui.rubber(self.controlArea)
         self.commit_button = gui.auto_commit(self.controlArea, self, 'auto_commit', '&Commit', box=False)
@@ -794,12 +845,21 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         previous_page = True if collections.get('previous') else False
         self.pagination_availability.emit(next_page, previous_page)
 
-    def normalize(self, table: Table) -> Table:
+    def normalize(self, table: Table) -> Optional[Table]:
+        if not table:
+            return
+
         if self.norm_component.log_norm:
             table = LogarithmicScale()(table)
 
         if self.norm_component.z_score_norm:
             table = ZScore(axis=self.norm_component.z_score_axis)(table)
+
+        if self.norm_component.quantile_transform:
+            axis = self.norm_component.quantile_transform_axis
+            quantiles = min(table.X.shape[int(not axis)], 100)
+            distribution = QuantileTransformDist.values()[self.norm_component.quantile_transform_dist]
+            table = QuantileTransform(axis=axis, n_quantiles=quantiles, output_distribution=distribution)(table)
 
         return table
 
@@ -818,6 +878,10 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     def on_exp_type_changed(self):
         self.data_table = None
 
+        if self.data_objects:
+            self.commit()
+
+    def on_normalization_changed(self):
         if self.data_objects:
             self.commit()
 
