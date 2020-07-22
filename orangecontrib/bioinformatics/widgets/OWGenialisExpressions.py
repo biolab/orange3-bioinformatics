@@ -587,7 +587,7 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     exp_type = settings.Setting(None, schema_only=True)
 
     log_norm: bool
-    log_norm = settings.Setting(False, schema_only=True)
+    log_norm = settings.Setting(True, schema_only=True)
 
     z_score_norm: bool
     z_score_norm = settings.Setting(False, schema_only=True)
