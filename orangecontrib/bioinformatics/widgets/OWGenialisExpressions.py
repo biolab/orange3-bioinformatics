@@ -1,7 +1,6 @@
 import io
 from enum import IntEnum
 from typing import Any, Dict, List, Optional
-from numbers import Number
 from datetime import datetime
 from collections import defaultdict
 
@@ -341,6 +340,46 @@ class PaginationComponent(OWComponent, QObject):
         self.options_changed.emit()
 
 
+class NormalizationComponent(OWComponent, QObject):
+    """ Gene expression normalization component """
+
+    options_changed = pyqtSignal()
+
+    log_norm: bool
+    log_norm = settings.Setting(True, schema_only=True)
+
+    z_score_norm: bool
+    z_score_norm = settings.Setting(False, schema_only=True)
+
+    z_score_axis: int
+    z_score_axis = settings.Setting(0, schema_only=True)
+
+    BOX_TITLE = 'Normalization'
+    LOG_NORM_LABEL = 'log2(x+1)'
+    Z_SCORE_LABEL = 'z-score'
+
+    def __init__(self, parent_widget, parent_component):
+        QObject.__init__(self)
+        OWComponent.__init__(self, widget=parent_widget)
+
+        box = gui.widgetBox(parent_component, self.BOX_TITLE)
+        gui.checkBox(box, self, 'log_norm', self.LOG_NORM_LABEL, callback=self.options_changed.emit)
+        gui.checkBox(box, self, 'z_score_norm', self.Z_SCORE_LABEL, callback=self.on_z_score_selected)
+        self.z_score_axis_btn = gui.radioButtons(
+            gui.indentedBox(box),
+            self,
+            'z_score_axis',
+            btnLabels=['Columns', 'Rows'],
+            callback=self.options_changed.emit,
+            orientation=Qt.Horizontal,
+        )
+        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
+
+    def on_z_score_selected(self):
+        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
+        self.options_changed.emit()
+
+
 class SignInForm(QDialog):
     def __init__(self, flags, *args, **kwargs):
         super().__init__(flags, *args, **kwargs)
@@ -580,20 +619,12 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     pagination_availability = pyqtSignal(bool, bool)
 
+    norm_component = settings.SettingProvider(NormalizationComponent)
     pagination_component = settings.SettingProvider(PaginationComponent)
     filter_component = settings.SettingProvider(CollapsibleFilterComponent)
 
     exp_type: int
     exp_type = settings.Setting(None, schema_only=True)
-
-    log_norm: bool
-    log_norm = settings.Setting(True, schema_only=True)
-
-    z_score_norm: bool
-    z_score_norm = settings.Setting(False, schema_only=True)
-
-    z_score_axis: int
-    z_score_axis = settings.Setting(0, schema_only=True)
 
     auto_commit: bool
     auto_commit = settings.Setting(False, schema_only=True)
@@ -624,17 +655,8 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         )
         self.set_exp_type_options()
 
-        box = gui.widgetBox(self.controlArea, 'Normalization')
-        gui.checkBox(box, self, 'log_norm', 'log2(x+1)', callback=self.on_normalization_changed)
-        gui.checkBox(box, self, 'z_score_norm', 'z-score', callback=self.on_z_score_selected)
-        self.z_score_axis_btn = gui.radioButtons(
-            gui.indentedBox(box),
-            self,
-            'z_score_axis',
-            btnLabels=['Columns', 'Rows'],
-            callback=self.on_normalization_changed,
-        )
-        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
+        self.norm_component = NormalizationComponent(self, self.controlArea)
+        self.norm_component.options_changed.connect(self.commit)
 
         gui.rubber(self.controlArea)
         self.commit_button = gui.auto_commit(self.controlArea, self, 'auto_commit', '&Commit', box=False)
@@ -773,11 +795,11 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.pagination_availability.emit(next_page, previous_page)
 
     def normalize(self, table: Table) -> Table:
-        if self.log_norm:
+        if self.norm_component.log_norm:
             table = LogarithmicScale()(table)
 
-        if self.z_score_norm:
-            table = ZScore(axis=self.z_score_axis)(table)
+        if self.norm_component.z_score_norm:
+            table = ZScore(axis=self.norm_component.z_score_axis)(table)
 
         return table
 
@@ -798,14 +820,6 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         if self.data_objects:
             self.commit()
-
-    def on_normalization_changed(self):
-        if self.data_table:
-            self.commit()
-
-    def on_z_score_selected(self):
-        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
-        self.on_normalization_changed()
 
     def on_selection_changed(self):
         self.__invalidate()
