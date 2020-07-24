@@ -41,8 +41,7 @@ class QuantileTransform(Preprocess):
 class QuantileNormalization(Preprocess):
     def __call__(self, data) -> Table:
         _data = data.copy()
-        sorted_indices = np.argsort(_data.X, axis=1)
-        mean = np.mean(np.take_along_axis(_data.X, sorted_indices, axis=1), axis=0)
+        mean = np.mean(np.sort(_data.X, axis=1), axis=0)
         rank = rankdata(_data.X, method='min', axis=1) - 1
         _data.X = mean.take(rank)
         return _data
