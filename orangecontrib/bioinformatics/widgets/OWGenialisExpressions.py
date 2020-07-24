@@ -44,7 +44,7 @@ from Orange.widgets.utils.itemmodels import PyTableModel
 
 from orangecontrib.bioinformatics.resolwe import ResolweAPI, ResolweAuthException, connect
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
-from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale, QuantileTransform
+from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale, QuantileTransform, QuantileNormalization
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
 from orangecontrib.bioinformatics.resolwe.resapi import DEFAULT_URL, RESOLWE_URLS, SAMPLE_DESCRIPTOR_LABELS
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
@@ -354,6 +354,9 @@ class NormalizationComponent(OWComponent, QObject):
 
     options_changed = pyqtSignal()
 
+    quantile_norm: bool
+    quantile_norm = settings.Setting(False, schema_only=True)
+
     log_norm: bool
     log_norm = settings.Setting(True, schema_only=True)
 
@@ -373,6 +376,7 @@ class NormalizationComponent(OWComponent, QObject):
     quantile_transform_dist = settings.Setting(0, schema_only=True)
 
     BOX_TITLE = 'Normalization'
+    QUANTILE_NORM_LABEL = 'Quantile normalization'
     LOG_NORM_LABEL = 'Log2(x+1)'
     Z_SCORE_LABEL = 'Z-score'
     QUANTILE_TRANSFORM_LABEL = 'Quantile transform'
@@ -382,6 +386,7 @@ class NormalizationComponent(OWComponent, QObject):
         OWComponent.__init__(self, widget=parent_widget)
 
         box = gui.widgetBox(parent_component, self.BOX_TITLE)
+        gui.checkBox(box, self, 'quantile_norm', self.QUANTILE_NORM_LABEL, callback=self.options_changed.emit)
         gui.checkBox(box, self, 'log_norm', self.LOG_NORM_LABEL, callback=self.options_changed.emit)
         gui.checkBox(box, self, 'z_score_norm', self.Z_SCORE_LABEL, callback=self.on_z_score_selected)
         self.z_score_axis_btn = gui.radioButtons(
@@ -848,6 +853,9 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     def normalize(self, table: Table) -> Optional[Table]:
         if not table:
             return
+
+        if self.norm_component.quantile_norm:
+            table = QuantileNormalization()(table)
 
         if self.norm_component.log_norm:
             table = LogarithmicScale()(table)

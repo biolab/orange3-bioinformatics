@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import zscore
+from scipy.stats import zscore, rankdata
 from sklearn.preprocessing import quantile_transform
 
 from Orange.data.table import Table
@@ -35,4 +35,14 @@ class QuantileTransform(Preprocess):
         _data.X = quantile_transform(
             _data.X, n_quantiles=self.n_quantiles, output_distribution=self.output_distribution, copy=True
         )
+        return _data
+
+
+class QuantileNormalization(Preprocess):
+    def __call__(self, data) -> Table:
+        _data = data.copy()
+        sorted_indices = np.argsort(_data.X, axis=1)
+        mean = np.mean(np.take_along_axis(_data.X, sorted_indices, axis=1), axis=0)
+        rank = rankdata(_data.X, method='min', axis=1) - 1
+        _data.X = mean.take(rank)
         return _data
