@@ -14,6 +14,12 @@ class LogarithmicScale(Preprocess):
 
 
 class ZScore(Preprocess):
+    """
+    Compute the z score.
+
+    Detailed description: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.zscore.html
+    """
+
     def __init__(self, axis=0):
         self.axis = axis
 
@@ -25,6 +31,12 @@ class ZScore(Preprocess):
 
 
 class QuantileTransform(Preprocess):
+    """
+    Transform features to follow a uniform or a normal distribution.
+
+    Detailed description: https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.quantile_transform.html
+    """
+
     def __init__(self, axis=0, n_quantiles=100, output_distribution='uniform'):
         self.axis = axis
         self.n_quantiles = n_quantiles
@@ -39,6 +51,13 @@ class QuantileTransform(Preprocess):
 
 
 class QuantileNormalization(Preprocess):
+    """
+    Quantile normalize a test distribution to a reference distribution
+    of the same length by taking the average of each quantile across samples.
+
+    Detailed description: https://en.wikipedia.org/wiki/Quantile_normalization
+    """
+
     def __call__(self, data) -> Table:
         _data = data.copy()
         mean = np.mean(np.sort(_data.X, axis=1), axis=0)
