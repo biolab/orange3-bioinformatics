@@ -45,7 +45,11 @@ class QuantileTransform(Preprocess):
     def __call__(self, data) -> Table:
         _data = data.copy()
         _data.X = quantile_transform(
-            _data.X, n_quantiles=self.n_quantiles, output_distribution=self.output_distribution, copy=True
+            _data.X,
+            n_quantiles=self.n_quantiles,
+            output_distribution=self.output_distribution,
+            copy=True,
+            axis=self.axis,
         )
         return _data
 
