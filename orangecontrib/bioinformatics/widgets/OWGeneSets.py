@@ -67,7 +67,7 @@ class OWGeneSets(OWWidget):
     name = "Gene Sets"
     description = ""
     icon = "icons/OWGeneSets.svg"
-    priority = 9
+    priority = 80
     want_main_area = True
 
     COUNT, GENES, CATEGORY, TERM = range(4)

@@ -238,7 +238,7 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
     name = "KEGG Pathways"
     description = "Browse KEGG pathways that include an input set of genes."
     icon = "../widgets/icons/OWKEGGPathwayBrowser.svg"
-    priority = 8
+    priority = 70
 
     inputs = [("Data", Orange.data.Table, "SetData", widget.Default), ("Reference", Orange.data.Table, "SetRefData")]
     outputs = [("Selected Data", Orange.data.Table, widget.Default), ("Unselected Data", Orange.data.Table)]

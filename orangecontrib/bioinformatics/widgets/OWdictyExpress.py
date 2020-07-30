@@ -49,7 +49,7 @@ class OWdictyExpress(OWWidget):
     description = "Time-course gene expression data"
     icon = "../widgets/icons/OWdictyExpress.svg"
     want_main_area = True
-    priority = 3
+    priority = 20
 
     class Inputs:
         pass

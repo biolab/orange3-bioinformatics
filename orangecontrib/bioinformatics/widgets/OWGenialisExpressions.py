@@ -668,7 +668,7 @@ def runner(res: ResolweAPI, data_objects: List[Data], exp_type: str, species: st
 
 class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     name = 'Genialis Expressions'
-    priority = 180
+    priority = 30
     want_main_area = True
     want_control_area = True
     icon = '../widgets/icons/OWGenialisExpressions.svg'

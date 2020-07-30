@@ -38,7 +38,7 @@ class OWGeneSetEnrichment(_OWGeneSets.OWGeneSets):
     name = "Gene Set Enrichment"
     description = ""
     icon = "icons/OWGeneSets.svg"
-    priority = 9
+    priority = 90
 
     max_p_value = Setting(0.0001)
     use_p_value = Setting(False)
