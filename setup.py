@@ -14,8 +14,8 @@ if __name__ == '__main__':
             'Orange3>=3.22.0',
             'point-annotator~=2.0',
             'resdk~=12.1.1',
+            'scipy>=1.5.0',
             # Versions are determined by Orange
-            'scipy',
             'numpy',
         ],
         extras_require={

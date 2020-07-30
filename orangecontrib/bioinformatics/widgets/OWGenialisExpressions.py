@@ -1,7 +1,6 @@
 import io
 from enum import IntEnum
 from typing import Any, Dict, List, Optional
-from numbers import Number
 from datetime import datetime
 from collections import defaultdict
 
@@ -45,7 +44,7 @@ from Orange.widgets.utils.itemmodels import PyTableModel
 
 from orangecontrib.bioinformatics.resolwe import ResolweAPI, ResolweAuthException, connect
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
-from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale
+from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale, QuantileTransform, QuantileNormalization
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
 from orangecontrib.bioinformatics.resolwe.resapi import DEFAULT_URL, RESOLWE_URLS, SAMPLE_DESCRIPTOR_LABELS
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
@@ -107,6 +106,15 @@ class ItemsPerPage(IntEnum):
     @staticmethod
     def values():
         return [20, 50, 100]
+
+
+class QuantileTransformDist(IntEnum):
+    normal = 0
+    uniform = 1
+
+    @staticmethod
+    def values():
+        return ['normal', 'uniform']
 
 
 class TableHeader(IntEnum):
@@ -338,6 +346,93 @@ class PaginationComponent(OWComponent, QObject):
 
     def on_limit_changed(self):
         self.reset_pagination()
+        self.options_changed.emit()
+
+
+class NormalizationComponent(OWComponent, QObject):
+    """ Gene expression normalization component """
+
+    options_changed = pyqtSignal()
+
+    quantile_norm: bool
+    quantile_norm = settings.Setting(False, schema_only=True)
+
+    log_norm: bool
+    log_norm = settings.Setting(True, schema_only=True)
+
+    z_score_norm: bool
+    z_score_norm = settings.Setting(False, schema_only=True)
+
+    z_score_axis: int
+    z_score_axis = settings.Setting(0, schema_only=True)
+
+    quantile_transform: bool
+    quantile_transform = settings.Setting(False, schema_only=True)
+
+    quantile_transform_axis: int
+    quantile_transform_axis = settings.Setting(0, schema_only=True)
+
+    quantile_transform_dist: int
+    quantile_transform_dist = settings.Setting(0, schema_only=True)
+
+    BOX_TITLE = 'Normalization'
+    QUANTILE_NORM_LABEL = 'Quantile normalization'
+    LOG_NORM_LABEL = 'Log2(x+1)'
+    Z_SCORE_LABEL = 'Z-score'
+    QUANTILE_TRANSFORM_LABEL = 'Quantile transform'
+
+    def __init__(self, parent_widget, parent_component):
+        QObject.__init__(self)
+        OWComponent.__init__(self, widget=parent_widget)
+
+        box = gui.widgetBox(parent_component, self.BOX_TITLE)
+        gui.checkBox(box, self, 'quantile_norm', self.QUANTILE_NORM_LABEL, callback=self.options_changed.emit)
+        gui.checkBox(box, self, 'log_norm', self.LOG_NORM_LABEL, callback=self.options_changed.emit)
+        gui.checkBox(box, self, 'z_score_norm', self.Z_SCORE_LABEL, callback=self.on_z_score_selected)
+        self.z_score_axis_btn = gui.radioButtons(
+            gui.indentedBox(box),
+            self,
+            'z_score_axis',
+            btnLabels=['columns', 'rows'],
+            callback=self.options_changed.emit,
+            orientation=Qt.Horizontal,
+        )
+        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
+
+        gui.checkBox(
+            box,
+            self,
+            'quantile_transform',
+            self.QUANTILE_TRANSFORM_LABEL,
+            callback=self.on_quantile_transform_selected,
+        )
+        self.quantile_transform_axis_btn = gui.radioButtons(
+            gui.indentedBox(box),
+            self,
+            'quantile_transform_axis',
+            btnLabels=['columns', 'rows'],
+            callback=self.options_changed.emit,
+            orientation=Qt.Horizontal,
+        )
+        self.quantile_transform_dist_btn = gui.radioButtons(
+            gui.indentedBox(box),
+            self,
+            'quantile_transform_dist',
+            btnLabels=QuantileTransformDist.values(),
+            callback=self.options_changed.emit,
+            orientation=Qt.Horizontal,
+        )
+
+        self.quantile_transform_axis_btn.setHidden(not bool(self.quantile_transform))
+        self.quantile_transform_dist_btn.setHidden(not bool(self.quantile_transform))
+
+    def on_z_score_selected(self):
+        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
+        self.options_changed.emit()
+
+    def on_quantile_transform_selected(self):
+        self.quantile_transform_axis_btn.setHidden(not bool(self.quantile_transform))
+        self.quantile_transform_dist_btn.setHidden(not bool(self.quantile_transform))
         self.options_changed.emit()
 
 
@@ -580,20 +675,12 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     pagination_availability = pyqtSignal(bool, bool)
 
+    norm_component = settings.SettingProvider(NormalizationComponent)
     pagination_component = settings.SettingProvider(PaginationComponent)
     filter_component = settings.SettingProvider(CollapsibleFilterComponent)
 
     exp_type: int
     exp_type = settings.Setting(None, schema_only=True)
-
-    log_norm: bool
-    log_norm = settings.Setting(False, schema_only=True)
-
-    z_score_norm: bool
-    z_score_norm = settings.Setting(False, schema_only=True)
-
-    z_score_axis: int
-    z_score_axis = settings.Setting(0, schema_only=True)
 
     auto_commit: bool
     auto_commit = settings.Setting(False, schema_only=True)
@@ -624,17 +711,8 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         )
         self.set_exp_type_options()
 
-        box = gui.widgetBox(self.controlArea, 'Normalization')
-        gui.checkBox(box, self, 'log_norm', 'log2(x+1)', callback=self.on_normalization_changed)
-        gui.checkBox(box, self, 'z_score_norm', 'z-score', callback=self.on_z_score_selected)
-        self.z_score_axis_btn = gui.radioButtons(
-            gui.indentedBox(box),
-            self,
-            'z_score_axis',
-            btnLabels=['Columns', 'Rows'],
-            callback=self.on_normalization_changed,
-        )
-        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
+        self.norm_component = NormalizationComponent(self, self.controlArea)
+        self.norm_component.options_changed.connect(self.on_normalization_changed)
 
         gui.rubber(self.controlArea)
         self.commit_button = gui.auto_commit(self.controlArea, self, 'auto_commit', '&Commit', box=False)
@@ -772,12 +850,24 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         previous_page = True if collections.get('previous') else False
         self.pagination_availability.emit(next_page, previous_page)
 
-    def normalize(self, table: Table) -> Table:
-        if self.log_norm:
+    def normalize(self, table: Table) -> Optional[Table]:
+        if not table:
+            return
+
+        if self.norm_component.quantile_norm:
+            table = QuantileNormalization()(table)
+
+        if self.norm_component.log_norm:
             table = LogarithmicScale()(table)
 
-        if self.z_score_norm:
-            table = ZScore(axis=self.z_score_axis)(table)
+        if self.norm_component.z_score_norm:
+            table = ZScore(axis=self.norm_component.z_score_axis)(table)
+
+        if self.norm_component.quantile_transform:
+            axis = self.norm_component.quantile_transform_axis
+            quantiles = min(table.X.shape[int(not axis)], 100)
+            distribution = QuantileTransformDist.values()[self.norm_component.quantile_transform_dist]
+            table = QuantileTransform(axis=axis, n_quantiles=quantiles, output_distribution=distribution)(table)
 
         return table
 
@@ -800,12 +890,8 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             self.commit()
 
     def on_normalization_changed(self):
-        if self.data_table:
+        if self.data_objects:
             self.commit()
-
-    def on_z_score_selected(self):
-        self.z_score_axis_btn.setHidden(not bool(self.z_score_norm))
-        self.on_normalization_changed()
 
     def on_selection_changed(self):
         self.__invalidate()
