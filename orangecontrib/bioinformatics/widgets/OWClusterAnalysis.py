@@ -50,7 +50,7 @@ class OWClusterAnalysis(OWWidget):
         "and corresponding gene terms that describe differentially expressed genes"
     )
     icon = "../widgets/icons/OWClusterAnalysis.svg"
-    priority = 100
+    priority = 110
 
     class Inputs:
         data_table = Input('Data', Table)

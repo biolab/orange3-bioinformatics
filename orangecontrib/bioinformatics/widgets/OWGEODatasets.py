@@ -220,7 +220,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     name = "GEO Data Sets"
     description = "Access to Gene Expression Omnibus data sets."
     icon = "icons/OWGEODatasets.svg"
-    priority = 2
+    priority = 10
 
     class Warning(OWWidget.Warning):
         using_local_files = Msg("Can't connect to serverfiles. Using cached files.")

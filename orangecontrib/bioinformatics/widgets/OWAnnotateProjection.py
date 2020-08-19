@@ -316,7 +316,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     name = "Annotator"
     description = "Annotates projection clusters."
     icon = "icons/OWAnnotateProjection.svg"
-    priority = 3050
+    priority = 140
     keywords = ["annotate"]
 
     GRAPH_CLASS = OWAnnotateProjectionGraph

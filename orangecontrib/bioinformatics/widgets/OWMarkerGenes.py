@@ -720,7 +720,7 @@ class TreeView(QTreeView):
 class OWMarkerGenes(widget.OWWidget):
     name = "Marker Genes"
     icon = 'icons/OWMarkerGenes.svg'
-    priority = 170
+    priority = 130
 
     replaces = ['orangecontrib.single_cell.widgets.owmarkergenes.OWMarkerGenes']
 
@@ -791,7 +791,7 @@ class OWMarkerGenes(widget.OWWidget):
         """
         box = gui.widgetBox(self.mainArea, "Description", addToLayout=False)
         self.descriptionlabel = QTextBrowser(
-            openExternalLinks=True, textInteractionFlags=(Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse),
+            openExternalLinks=True, textInteractionFlags=(Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse)
         )
         box.setMaximumHeight(self.descriptionlabel.fontMetrics().height() * (NUM_LINES_TEXT + 3))
 

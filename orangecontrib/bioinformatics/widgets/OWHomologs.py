@@ -29,7 +29,7 @@ HOMOLOG_ID = "Homolog ID"
 class OWHomologs(widget.OWWidget):
     name = "Homologs"
     icon = 'icons/OWHomologs.svg'
-    priority = 170
+    priority = 120
 
     class Outputs:
         genes = widget.Output("Genes", Table)

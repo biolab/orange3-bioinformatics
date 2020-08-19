@@ -213,7 +213,7 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
     name = "Genes"
     description = "Tool for working with genes"
     icon = "../widgets/icons/OWGeneInfo.svg"
-    priority = 5
+    priority = 40
     want_main_area = True
 
     selected_organism: int = Setting(11)

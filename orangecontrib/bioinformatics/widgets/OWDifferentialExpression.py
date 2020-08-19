@@ -534,7 +534,7 @@ class OWDifferentialExpression(widget.OWWidget):
     name = "Differential Expression"
     description = "Gene selection by differential expression analysis."
     icon = "../widgets/icons/OWDifferentialExpression.svg"
-    priority = 6
+    priority = 50
 
     inputs = [("Data", Orange.data.Table, "set_data")]
     outputs = [

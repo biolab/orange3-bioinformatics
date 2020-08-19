@@ -121,7 +121,7 @@ class OWGOBrowser(widget.OWWidget):
     name = "GO Browser"
     description = "Enrichment analysis for Gene Ontology terms."
     icon = "../widgets/icons/OWGOBrowser.svg"
-    priority = 7
+    priority = 60
 
     inputs = [
         ("Cluster Data", Orange.data.Table, "set_dataset", widget.Single + widget.Default),
