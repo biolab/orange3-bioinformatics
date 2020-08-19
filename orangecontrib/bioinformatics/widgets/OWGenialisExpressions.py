@@ -1,6 +1,6 @@
 import io
 from enum import IntEnum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Tuple, Optional
 from datetime import datetime
 from collections import defaultdict
 
@@ -666,7 +666,7 @@ def runner(res: ResolweAPI, data_objects: List[Data], exp_type: str, species: st
     return table
 
 
-class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
+class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     name = 'Genialis Expressions'
     priority = 30
     want_main_area = True
@@ -831,13 +831,18 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         return params
 
-    def update_collections_view(self):
+    def get_collections(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         # Get response from the server
         collections = self.res.get_collections(**self.get_query_parameters())
         # Loop trough collections and store ids
         collection_ids = [collection['id'] for collection in collections.get('results', [])]
         # Get species by collection ids
         collection_to_species = self.res.get_species(collection_ids)
+
+        return collections, collection_to_species
+
+    def update_collections_view(self):
+        collections, collection_to_species = self.get_collections()
 
         # Pass the results to data model
         self.model.set_data(collections.get('results', []), collection_to_species)
@@ -935,4 +940,4 @@ class OWMGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 if __name__ == "__main__":
     from orangewidget.utils.widgetpreview import WidgetPreview
 
-    WidgetPreview(OWMGenialisExpressions).run()
+    WidgetPreview(OWGenialisExpressions).run()
