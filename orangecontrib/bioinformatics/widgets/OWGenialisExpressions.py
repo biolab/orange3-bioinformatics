@@ -690,6 +690,8 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     class Warning(widget.OWWidget.Warning):
         no_expressions = Msg('Expression data objects not found.')
+        unexpected_feature_type = Msg('Can not import expression data, unexpected feature type "{}".')
+        multiple_feature_type = Msg('Can not import expression data, multiple feature types found.')
 
     def __init__(self):
         super().__init__()
@@ -750,6 +752,8 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.data_objects = None
         self.data_table = None
         self.Warning.no_expressions.clear()
+        self.Warning.multiple_feature_type.clear()
+        self.Warning.unexpected_feature_type.clear()
         self.info.set_output_summary(StateInfo.NoOutput)
 
     def set_exp_type_options(self, options: List[str] = None) -> None:
@@ -910,6 +914,22 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         if not self.data_objects:
             self.Warning.no_expressions()
+            return
+
+        # Note: This here is to handle an edge case where we get
+        #       different 'feature_type' data object in a collection.
+        #       For now we raise a warning, but in the future we should
+        #       discuss about how to properly handle different types of features.
+        feature_types = {data.output['feature_type'] for data in self.data_objects}
+
+        if len(feature_types) == 1 and 'gene' not in feature_types:
+            self.Warning.unexpected_feature_type(feature_types.pop())
+            self.data_objects = []
+            return
+
+        if len(feature_types) > 1:
+            self.Warning.multiple_feature_type()
+            self.data_objects = []
             return
 
         self.commit()
