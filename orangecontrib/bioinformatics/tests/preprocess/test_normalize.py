@@ -16,9 +16,7 @@ class TestQuantileNormalization(unittest.TestCase):
         _table = QuantileNormalization()(table)
 
         # expected result
-        result = np.array(
-            [[5.66666667, 2, 3, 4.66666667], [4.66666667, 2, 4.66666667, 3], [2, 3, 4.66666667, 5.66666667]]
-        )
+        result = np.array([[5.66666667, 2, 3, 4.66666667], [5.166667, 2, 5.166667, 3], [2, 3, 4.66666667, 5.66666667]])
         np.testing.assert_array_almost_equal(result, _table.X)
 
 

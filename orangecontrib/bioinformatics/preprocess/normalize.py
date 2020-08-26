@@ -64,7 +64,12 @@ class QuantileNormalization(Preprocess):
 
     def __call__(self, data) -> Table:
         _data = data.copy()
+
         mean = np.mean(np.sort(_data.X, axis=1), axis=0)
-        rank = rankdata(_data.X, method='min', axis=1) - 1
-        _data.X = mean.take(rank)
+        rank = rankdata(_data.X, method='average', axis=1) - 1
+
+        rank_floor = rank.astype(int)
+        rank_ceil = np.ceil(rank).astype(int)
+        _data.X = (mean.take(rank_floor) + mean.take(rank_ceil)) / 2
+
         return _data
