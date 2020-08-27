@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2020-08-27
+
+### Fixed
+- [#214](https://github.com/biolab/orange3-bioinformatics/pull/214): Fixed a problem in OWGEODatasets with filter component, [related isue](https://github.com/biolab/orange3-bioinformatics/issues/210). 
+- [#233](https://github.com/biolab/orange3-bioinformatics/pull/233): Fixed output summary and stop showing links if they are not available, [related isue](https://github.com/biolab/orange3-bioinformatics/issues/228).  
+- [#231](https://github.com/biolab/orange3-bioinformatics/pull/231): Properly use gene matcher in dictyExpress widget.
+- [#237](https://github.com/biolab/orange3-bioinformatics/pull/237): Fixed a problem with enrichment. Results from Gene Set Enrichemnt and GOBrowser widgets are now consistent, [related isue](https://github.com/biolab/orange3-bioinformatics/issues/234).
+- [#241](https://github.com/biolab/orange3-bioinformatics/pull/241): OWGEODatasets: Remove `wrap` reimplementation.
+- [#242](https://github.com/biolab/orange3-bioinformatics/pull/242): Marker genes settings migration.
+
+### Changed
+- [#215](https://github.com/biolab/orange3-bioinformatics/pull/215): Bump minimum version of point-annotator module.
+- [#216](https://github.com/biolab/orange3-bioinformatics/pull/216): Update icon for Gene Set Enrichment widget.
+- [#221](https://github.com/biolab/orange3-bioinformatics/pull/221): Update icons for Volcano plot and Annotate Projection widgets.
+- [#260](https://github.com/biolab/orange3-bioinformatics/pull/260): Update icon for dictyExpress widget.
+- [#219](https://github.com/biolab/orange3-bioinformatics/pull/219): Complete redesign of Marker Genes widget.
+- [#244](https://github.com/biolab/orange3-bioinformatics/pull/244): Unify add-on descriptions, [related isue](https://github.com/biolab/orange3/issues/4850).  
+
+### Added
+- [#215](https://github.com/biolab/orange3-bioinformatics/pull/215): Add support for sparse data in Annotation module.
+- [#245](https://github.com/biolab/orange3-bioinformatics/pull/245): setup Github Actions and tox.
+- [#252](https://github.com/biolab/orange3-bioinformatics/pull/251): Add GenialisExpressions widget, [project status](https://github.com/biolab/orange3-bioinformatics/projects/2).
+
 ## [4.0.0] - 2019-09-05
 
 ### Fixed
