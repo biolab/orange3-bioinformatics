@@ -31,13 +31,13 @@ class TableAnnotation(SimpleNamespace):
 
 
 def check_table_annotation(f):
-    """ Wrapper for widget's input method that checks if the data on the input is correctly annotated.
+    """Wrapper for widget's input method that checks if the data on the input is correctly annotated.
 
-     A widget in bioinformatics add-on expects that every Table has additional
-     information stored as table attributes:
-        - taxonomy_id = 'taxonomy id for given organism'
-        - gene_as_attribute_name = 'location of gene names (rows/columns)'
-        - gene_id_attribute/gene_id_column = 'attribute/column name'
+    A widget in bioinformatics add-on expects that every Table has additional
+    information stored as table attributes:
+       - taxonomy_id = 'taxonomy id for given organism'
+       - gene_as_attribute_name = 'location of gene names (rows/columns)'
+       - gene_id_attribute/gene_id_column = 'attribute/column name'
 
     """
 

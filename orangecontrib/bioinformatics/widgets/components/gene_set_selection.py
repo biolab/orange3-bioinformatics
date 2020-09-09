@@ -232,8 +232,7 @@ class GeneSetSelection(OWComponent, QObject):
             self.custom_gene_set_hierarchy = None
 
     def initialize(self, tax_id: str):
-        """ Initialize widget component with provided data.
-        """
+        """Initialize widget component with provided data."""
         self._load_gene_sets(tax_id)
         if self.data:
             self._load_custom_gene_sets()

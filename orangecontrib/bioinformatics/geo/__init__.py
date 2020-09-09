@@ -33,8 +33,7 @@ def is_cached(gds_id):
 
 
 def info_cache(f):
-    """ Store content of __INFO__ file locally.
-    """
+    """Store content of __INFO__ file locally."""
 
     def wrapper():
         if not os.path.isfile(_all_info_file) or os.path.getsize(_all_info_file) == 0:
