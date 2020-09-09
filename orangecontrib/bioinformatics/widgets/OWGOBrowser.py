@@ -39,15 +39,7 @@ from orangecontrib.bioinformatics import go
 from orangecontrib.bioinformatics.ncbi import gene, taxonomy
 from orangecontrib.bioinformatics.utils import statistics, serverfiles
 from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY, FILENAME_ANNOTATION
-from orangecontrib.bioinformatics.widgets.utils.data import (
-    TAX_ID,
-    GENE_ID_COLUMN,
-    GENE_ID_ATTRIBUTE,
-    GENE_AS_ATTRIBUTE_NAME,
-    ERROR_ON_MISSING_TAX_ID,
-    ERROR_ON_MISSING_GENE_ID,
-    ERROR_ON_MISSING_ANNOTATION,
-)
+from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation, check_table_annotation
 
 
 class EnsureDownloaded(Task):
@@ -151,9 +143,6 @@ class OWGOBrowser(widget.OWWidget):
         serverfiles_unavailable = widget.Msg(
             'Can not locate annotation files, ' 'please check your connection and try again.'
         )
-        missing_annotation = widget.Msg(ERROR_ON_MISSING_ANNOTATION)
-        missing_gene_id = widget.Msg(ERROR_ON_MISSING_GENE_ID)
-        missing_tax_id = widget.Msg(ERROR_ON_MISSING_TAX_ID)
 
     def __init__(self, parent=None):
         super().__init__(self, parent)
@@ -404,32 +393,21 @@ class OWGOBrowser(widget.OWWidget):
         self.send("Data on Selected Genes", None)
         self.send("Enrichment Report", None)
 
+    @check_table_annotation
     def set_dataset(self, data=None):
         self.closeContext()
         self.clear()
         self.Error.clear()
+        # print(data)
         if data:
             self.input_data = data
-            self.tax_id = str(self.input_data.attributes.get(TAX_ID, None))
-            self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
-            self.gene_id_attribute = self.input_data.attributes.get(GENE_ID_ATTRIBUTE, None)
-            self.gene_id_column = self.input_data.attributes.get(GENE_ID_COLUMN, None)
+            self.tax_id = data.attributes[TableAnnotation.tax_id]
+            self.use_attr_names = data.attributes[TableAnnotation.gene_as_attr_name]
+            if self.use_attr_names:
+                self.gene_id_attribute = data.attributes[TableAnnotation.gene_id_attribute]
+            else:
+                self.gene_id_column = data.attributes[TableAnnotation.gene_id_column]
             self.annotation_index = None
-
-            if not (
-                self.use_attr_names is not None and ((self.gene_id_attribute is None) ^ (self.gene_id_column is None))
-            ):
-
-                if self.tax_id is None:
-                    self.Error.missing_annotation()
-                    return
-
-                self.Error.missing_gene_id()
-                return
-
-            elif self.tax_id is None:
-                self.Error.missing_tax_id()
-                return
 
             _c2i = {a.taxid: i for i, a in enumerate(self.available_annotations)}
             try:
@@ -443,30 +421,17 @@ class OWGOBrowser(widget.OWWidget):
 
             self.__invalidate()
 
+    @check_table_annotation
     def set_reference_dataset(self, data=None):
         self.Error.clear()
         if data:
             self.ref_data = data
-            self.ref_tax_id = str(self.ref_data.attributes.get(TAX_ID, None))
-            self.ref_use_attr_names = self.ref_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
-            self.ref_gene_id_attribute = self.ref_data.attributes.get(GENE_ID_ATTRIBUTE, None)
-            self.ref_gene_id_column = self.ref_data.attributes.get(GENE_ID_COLUMN, None)
-
-            if not (
-                self.ref_use_attr_names is not None
-                and ((self.ref_gene_id_attribute is None) ^ (self.ref_gene_id_column is None))
-            ):
-
-                if self.ref_tax_id is None:
-                    self.Error.missing_annotation()
-                    return
-
-                self.Error.missing_gene_id()
-                return
-
-            elif self.ref_tax_id is None:
-                self.Error.missing_tax_id()
-                return
+            self.ref_tax_id = data.attributes[TableAnnotation.tax_id]
+            self.ref_use_attr_names = data.attributes[TableAnnotation.gene_as_attr_name]
+            if self.ref_use_attr_names:
+                self.ref_gene_id_attribute = data.attributes[TableAnnotation.gene_id_attribute]
+            else:
+                self.ref_gene_id_column = data.attributes[TableAnnotation.gene_id_column]
 
         self.referenceRadioBox.buttons[1].setDisabled(not bool(data))
         self.referenceRadioBox.buttons[1].setText("Reference set")
@@ -1033,8 +998,7 @@ class OWGOBrowser(widget.OWWidget):
         dialog.show()
 
     def onDeleteWidget(self):
-        """Called before the widget is removed from the canvas.
-        """
+        """Called before the widget is removed from the canvas."""
         self.annotations = None
         self.ontology = None
         gc.collect()  # Force collection
