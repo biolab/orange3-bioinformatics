@@ -107,7 +107,7 @@ class TestGeneSetSelection(WidgetTest):
 
         # simulate click on items checkbox.
         # checkbox status is changed and signal is emitted
-        click_checkbox = QPoint(rect.x() + 20, rect.y() + 5)
+        click_checkbox = QPoint(rect.x() + 10, rect.y() + 5)
         QTest.mouseClick(tree_widget.viewport(), Qt.LeftButton, Qt.NoModifier, click_checkbox)
         self.assertTrue(len(emitted_signals))
         self.assertNotEqual(self.component._get_selection(), self.default_selection)

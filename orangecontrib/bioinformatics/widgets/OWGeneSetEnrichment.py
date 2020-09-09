@@ -388,21 +388,26 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
     @check_table_annotation
     def set_data(self, input_data: Table):
         self.Outputs.matched_genes.send(None)
-        self.update_info_box()
+        self.input_data = None
+        self.num_of_selected_genes = 0
 
         if input_data:
             self.input_data = input_data
             self.gene_info = GeneInfo(self.tax_id)
             self.gs_selection_component.initialize(self.tax_id)
 
+        self.update_info_box()
+
     @Inputs.custom_gene_sets
     def handle_custom_gene_sets_input(self, custom_data):
         self.Outputs.matched_genes.send(None)
-        self.update_info_box()
+
         if custom_data:
             self.gs_selection_component.initialize_custom_gene_sets(custom_data)
         else:
             self.gs_selection_component.initialize_custom_gene_sets(None)
+
+        self.update_info_box()
 
     @Inputs.reference
     @check_table_annotation
@@ -467,13 +472,14 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
             self.info.set_output_summary(
                 str(self.num_of_selected_genes), '{} genes on output.\n'.format(self.num_of_selected_genes)
             )
-        elif self.input_data:
-            if not any([self.gene_id_column, self.gene_id_attribute]):
-                input_number += '0'
-                input_string += 'Input data with incorrect meta data.\nUse Gene Name Matcher widget.'
-            self.info.set_output_summary(self.info.NoOutput)
         else:
             self.info.set_output_summary(self.info.NoOutput)
+
+        if self.gs_selection_component.data:
+            num_of_genes = self.gs_selection_component.num_of_genes
+            num_of_sets = self.gs_selection_component.num_of_custom_sets
+            input_number += f"{'' if input_number else '0'}|{num_of_genes}"
+            input_string += '{} marker genes in {} sets\n'.format(num_of_genes, num_of_sets)
 
         if not input_number:
             self.info.set_input_summary(self.info.NoInput)

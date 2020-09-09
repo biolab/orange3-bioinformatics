@@ -79,6 +79,15 @@ class GeneSetSelection(OWComponent, QObject):
 
         return self.data.attributes[TableAnnotation.gene_id_column]
 
+    @property
+    def num_of_custom_sets(self) -> int:
+        custom_gene_sets = self._gene_sets.map_hierarchy_to_sets().get(self.custom_gene_set_hierarchy, None)
+        return len(custom_gene_sets) if custom_gene_sets else 0
+
+    @property
+    def num_of_genes(self) -> int:
+        return self.data.X.shape[0]
+
     def _on_item_clicked(self) -> None:
         """
         The problem is that signal 'itemClicked' activates even if we don't click on checkbox area.
@@ -178,7 +187,6 @@ class GeneSetSelection(OWComponent, QObject):
         else:
             gene_sets_names, _ = self.data.get_column_view(self.custom_gene_set_indicator)
 
-        # self.num_of_custom_sets = len(set(gene_sets_names))
         gene_names, _ = self.data.get_column_view(self.gene_ids_location)
         domain = (self.data.name if self.data.name else 'Custom sets',)
         self.custom_gene_set_hierarchy = domain
