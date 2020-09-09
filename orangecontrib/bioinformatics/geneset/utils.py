@@ -8,7 +8,7 @@ from orangecontrib.bioinformatics.utils.statistics import Hypergeometric
 
 
 def filename(hierarchy, organism):  # type: (Tuple[str, str], str) -> str
-    """ Obtain a filename for given hierarchy and organism.
+    """Obtain a filename for given hierarchy and organism.
 
     :param hierarchy: GeneSet hierarchy, example: ('GO', 'biological_process')
     :param organism: Taxonomy ID
@@ -25,7 +25,7 @@ def filename(hierarchy, organism):  # type: (Tuple[str, str], str) -> str
 
 
 def filename_parse(fn):  # type: (str) -> (Tuple[Tuple[str, str], str])
-    """ Returns a hierarchy and the organism from the gene set filename format.
+    """Returns a hierarchy and the organism from the gene set filename format.
 
     :param fn: GeneSets file name (.gmt)
 
@@ -57,7 +57,7 @@ class GeneSet:
     __slots__ = GENE_SET_ATTRIBUTES
 
     def __init__(self, gs_id=None, hierarchy=None, organism=None, name=None, genes=None, description=None, link=None):
-        """ Object representing a single set of genes
+        """Object representing a single set of genes
 
         :param gs_id: Short gene set ID.
         :param hierarchy: Hierarchy should be formated as a tuple, for example ``("GO", "biological_process")``
@@ -112,7 +112,7 @@ class GeneSet:
         )
 
     def gmt_description(self):
-        """ Represent GeneSet as line in GMT file format
+        """Represent GeneSet as line in GMT file format
 
         :return: Comma-separated GeneSet attributes.
         """
@@ -135,8 +135,7 @@ class GeneSet:
 
 
 class GeneSets(set):
-    """ A collection of gene sets: contains :obj:`GeneSet` objects.
-    """
+    """A collection of gene sets: contains :obj:`GeneSet` objects."""
 
     def __init__(self, sets=None):
         # type: (List[GeneSet]) -> None
@@ -180,12 +179,14 @@ class GeneSets(set):
     def delete_sets_by_hierarchy(self, hier):
         selected_sets = self.map_hierarchy_to_sets().get(hier, None)
         if selected_sets:
-            [self.remove(gene_set) for gene_set in selected_sets]
+            for gene_set in selected_sets:
+                self.remove(gene_set)
 
     def map_hierarchy_to_sets(self):
         try:
             split_by_hier = {hier: GeneSets() for hier in self.hierarchies()}
-            [split_by_hier[gs.hierarchy].update([gs]) for gs in self]
+            for gs in self:
+                split_by_hier[gs.hierarchy].update([gs])
             return split_by_hier
 
         except GeneSetException:
@@ -212,7 +213,7 @@ class GeneSets(set):
         return genes
 
     def to_gmt_file_format(self, file_path):  # type: (str) -> None
-        """ The GMT file format is a tab delimited file format that describes gene sets.
+        """The GMT file format is a tab delimited file format that describes gene sets.
 
         In the GMT format, each row represents a gene set.
         Columns: gs_id    gmt_description    Gene    Gene    Gene    ...
@@ -230,7 +231,7 @@ class GeneSets(set):
 
     @staticmethod
     def from_gmt_file_format(file_path):  # type: (str) -> GeneSets
-        """ Load GeneSets object from GMT file.
+        """Load GeneSets object from GMT file.
 
         :param file_path: path to a file on local disk
         :rtype: :obj:`GeneSets`
