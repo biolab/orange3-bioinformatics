@@ -32,12 +32,13 @@ jobs:
         run: |
           pip install pre-commit
           pre-commit install
+          pre-commit autoupdate
 
       - name: Changed files
         run: git diff --name-only HEAD^ HEAD
 
       - name: Run pre-commit
-        run: git diff --name-only HEAD^ HEAD | xargs pre-commit run --files
+        run: git diff --name-only HEAD^ HEAD | xargs pre-commit run --show-diff-on-failure --files
 
 #      - name: Lint Code Base
 #        uses: docker://github/super-linter:v2.2.0
