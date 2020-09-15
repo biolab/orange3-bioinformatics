@@ -194,6 +194,7 @@ class CollapsibleFilterComponent(OWComponent, QObject):
         self.collapsible_components.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.collapsible_components.setFrameShape(QFrame.NoFrame)
 
+        box = gui.widgetBox(parent_component, margin=0)
         box.layout().addWidget(self.toggle_button)
         box.layout().addWidget(self.collapsible_components)
 
