@@ -19,7 +19,14 @@
    {
     "text": "dictyExpress",
     "doc": "widgets/dicty_express.md",
-    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWdictyExpress.png",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWdictyExpress.svg",
+    "background": "light-grass",
+    "keywords": []
+   },
+   {
+    "text": "Genialis Expressions",
+    "doc": null,
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGenialisExpressions.svg",
     "background": "light-grass",
     "keywords": []
    },
