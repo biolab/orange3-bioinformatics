@@ -12,8 +12,8 @@ from orangecontrib.bioinformatics.resolwe.utils import CACHE_BACKEND, RESOLWEAPI
 
 DEFAULT_URL: str = 'https://app.genialis.com'
 RESOLWE_URLS: List[str] = [DEFAULT_URL, 'https://imaps.genialis.com', 'https://bcm.genialis.com']
-
-SAMPLE_DESCRIPTOR_LABELS = ['species', 'genotype', 'biosample_source', 'biosample_treatment']
+SAMPLE_DESCRIPTOR_LABELS: List[str] = ['species', 'genotype', 'biosample_source', 'biosample_treatment']
+CREDENTIAL_MANAGER_SERVICE: str = 'resolwe_credentials'
 
 requests_cache.install_cache(
     cache_name=RESOLWEAPI_CACHE, backend=CACHE_BACKEND, include_get_headers=True, expire_after=3600

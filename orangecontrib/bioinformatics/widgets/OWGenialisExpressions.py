@@ -39,6 +39,7 @@ from Orange.data import Table, Domain, StringVariable
 from Orange.widgets import gui, widget, settings
 from Orange.widgets.widget import Msg, Output, StateInfo, OWComponent
 from Orange.data.pandas_compat import table_from_frame
+from Orange.widgets.credentials import CredentialManager
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import PyTableModel
 
@@ -46,7 +47,12 @@ from orangecontrib.bioinformatics.resolwe import ResolweAPI, ResolweAuthExceptio
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
 from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale, QuantileTransform, QuantileNormalization
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
-from orangecontrib.bioinformatics.resolwe.resapi import DEFAULT_URL, RESOLWE_URLS, SAMPLE_DESCRIPTOR_LABELS
+from orangecontrib.bioinformatics.resolwe.resapi import (
+    DEFAULT_URL,
+    RESOLWE_URLS,
+    SAMPLE_DESCRIPTOR_LABELS,
+    CREDENTIAL_MANAGER_SERVICE,
+)
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
 PAST_HOUR = relativedelta(hours=-1)
@@ -440,6 +446,8 @@ class NormalizationComponent(OWComponent, QObject):
 class SignInForm(QDialog):
     def __init__(self, flags, *args, **kwargs):
         super().__init__(flags, *args, **kwargs)
+        self.cm: CredentialManager = CredentialManager(CREDENTIAL_MANAGER_SERVICE)
+
         self.setWindowTitle('Sign in')
         self.setFixedSize(400, 250)
 
@@ -494,8 +502,8 @@ class SignInForm(QDialog):
         self.error_msg.hide()
 
         server = self.server_cb.currentText()
-        username = self.username_line_edit.text()
-        password = self.password_line_edit.text()
+        username = self.cm.username if self.cm.username else self.username_line_edit.text()
+        password = self.cm.password if self.cm.password else self.password_line_edit.text()
 
         if not server:
             self.server_cb_label.setStyleSheet('color:red')
@@ -515,6 +523,8 @@ class SignInForm(QDialog):
             self.error_msg.show()
             return
 
+        self.cm.username = username
+        self.cm.password = password
         self.accept()
 
 
@@ -697,7 +707,10 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     def __init__(self):
         super().__init__()
         ConcurrentWidgetMixin.__init__(self)
-        self._res = connect(url=DEFAULT_URL)
+
+        self._res = None
+        self.data_objects: Optional[List[Data]] = None
+        self.data_table: Optional[Table] = None
 
         # Control area
         box = gui.widgetBox(self.controlArea, 'Sign in')
@@ -744,10 +757,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.pagination_component = PaginationComponent(self, self.mainArea)
         self.pagination_component.options_changed.connect(self.update_collections_view)
 
-        self.data_objects: Optional[List[Data]] = None
-        self.data_table: Optional[Table] = None
-        self.update_collections_view()
-        self.update_user_status()
+        self.sign_in(silent=True)
 
     def __invalidate(self):
         self.data_objects = None
@@ -791,21 +801,36 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         if user:
             user_info = f"{user[0].get('first_name', '')} {user[0].get('last_name', '')}".strip()
             user_info = f"User: {user_info if user_info else user[0].get('username', '')}"
+            self.sign_in_btn.setEnabled(False)
             self.sign_out_btn.setEnabled(True)
         else:
             user_info = 'User: Anonymous'
+            self.sign_in_btn.setEnabled(True)
             self.sign_out_btn.setEnabled(False)
 
         self.user_info.setText(user_info)
         self.server_info.setText(f'Server: {self.res.url[8:]}')
 
-    def sign_in(self):
+    def sign_in(self, silent=False):
         dialog = SignInForm(self)
-        if dialog.exec_():
+
+        if silent:
+            dialog.sign_in()
+            if dialog.resolwe_instance is not None:
+                self.res = dialog.resolwe_instance
+            else:
+                self.res = connect(url=DEFAULT_URL)
+
+        if not silent and dialog.exec_():
             self.res = dialog.resolwe_instance
 
     def sign_out(self):
+        # Use public credentials when user signs out
         self.res = connect(url=DEFAULT_URL)
+        # Remove username and
+        cm = CredentialManager(CREDENTIAL_MANAGER_SERVICE)
+        del cm.username
+        del cm.password
 
     def on_filter_changed(self):
         self.pagination_component.reset_pagination()
