@@ -957,6 +957,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.shutdown()
         super().onDeleteWidget()
 
+    def sizeHint(self):
+        return QSize(1280, 620)
+
 
 if __name__ == "__main__":
     from orangewidget.utils.widgetpreview import WidgetPreview
