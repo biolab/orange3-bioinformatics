@@ -1,7 +1,7 @@
 import random
 import unittest
 from datetime import datetime, timezone
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from AnyQt.QtCore import pyqtSignal
 from AnyQt.QtTest import QSignalSpy
@@ -9,6 +9,7 @@ from AnyQt.QtTest import QSignalSpy
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.settings import SettingProvider
 from Orange.widgets.tests.base import GuiTest, WidgetTest
+from Orange.widgets.credentials import CredentialManager
 from Orange.widgets.tests.utils import simulate
 
 from orangecontrib.bioinformatics.widgets.OWGenialisExpressions import (
@@ -160,6 +161,10 @@ class TestPaginationComponent(WidgetTest):
 
 
 class TestSignInForm(GuiTest):
+    @patch(
+        'orangecontrib.bioinformatics.widgets.OWGenialisExpressions.CREDENTIAL_MANAGER_SERVICE',
+        'resolwe_credentials_test',
+    )
     @patch('orangecontrib.bioinformatics.widgets.OWGenialisExpressions.connect')
     def test_dialog_success(self, mocked_connect):
         widget = MockWidget()
@@ -181,6 +186,15 @@ class TestSignInForm(GuiTest):
         self.assertTrue(dialog.error_msg.isHidden())
         self.assertIsNotNone(dialog.resolwe_instance)
 
+        # cleanup
+        cm = CredentialManager('resolwe_credentials_test')
+        del cm.username
+        del cm.password
+
+    @patch(
+        'orangecontrib.bioinformatics.widgets.OWGenialisExpressions.CREDENTIAL_MANAGER_SERVICE',
+        'resolwe_credentials_test',
+    )
     @patch('orangecontrib.bioinformatics.widgets.OWGenialisExpressions.connect', side_effect=ResolweAuthException())
     def test_dialog_fail(self, mocked_connect):
         widget = MockWidget()
@@ -193,6 +207,11 @@ class TestSignInForm(GuiTest):
         self.assertFalse(dialog.error_msg.isHidden())
 
         mocked_connect.assert_called_once()
+
+        # cleanup
+        cm = CredentialManager('resolwe_credentials_test')
+        del cm.username
+        del cm.password
 
 
 def collection_generator(num_of_collections):
@@ -214,11 +233,11 @@ def collection_generator(num_of_collections):
 
 class TestOWGenialisExpressions(WidgetTest):
     @patch('orangecontrib.bioinformatics.resolwe.ResolweAPI', spec=True)
-    @patch('orangecontrib.bioinformatics.widgets.OWGenialisExpressions.SignInForm')
-    def test_signin_popup(self, mock_dialog, _):
+    @patch('orangecontrib.bioinformatics.widgets.OWGenialisExpressions.OWGenialisExpressions.sign_in')
+    def test_signin_popup(self, mock_sign_in, _):
         self.widget = self.create_widget(OWGenialisExpressions)
         self.widget.sign_in_btn.click()
-        mock_dialog.assert_called_once()
+        mock_sign_in.assert_has_calls([call(silent=True), call(False)])
 
     @patch('orangecontrib.bioinformatics.resolwe.ResolweAPI', spec=True)
     def test_widget_initialization(self, mock_resolwe_api):
