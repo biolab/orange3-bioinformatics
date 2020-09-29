@@ -1,6 +1,6 @@
 import io
 from enum import IntEnum
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, NamedTuple
 from datetime import datetime
 from collections import defaultdict
 
@@ -43,7 +43,7 @@ from Orange.widgets.credentials import CredentialManager
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import PyTableModel
 
-from orangecontrib.bioinformatics.resolwe import ResolweAPI, ResolweAuthException, connect
+from orangecontrib.bioinformatics.resolwe import ResolweAPI, ResolweAuthException, ResolweDataObjectsNotFound, connect
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
 from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale, QuantileTransform, QuantileNormalization
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
@@ -609,7 +609,37 @@ class GenialisExpressionsModel(PyTableModel):
         self.wrap([model_row(result) for result in collections])
 
 
-def runner(res: ResolweAPI, data_objects: List[Data], exp_type: str, species: str, state: TaskState) -> Table:
+class Expression(NamedTuple):
+    type: str
+    name: str
+
+
+class Process(NamedTuple):
+    type: str
+    name: str
+
+
+class InputAnnotation(NamedTuple):
+    source: str
+    species: str
+    build: str
+
+
+class DataOutputOptions(NamedTuple):
+    expression: Tuple[Expression]
+    process: Tuple[Process]
+    input_annotation: Tuple[InputAnnotation]
+
+
+def runner(
+    res: ResolweAPI,
+    data_objects: List[Data],
+    options: DataOutputOptions,
+    exp_type: int,
+    proc_type: int,
+    input_annotation: int,
+    state: TaskState,
+) -> Table:
     data_frames = []
     metadata = defaultdict(list)
 
@@ -621,11 +651,25 @@ def runner(res: ResolweAPI, data_objects: List[Data], exp_type: str, species: st
 
         metadata['sample_name'].append([sample.name])
 
+    exp_type = file_output_field = options.expression[exp_type].type
+    proc_type = options.process[proc_type].type
+    source = options.input_annotation[input_annotation].source
+    species = options.input_annotation[input_annotation].species
+    build = options.input_annotation[input_annotation].build
+
+    # apply filters
+    data_objects = [obj for obj in data_objects if obj.process.type == proc_type]
+    data_objects = [
+        obj
+        for obj in data_objects
+        if obj.output['source'] == source and obj.output['species'] == species and obj.output['build'] == build
+    ]
     if exp_type != 'rc':
-        output_field = 'exp'
+        file_output_field = 'exp'
         data_objects = [obj for obj in data_objects if obj.output['exp_type'] == exp_type]
-    else:
-        output_field = 'rc'
+
+    if not data_objects:
+        raise ResolweDataObjectsNotFound
 
     step, steps = 0, len(data_objects) + 3
 
@@ -640,7 +684,7 @@ def runner(res: ResolweAPI, data_objects: List[Data], exp_type: str, species: st
         parse_sample_descriptor(data_object.sample)
         metadata['expression_type'].append([exp_type.upper()])
 
-        response = res.get_expressions(data_object.id, data_object.output[output_field]['file'])
+        response = res.get_expressions(data_object.id, data_object.output[file_output_field]['file'])
         with io.BytesIO() as f:
             f.write(response.content)
             f.seek(0)
@@ -693,6 +737,12 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     exp_type: int
     exp_type = settings.Setting(None, schema_only=True)
 
+    proc_type: int
+    proc_type = settings.Setting(None, schema_only=True)
+
+    input_annotation: int
+    input_annotation = settings.Setting(None, schema_only=True)
+
     auto_commit: bool
     auto_commit = settings.Setting(False, schema_only=True)
 
@@ -701,6 +751,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     class Warning(widget.OWWidget.Warning):
         no_expressions = Msg('Expression data objects not found.')
+        no_data_objects = Msg('No expression data matches the selected filtering options.')
         unexpected_feature_type = Msg('Can not import expression data, unexpected feature type "{}".')
         multiple_feature_type = Msg('Can not import expression data, multiple feature types found.')
 
@@ -709,7 +760,8 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         ConcurrentWidgetMixin.__init__(self)
 
         self._res = None
-        self.data_objects: Optional[List[Data]] = None
+        self._data_objects: Optional[List[Data]] = None
+        self.data_output_options: Optional[DataOutputOptions] = None
         self.data_table: Optional[Table] = None
 
         # Control area
@@ -718,14 +770,23 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.server_info = gui.label(box, self, '')
 
         box = gui.widgetBox(box, orientation=Qt.Horizontal)
-        self.sign_in_btn = gui.button(box, self, 'Sign in', callback=self.sign_in, autoDefault=False)
-        self.sign_out_btn = gui.button(box, self, 'Sign out', callback=self.sign_out, autoDefault=False)
+        self.sign_in_btn = gui.button(box, self, 'Sign In', callback=self.sign_in, autoDefault=False)
+        self.sign_out_btn = gui.button(box, self, 'Sign Out', callback=self.sign_out, autoDefault=False)
 
-        self.exp_type_box = gui.widgetBox(self.controlArea, 'Expression type')
+        self.exp_type_box = gui.widgetBox(self.controlArea, 'Expression Type')
         self.exp_type_options = gui.radioButtons(
-            self.exp_type_box, self, 'exp_type', callback=self.on_exp_type_changed
+            self.exp_type_box, self, 'exp_type', callback=self.on_data_output_option_changed
         )
-        self.set_exp_type_options()
+
+        self.proc_type_box = gui.widgetBox(self.controlArea, 'Process Name')
+        self.proc_type_options = gui.radioButtons(
+            self.proc_type_box, self, 'proc_type', callback=self.on_data_output_option_changed
+        )
+
+        self.input_anno_box = gui.widgetBox(self.controlArea, 'Expression source')
+        self.input_anno_options = gui.radioButtons(
+            self.input_anno_box, self, 'input_annotation', callback=self.on_data_output_option_changed
+        )
 
         self.norm_component = NormalizationComponent(self, self.controlArea)
         self.norm_component.options_changed.connect(self.on_normalization_changed)
@@ -767,33 +828,102 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.Warning.unexpected_feature_type.clear()
         self.info.set_output_summary(StateInfo.NoOutput)
 
-    def set_exp_type_options(self, options: List[str] = None) -> None:
-        self.clear_exp_type_options()
-        gui.appendRadioButton(self.exp_type_options, 'Read Counts', disabled=not bool(options))
+    def set_input_annotation_options(self) -> None:
+        for btn in self.input_anno_options.buttons:
+            btn.deleteLater()
+        self.input_anno_options.buttons = []
 
-        for option in options if options is not None else []:
-            gui.appendRadioButton(self.exp_type_options, option)
+        if not self.data_output_options:
+            return
 
-        if len(self.exp_type_options.buttons) > 1:
-            self.exp_type = 1
+        for source, species, build in self.data_output_options.input_annotation:
+            tooltip = f'{source}, {species}, {build}'
+            text = f'{species}, {build}'
+            gui.appendRadioButton(self.input_anno_options, text, tooltip=tooltip)
 
-    def clear_exp_type_options(self) -> None:
+        if len(self.input_anno_options.buttons):
+            self.input_annotation = 0
+
+    def set_proc_type_options(self) -> None:
+        for btn in self.proc_type_options.buttons:
+            btn.deleteLater()
+        self.proc_type_options.buttons = []
+
+        if not self.data_output_options:
+            return
+
+        for proc_type, proc_name in self.data_output_options.process:
+            gui.appendRadioButton(self.proc_type_options, proc_name, tooltip=proc_type)
+
+        if len(self.proc_type_options.buttons):
+            self.proc_type = 0
+
+    def set_exp_type_options(self) -> None:
         for btn in self.exp_type_options.buttons:
             btn.deleteLater()
         self.exp_type_options.buttons = []
+
+        if not self.data_output_options:
+            return
+
+        for _, exp_name in self.data_output_options.expression:
+            gui.appendRadioButton(self.exp_type_options, exp_name)
+
+        if len(self.exp_type_options.buttons) > 1:
+            self.exp_type = 1
 
     @property
     def res(self):
         return self._res
 
     @res.setter
-    def res(self, value):
+    def res(self, value: ResolweAPI):
         if isinstance(value, ResolweAPI):
             self._res = value
             self.update_user_status()
             self.update_collections_view()
             self.__invalidate()
             self.Outputs.table.send(None)
+
+    @property
+    def data_objects(self):
+        return self._data_objects
+
+    @data_objects.setter
+    def data_objects(self, data_objects: Optional[List[Data]]):
+        self._data_objects = data_objects
+        self.data_output_options = self._available_data_output_options()
+
+    def _available_data_output_options(self) -> Optional[DataOutputOptions]:
+        """
+        Traverse the data objects in the selected collection and store the
+        information regarding available expression types, process types and
+        input annotations used in the creation of the data object.
+
+        The method returns a named tuple (`DataOutputOptions`) which used for
+        creating radio buttons in the control area.
+        """
+        if not self.data_objects:
+            return
+
+        expression_types = sorted({data.output['exp_type'] for data in self.data_objects})
+        expression_types = (Expression('rc', 'Read Counts'),) + tuple(
+            Expression(exp_type, exp_type) for exp_type in expression_types
+        )
+
+        process_types = sorted({(data.process.type, data.process.name) for data in self.data_objects})
+        process_types = tuple(Process(proc_type, proc_name) for proc_type, proc_name in process_types)
+
+        input_annotations = sorted(
+            {(data.output['source'], data.output['species'], data.output['build']) for data in self.data_objects}
+        )
+        input_annotations = tuple(
+            InputAnnotation(source, species, build) for source, species, build in input_annotations
+        )
+
+        return DataOutputOptions(
+            expression=expression_types, process=process_types, input_annotation=input_annotations
+        )
 
     def update_user_status(self):
         user = self.res.get_currently_logged_user()
@@ -907,18 +1037,23 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         return table
 
     def commit(self):
+        self.Warning.no_data_objects.clear()
         self.cancel()
 
         if self.data_objects and not self.data_table:
-            exp_type: str = 'rc' if self.exp_type == 0 else self.exp_type_options.group.checkedButton().text()
-            collection_species: str = self.get_selected_row_data(TableHeader.species)
-
-            self.start(runner, self.res, self.data_objects, exp_type, collection_species)
-
+            self.start(
+                runner,
+                self.res,
+                self.data_objects,
+                self.data_output_options,
+                self.exp_type,
+                self.proc_type,
+                self.input_annotation,
+            )
         else:
             self.Outputs.table.send(self.normalize(self.data_table))
 
-    def on_exp_type_changed(self):
+    def on_data_output_option_changed(self):
         self.data_table = None
 
         if self.data_objects:
@@ -936,7 +1071,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             return
 
         self.data_objects = self.res.get_expression_data_objects(collection_id)
-        self.set_exp_type_options(list({data.output['exp_type'] for data in self.data_objects}))
+        self.set_exp_type_options()
+        self.set_proc_type_options()
+        self.set_input_annotation_options()
 
         if not self.data_objects:
             self.Warning.no_expressions()
@@ -974,6 +1111,15 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             self.info.set_output_summary(f'Samples: {samples} Genes: {genes}')
             self.data_table = table
             self.Outputs.table.send(self.normalize(table))
+
+    def on_exception(self, ex):
+        if isinstance(ex, ResolweDataObjectsNotFound):
+            self.Warning.no_data_objects()
+            self.Outputs.table.send(None)
+            self.data_table = None
+            self.info.set_output_summary(StateInfo.NoOutput)
+        else:
+            raise ex
 
     def on_partial_result(self, result: Any) -> None:
         pass
