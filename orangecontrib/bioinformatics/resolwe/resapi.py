@@ -1,5 +1,6 @@
 """ ResolweAPI """
 from typing import Dict, List
+from datetime import timedelta
 from urllib.parse import urljoin
 
 import requests
@@ -15,9 +16,8 @@ RESOLWE_URLS: List[str] = [DEFAULT_URL, 'https://imaps.genialis.com', 'https://b
 SAMPLE_DESCRIPTOR_LABELS: List[str] = ['species', 'genotype', 'biosample_source', 'biosample_treatment']
 CREDENTIAL_MANAGER_SERVICE: str = 'resolwe_credentials'
 
-requests_cache.install_cache(
-    cache_name=RESOLWEAPI_CACHE, backend=CACHE_BACKEND, include_get_headers=True, expire_after=3600
-)
+expire_after = timedelta(days=365)
+requests_cache.install_cache(cache_name=RESOLWEAPI_CACHE, backend=CACHE_BACKEND, expire_after=expire_after)
 
 
 class ResolweAPI:
@@ -58,9 +58,21 @@ class ResolweAPI:
 
     def get_currently_logged_user(self):
         url = urljoin(self.base_url, 'user?current_only=1')
-        response = self.session.get(url, auth=self._res.auth)
-        response.raise_for_status()
-        return response.json()
+
+        with self.session.cache_disabled():
+            response = self.session.get(url, auth=self._res.auth)
+            response.raise_for_status()
+            return response.json()
+
+    def get_collections(self, **kwargs):
+        kwargs.update({'fields': ','.join(self.COLLECTION_FIELDS)})
+        params = '&'.join([f'{key}={value}' for key, value in kwargs.items() if value is not None])
+        url = urljoin(self.base_url, f'collection?{params}')
+
+        with self.session.cache_disabled():
+            response = self.session.get(url, auth=self._res.auth)
+            response.raise_for_status()
+            return response.json()
 
     def get_species(self, collection_ids: List[str]) -> Dict[str, str]:
         params = '&'.join(f'collection[]={col_id}' for col_id in collection_ids)
@@ -75,13 +87,6 @@ class ResolweAPI:
         }
 
         return col_to_species
-
-    def get_collections(self, **kwargs):
-        kwargs.update({'fields': ','.join(self.COLLECTION_FIELDS)})
-        params = '&'.join([f'{key}={value}' for key, value in kwargs.items() if value is not None])
-        url = urljoin(self.base_url, f'collection?{params}')
-
-        return self.session.get(url, auth=self._res.auth).json()
 
     def get_expressions(self, data_id, data_file_name) -> Response:
         file_url = urljoin(self.url, f'data/{data_id}/{data_file_name}')
