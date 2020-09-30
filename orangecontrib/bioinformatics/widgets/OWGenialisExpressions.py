@@ -668,7 +668,7 @@ def runner(res: ResolweAPI, data_objects: List[Data], exp_type: str, species: st
     state.set_status('Matching genes ...')
     tax_id = species_name_to_taxid(species)
     gm = GeneMatcher(tax_id)
-    gm.match_table_attributes(table)
+    table = gm.match_table_attributes(table, rename=True)
     table.attributes[TableAnnotation.tax_id] = tax_id
     table.attributes[TableAnnotation.gene_as_attr_name] = True
     table.attributes[TableAnnotation.gene_id_attribute] = 'Entrez ID'

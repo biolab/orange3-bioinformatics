@@ -260,7 +260,7 @@ class OWdictyExpress(OWWidget):
                 data = gene_matcher.match_table_column(data, 'Gene', StringVariable(ENTREZ_ID))
             data.attributes[GENE_ID_COLUMN] = ENTREZ_ID
         else:
-            gene_matcher.match_table_attributes(data)
+            data = gene_matcher.match_table_attributes(data)
             data.attributes[GENE_ID_ATTRIBUTE] = ENTREZ_ID
 
         # add table attributes
