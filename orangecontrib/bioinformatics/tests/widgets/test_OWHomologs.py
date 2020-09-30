@@ -1,7 +1,8 @@
 import unittest
 
+from orangewidget.tests.base import WidgetTest
+
 from Orange.data import Table, Domain, StringVariable, ContinuousVariable
-from Orange.widgets.tests.base import WidgetTest
 
 from orangecontrib.bioinformatics.widgets.OWHomologs import HOMOLOG_ID, OWHomologs
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation

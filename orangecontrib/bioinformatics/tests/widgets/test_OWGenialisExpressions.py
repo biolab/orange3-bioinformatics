@@ -3,12 +3,13 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import call, patch
 
+from orangewidget.tests.base import GuiTest, WidgetTest
+
 from AnyQt.QtCore import pyqtSignal
 from AnyQt.QtTest import QSignalSpy
 
 from Orange.widgets.widget import OWWidget
 from Orange.widgets.settings import SettingProvider
-from Orange.widgets.tests.base import GuiTest, WidgetTest
 from Orange.widgets.credentials import CredentialManager
 from Orange.widgets.tests.utils import simulate
 
