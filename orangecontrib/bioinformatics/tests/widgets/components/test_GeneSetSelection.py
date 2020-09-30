@@ -1,5 +1,7 @@
 import unittest
 
+from orangewidget.tests.base import WidgetTest
+
 from AnyQt.QtCore import Qt, QPoint
 from AnyQt.QtTest import QTest, QSignalSpy
 from AnyQt.QtWidgets import QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator
@@ -7,7 +9,6 @@ from AnyQt.QtWidgets import QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterato
 from Orange.data import Table, Domain, StringVariable, DiscreteVariable
 from Orange.widgets.widget import Msg, OWWidget
 from Orange.widgets.settings import SettingProvider
-from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
 
 from orangecontrib.bioinformatics.widgets.components import GeneSetSelection

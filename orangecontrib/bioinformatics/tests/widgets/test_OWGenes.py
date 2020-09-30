@@ -1,8 +1,9 @@
 import os
 import unittest
 
+from orangewidget.tests.base import WidgetTest
+
 from Orange.data import Table
-from Orange.widgets.tests.base import WidgetTest
 
 from orangecontrib.bioinformatics.widgets.OWGenes import OWGenes
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME

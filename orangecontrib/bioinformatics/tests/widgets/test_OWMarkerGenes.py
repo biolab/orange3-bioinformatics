@@ -2,11 +2,11 @@ import unittest
 from unittest.mock import Mock
 
 import numpy as np
+from orangewidget.tests.base import WidgetTest
 
 from AnyQt.QtCore import QModelIndex, QItemSelectionModel
 
 from Orange.data import Table
-from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
 
 from orangecontrib.bioinformatics.utils import serverfiles

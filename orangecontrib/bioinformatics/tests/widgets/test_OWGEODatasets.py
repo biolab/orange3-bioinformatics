@@ -1,7 +1,8 @@
 import unittest
 
+from orangewidget.tests.base import WidgetTest
+
 from Orange.data import Table
-from Orange.widgets.tests.base import WidgetTest
 
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 from orangecontrib.bioinformatics.widgets.OWGEODatasets import OWGEODatasets

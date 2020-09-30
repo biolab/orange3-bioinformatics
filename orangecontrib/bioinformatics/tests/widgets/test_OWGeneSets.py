@@ -1,8 +1,9 @@
 import os
 from unittest.mock import Mock
 
+from orangewidget.tests.base import WidgetTest
+
 from Orange.data import Table, Domain, StringVariable
-from Orange.widgets.tests.base import WidgetTest
 
 from orangecontrib.bioinformatics.widgets.OWGeneSets import OWGeneSets
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
