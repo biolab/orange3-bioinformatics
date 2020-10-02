@@ -14,8 +14,12 @@ class ResolweServerTypeException(Exception):
     """ Unknown server type """
 
 
+class ResolweDataObjectsNotFound(Exception):
+    """ Data Objects not found """
+
+
 def connect(username=None, password=None, url=None, server_type='resolwe'):
-    """ Connect to Resolwe server
+    """Connect to Resolwe server
 
     :param username:
     :type username: str
