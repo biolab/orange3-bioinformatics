@@ -81,10 +81,11 @@ class TestGeneMatcher(unittest.TestCase):
 
         data = Table('brown-selected.tab')
         data = Table.transpose(data, feature_names_column='gene')
-        gm.match_table_attributes(data)
+        data = gm.match_table_attributes(data, rename=True, source_name='FooBar')
 
         for column in data.domain.attributes:
             self.assertTrue(ENTREZ_ID in column.attributes)
+            self.assertTrue('FooBar' in column.attributes)
 
 
 class TestGeneInfo(unittest.TestCase):
