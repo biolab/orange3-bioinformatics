@@ -1030,7 +1030,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         if self.norm_component.quantile_transform:
             axis = self.norm_component.quantile_transform_axis
-            quantiles = min(table.X.shape[int(not axis)], 100)
+            quantiles = table.X.shape[int(not axis)]
             distribution = QuantileTransformDist.values()[self.norm_component.quantile_transform_dist]
             table = QuantileTransform(axis=axis, n_quantiles=quantiles, output_distribution=distribution)(table)
 
