@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2020-10-27
+
+### Fixed
+- [#267](https://github.com/biolab/orange3-bioinformatics/pull/267): (OWGenialisExpressions) Fixed animation toggle.
+
+### Changed
+- [#269](https://github.com/biolab/orange3-bioinformatics/pull/269): (OWGenialisExpressions) Changed default window size.
+- [#274](https://github.com/biolab/orange3-bioinformatics/pull/274): (OWGenialisExpressions) Use number of samples/genes as quantiles in Quantile transformation.
+
+### Added
+- [#268](https://github.com/biolab/orange3-bioinformatics/pull/268): (OWGenialisExpressions) Use Orange.widgets.credentials.CredentialManager to securely store user password.
+- [#270](https://github.com/biolab/orange3-bioinformatics/pull/270): (OWGenialisExpressions) Additionally, filter data objects by process type and input annotations.
+- [#272](https://github.com/biolab/orange3-bioinformatics/pull/272), [#276](https://github.com/biolab/orange3-bioinformatics/pull/276): (OWGenialisExpressions) Rename table attributes when matching genes and display report.
+
+### Other
+The release includes some other minor bug fixes and project maintenance.
+
 ## [4.1.0] - 2020-08-27
 
 ### Fixed
