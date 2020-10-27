@@ -765,13 +765,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.data_table: Optional[Table] = None
 
         # Control area
-        box = gui.widgetBox(self.controlArea, 'Sign in')
-        self.user_info = gui.label(box, self, '')
-        self.server_info = gui.label(box, self, '')
-
-        box = gui.widgetBox(box, orientation=Qt.Horizontal)
-        self.sign_in_btn = gui.button(box, self, 'Sign In', callback=self.sign_in, autoDefault=False)
-        self.sign_out_btn = gui.button(box, self, 'Sign Out', callback=self.sign_out, autoDefault=False)
+        self.info_box = gui.widgetLabel(gui.widgetBox(self.controlArea, "Info", addSpace=True), 'No data on output.')
 
         self.exp_type_box = gui.widgetBox(self.controlArea, 'Expression Type')
         self.exp_type_options = gui.radioButtons(
@@ -792,6 +786,14 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.norm_component.options_changed.connect(self.on_normalization_changed)
 
         gui.rubber(self.controlArea)
+        box = gui.widgetBox(self.controlArea, 'Sign in')
+        self.user_info = gui.label(box, self, '')
+        self.server_info = gui.label(box, self, '')
+
+        box = gui.widgetBox(box, orientation=Qt.Horizontal)
+        self.sign_in_btn = gui.button(box, self, 'Sign In', callback=self.sign_in, autoDefault=False)
+        self.sign_out_btn = gui.button(box, self, 'Sign Out', callback=self.sign_out, autoDefault=False)
+
         self.commit_button = gui.auto_commit(self.controlArea, self, 'auto_commit', '&Commit', box=False)
         self.commit_button.button.setAutoDefault(False)
 
@@ -827,6 +829,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.Warning.multiple_feature_type.clear()
         self.Warning.unexpected_feature_type.clear()
         self.info.set_output_summary(StateInfo.NoOutput)
+        self.update_info_box()
 
     def set_input_annotation_options(self) -> None:
         for btn in self.input_anno_options.buttons:
@@ -940,6 +943,23 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         self.user_info.setText(user_info)
         self.server_info.setText(f'Server: {self.res.url[8:]}')
+
+    def update_info_box(self):
+
+        if self.data_table:
+            total_genes = len(self.data_table.domain.attributes)
+            known_genes = len([col for col in self.data_table.domain.attributes if len(col.attributes)])
+
+            info_text = (
+                '{} genes on output\n'
+                '{} genes match Entrez database\n'
+                '{} genes with match conflicts\n'.format(total_genes, known_genes, total_genes - known_genes)
+            )
+
+        else:
+            info_text = 'No data on output.'
+
+        self.info_box.setText(info_text)
 
     def sign_in(self, silent=False):
         dialog = SignInForm(self)
@@ -1108,8 +1128,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     def on_done(self, table: Table):
         if table:
             samples, genes = table.X.shape
-            self.info.set_output_summary(f'Samples: {samples} Genes: {genes}')
             self.data_table = table
+            self.info.set_output_summary(f'Samples: {samples} Genes: {genes}')
+            self.update_info_box()
             self.Outputs.table.send(self.normalize(table))
 
     def on_exception(self, ex):
@@ -1118,6 +1139,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             self.Outputs.table.send(None)
             self.data_table = None
             self.info.set_output_summary(StateInfo.NoOutput)
+            self.update_info_box()
         else:
             raise ex
 
