@@ -37,7 +37,7 @@ class QuantileTransform(Preprocess):
     Detailed description: https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.quantile_transform.html
     """
 
-    def __init__(self, axis=0, n_quantiles=100, output_distribution='uniform'):
+    def __init__(self, axis=0, n_quantiles=1000, output_distribution='uniform'):
         self.axis = axis
         self.n_quantiles = n_quantiles
         self.output_distribution = output_distribution
