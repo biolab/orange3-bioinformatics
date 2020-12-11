@@ -3,6 +3,7 @@ from enum import IntEnum
 from typing import Any, Dict, List, Tuple, Optional, NamedTuple
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 from resdk.resources.data import Data
 from dateutil.relativedelta import relativedelta
@@ -1132,7 +1133,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         domain = Domain(table.domain.attributes, table.domain.class_vars, list(metadata.keys()))
         table = table.transform(domain)
         for key, value in metadata.items():
-            table[:, key] = value
+            table[:, key] = np.reshape(value, (-1, 1))
 
         if self.clinical_metadata:
             table = merge_clinical_data(table, self.clinical_metadata)
