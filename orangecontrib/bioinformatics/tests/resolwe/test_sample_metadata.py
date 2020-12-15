@@ -68,16 +68,14 @@ class TestSampleMetadata(unittest.TestCase):
             'section_2.field_1',
         ]
         self.assertTrue(len(schema.keys()) == 8)
-        print(schema.keys())
         self.assertTrue(all(key in expected_keys for key in schema.keys()))
 
         # test if fields with multiple choices are properly handled
         discrete_field = schema['section_1.field_2']
         self.assertTrue(len(discrete_field.keys()) == 4)
-        self.assertEqual(tuple(index for index, _ in discrete_field['choices'].values()), (0, 1, 2, 3))
         self.assertEqual(
-            tuple(val for _, val in discrete_field['choices'].values()),
-            ('Choice 1', 'Choice 2', 'Choice 3', 'Choice 4'),
+            ('choice_1', 'choice_2', 'choice_3', 'choice_4'),
+            tuple(choice['value'] for choice in discrete_field['choices']),
         )
 
     def test_flatten_descriptor(self):
@@ -156,7 +154,6 @@ class TestSampleMetadata(unittest.TestCase):
                 resolwe=MagicMock(),
             )
         )
-        import pprint
 
         metadata = descriptors(samples)
         self.assertTrue(len(metadata.keys()) == 11)

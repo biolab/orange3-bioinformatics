@@ -6,7 +6,7 @@ import numpy as np
 from resdk.resources.data import Sample
 from resdk.resources.relation import Relation
 
-from Orange.data import Table, Domain, Variable, TimeVariable, StringVariable, DiscreteVariable, ContinuousVariable
+from Orange.data import Table, Domain, Variable, TimeVariable, DiscreteVariable
 from Orange.data.io_util import guess_data_type
 
 
@@ -62,16 +62,6 @@ def flatten_descriptor_schema(schema: List[dict]) -> Tuple[Dict[str, dict], Dict
 
     """
 
-    def map_choices_with_value(_field: dict) -> dict:
-        _field = _field.copy()
-        if 'choices' in _field:
-            _field['choices'] = {
-                choice['value']: (index, choice['label'])
-                for index, choice in enumerate(sorted(_field['choices'], key=lambda i: i['value']))
-                # choice['value']: (index, choice['label']) for index, choice in enumerate(_field['choices'])
-            }
-        return _field
-
     flat_schema = {}
     section_name_to_label = {}
     for section in schema:
@@ -80,43 +70,38 @@ def flatten_descriptor_schema(schema: List[dict]) -> Tuple[Dict[str, dict], Dict
         for field in section['group']:
             if 'group' in field:
                 # field is a subgroup
-                flat_schema.update(
-                    {
-                        f"{field['name']}.{sub_field['name']}": map_choices_with_value(sub_field)
-                        for sub_field in field['group']
-                    }
-                )
+                flat_schema.update({f"{field['name']}.{sub_field['name']}": sub_field for sub_field in field['group']})
                 section_name_to_label.update({sub_field['name']: sub_field['label'] for sub_field in field['group']})
             else:
-                flat_schema.update({f"{section['name']}.{field['name']}": map_choices_with_value(field)})
+                flat_schema.update({f"{section['name']}.{field['name']}": field})
 
     return flat_schema, section_name_to_label
 
 
 def handle_field_type(field: dict, field_values: np.array) -> Optional[Tuple[Variable, list]]:
-    field_type = field['type']
     var_name = field['label']
 
-    # Check for multiple choices first.
+    # Multiple choices fields are always discrete
     if 'choices' in field:
-        discrete_values = (label for _, label in sorted(field['choices'].values(), key=lambda x: x[0]))
-        return DiscreteVariable(var_name, values=discrete_values), field_values
-
-    if field_type == 'basic:string:':
+        discrete_values = sorted((choice['value'] for choice in field['choices']))
+        indexes = np.nonzero(field_values[:, None] == discrete_values)[1]
+        return DiscreteVariable(var_name, values=discrete_values), indexes
+    else:
         discrete_values, _field_values, col_type = guess_data_type(field_values)
         if discrete_values is not None:
             indexes = np.nonzero(_field_values[:, None] == discrete_values)[1]
             return DiscreteVariable(var_name, values=discrete_values), indexes
-        return StringVariable(var_name), field_values
+        var = col_type(var_name)
 
-    if field_type in ('basic:decimal:', 'basic:integer:'):
-        return ContinuousVariable(var_name), field_values
+        if isinstance(var, TimeVariable):
+            _var = TimeVariable(var_name)
+            for time in field_values:
+                _var.parse(time)
 
-    if field_type == 'basic:boolean:':
-        return DiscreteVariable(var_name, values=['False', 'True']), field_values
+            field_values = _field_values
+            var = _var
 
-    if field_type in ('basic:date:', 'basic:datetime:'):
-        return TimeVariable(var_name), field_values
+        return var, field_values
 
 
 def descriptors(samples: List[Sample]) -> Dict[Variable, List[List[str]]]:
@@ -150,14 +135,8 @@ def descriptors(samples: List[Sample]) -> Dict[Variable, List[List[str]]]:
             field = schema[field_name]
             field_choice = descriptor[field_name]
 
-            # if multiple choices or boolean type store discrete value index.
-            if 'choices' in field:
-                meta_value = field['choices'][field_choice][0]
-            elif field['type'] == 'basic:boolean:':
-                meta_value = int(field_choice)
-            elif field['type'] in ('basic:date:', 'basic:datetime:'):
-                time_var = TimeVariable('placeholder')
-                meta_value = time_var.parse(field_choice)
+            if field['type'] == 'basic:boolean:':
+                meta_value = str(field_choice)
             else:
                 meta_value = field_choice
             metadata[field_name].append(meta_value)
