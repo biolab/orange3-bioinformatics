@@ -79,29 +79,29 @@ def flatten_descriptor_schema(schema: List[dict]) -> Tuple[Dict[str, dict], Dict
 
 
 def handle_field_type(field: dict, field_values: np.array) -> Optional[Tuple[Variable, list]]:
-    var_name = field['label']
+    field_name = field['label']
+    field_type = field['type']
 
     # Multiple choices fields are always discrete
     if 'choices' in field:
         discrete_values = sorted((choice['value'] for choice in field['choices']))
-        indexes = np.nonzero(field_values[:, None] == discrete_values)[1]
-        return DiscreteVariable(var_name, values=discrete_values), indexes
+        var = DiscreteVariable(field_name, values=(str(val) for val in discrete_values))
+        return var, [var.to_val(value) for value in field_values]
     else:
         discrete_values, _field_values, col_type = guess_data_type(field_values)
         if discrete_values is not None:
-            indexes = np.nonzero(_field_values[:, None] == discrete_values)[1]
-            return DiscreteVariable(var_name, values=discrete_values), indexes
-        var = col_type(var_name)
+            # indexes = np.nonzero(_field_values[:, None] == discrete_values)[1]
+            var = DiscreteVariable(field_name, values=(str(val) for val in discrete_values))
+            return var, [var.to_val(str(value)) for value in _field_values]
 
-        if isinstance(var, TimeVariable):
-            _var = TimeVariable(var_name)
-            for time in field_values:
-                _var.parse(time)
-
-            field_values = _field_values
+        var = col_type(field_name)
+        # Orange does not handle Time variables correctly
+        if field_type in ('basic:date:', 'basic:datetime:'):
+            _var = TimeVariable(field_name)
+            _field_values = [_var.parse(time) for time in field_values]
             var = _var
 
-        return var, field_values
+        return var, _field_values
 
 
 def descriptors(samples: List[Sample]) -> Dict[Variable, List[List[str]]]:
@@ -131,19 +131,21 @@ def descriptors(samples: List[Sample]) -> Dict[Variable, List[List[str]]]:
     for sample in samples:
         descriptor = flatten_descriptor(sample.descriptor)
 
-        for field_name in (name for name in schema.keys() if name in descriptor.keys()):
+        for field_name in schema.keys():
             field = schema[field_name]
-            field_choice = descriptor[field_name]
+            descriptor_value = descriptor.get(field_name, '')
 
-            if field['type'] == 'basic:boolean:':
-                meta_value = str(field_choice)
-            else:
-                meta_value = field_choice
-            metadata[field_name].append(meta_value)
+            if field['type'] == 'basic:boolean:' and descriptor_value is not None:
+                descriptor_value = str(descriptor_value)
+
+            metadata[field_name].append(descriptor_value)
 
         metadata['other.sample_name'].append(sample.name)
         metadata['other.sample_slug'].append(sample.slug)
         metadata['other.sample_id'].append(sample.id)
+
+    # Filter fields with empty values
+    metadata = {k: v for k, v in metadata.items() if not all(x == '' for x in v)}
 
     # handle duplicates
     split_section_field = [label.split(sep='.') for label in metadata.keys()]
