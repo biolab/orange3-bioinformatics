@@ -2,12 +2,11 @@ import io
 from enum import IntEnum
 from typing import Any, Dict, List, Tuple, Optional, NamedTuple
 from datetime import datetime
-from collections import defaultdict
 
+import numpy as np
 import pandas as pd
 from resdk.resources.data import Data
 from dateutil.relativedelta import relativedelta
-from resdk.resources.sample import Sample
 
 from AnyQt.QtCore import (
     Qt,
@@ -35,7 +34,7 @@ from AnyQt.QtWidgets import (
     QAbstractItemView,
 )
 
-from Orange.data import Table, Domain, StringVariable
+from Orange.data import Table, Domain
 from Orange.widgets import gui, widget, settings
 from Orange.widgets.widget import Msg, Output, StateInfo, OWComponent
 from Orange.data.pandas_compat import table_from_frame
@@ -47,13 +46,9 @@ from orangecontrib.bioinformatics.resolwe import ResolweAPI, ResolweAuthExceptio
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
 from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale, QuantileTransform, QuantileNormalization
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
-from orangecontrib.bioinformatics.resolwe.resapi import (
-    DEFAULT_URL,
-    RESOLWE_URLS,
-    SAMPLE_DESCRIPTOR_LABELS,
-    CREDENTIAL_MANAGER_SERVICE,
-)
+from orangecontrib.bioinformatics.resolwe.resapi import DEFAULT_URL, RESOLWE_URLS, CREDENTIAL_MANAGER_SERVICE
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
+from orangecontrib.bioinformatics.resolwe.sample_metadata import merge_clinical_data
 
 PAST_HOUR = relativedelta(hours=-1)
 PAST_DAY = relativedelta(days=-1)
@@ -392,7 +387,7 @@ class NormalizationComponent(OWComponent, QObject):
         QObject.__init__(self)
         OWComponent.__init__(self, widget=parent_widget)
 
-        box = gui.widgetBox(parent_component, self.BOX_TITLE)
+        box = gui.widgetBox(parent_component, self.BOX_TITLE, margin=3)
         gui.checkBox(box, self, 'quantile_norm', self.QUANTILE_NORM_LABEL, callback=self.options_changed.emit)
         gui.checkBox(box, self, 'log_norm', self.LOG_NORM_LABEL, callback=self.options_changed.emit)
         gui.checkBox(box, self, 'z_score_norm', self.Z_SCORE_LABEL, callback=self.on_z_score_selected)
@@ -631,94 +626,30 @@ class DataOutputOptions(NamedTuple):
     input_annotation: Tuple[InputAnnotation]
 
 
-def runner(
-    res: ResolweAPI,
-    data_objects: List[Data],
-    options: DataOutputOptions,
-    exp_type: int,
-    proc_type: int,
-    input_annotation: int,
-    state: TaskState,
-) -> Table:
-    data_frames = []
-    metadata = defaultdict(list)
+def available_data_output_options(data_objects: List[Data]) -> DataOutputOptions:
+    """
+    Traverse the data objects in the selected collection and store the
+    information regarding available expression types, process types and
+    input annotations.
 
-    def parse_sample_descriptor(sample: Sample) -> None:
-        general = sample.descriptor.get('general', {})
+    The method returns a named tuple (`DataOutputOptions`) which used for
+    creating radio buttons in the control area.
+    """
 
-        for label in SAMPLE_DESCRIPTOR_LABELS:
-            metadata[label].append([general.get(label, '')])
+    expression_types = sorted({data.output['exp_type'] for data in data_objects})
+    expression_types = (Expression('rc', 'Read Counts'),) + tuple(
+        Expression(exp_type, exp_type) for exp_type in expression_types
+    )
 
-        metadata['sample_name'].append([sample.name])
+    process_types = sorted({(data.process.type, data.process.name) for data in data_objects})
+    process_types = tuple(Process(proc_type, proc_name) for proc_type, proc_name in process_types)
 
-    exp_type = file_output_field = options.expression[exp_type].type
-    proc_type = options.process[proc_type].type
-    source = options.input_annotation[input_annotation].source
-    species = options.input_annotation[input_annotation].species
-    build = options.input_annotation[input_annotation].build
+    input_annotations = sorted(
+        {(data.output['source'], data.output['species'], data.output['build']) for data in data_objects}
+    )
+    input_annotations = tuple(InputAnnotation(source, species, build) for source, species, build in input_annotations)
 
-    # apply filters
-    data_objects = [obj for obj in data_objects if obj.process.type == proc_type]
-    data_objects = [
-        obj
-        for obj in data_objects
-        if obj.output['source'] == source and obj.output['species'] == species and obj.output['build'] == build
-    ]
-    if exp_type != 'rc':
-        file_output_field = 'exp'
-        data_objects = [obj for obj in data_objects if obj.output['exp_type'] == exp_type]
-
-    if not data_objects:
-        raise ResolweDataObjectsNotFound
-
-    step, steps = 0, len(data_objects) + 3
-
-    def set_progress():
-        nonlocal step
-        step += 1
-        state.set_progress_value(100 * (step / steps))
-
-    state.set_status('Downloading ...')
-    for data_object in data_objects:
-        set_progress()
-        parse_sample_descriptor(data_object.sample)
-        metadata['expression_type'].append([exp_type.upper()])
-
-        response = res.get_expressions(data_object.id, data_object.output[file_output_field]['file'])
-        with io.BytesIO() as f:
-            f.write(response.content)
-            f.seek(0)
-            # expressions to data frame
-            df = pd.read_csv(f, sep='\t', compression='gzip')
-            df = df.set_index('Gene').T.reset_index(drop=True)
-            data_frames.append(df)
-
-    state.set_status('Concatenating samples ...')
-    df = pd.concat(data_frames, axis=0)
-
-    state.set_status('To data table ...')
-    table = table_from_frame(df)
-    set_progress()
-
-    state.set_status('Adding metadata ...')
-    metas = [StringVariable(label) for label in metadata.keys()]
-    domain = Domain(table.domain.attributes, table.domain.class_vars, metas)
-    table = table.transform(domain)
-
-    for key, value in metadata.items():
-        table[:, key] = value
-    set_progress()
-
-    state.set_status('Matching genes ...')
-    tax_id = species_name_to_taxid(species)
-    gm = GeneMatcher(tax_id)
-    table = gm.match_table_attributes(table, rename=True)
-    table.attributes[TableAnnotation.tax_id] = tax_id
-    table.attributes[TableAnnotation.gene_as_attr_name] = True
-    table.attributes[TableAnnotation.gene_id_attribute] = 'Entrez ID'
-    set_progress()
-
-    return table
+    return DataOutputOptions(expression=expression_types, process=process_types, input_annotation=input_annotations)
 
 
 class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
@@ -735,13 +666,16 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     filter_component = settings.SettingProvider(CollapsibleFilterComponent)
 
     exp_type: int
-    exp_type = settings.Setting(None, schema_only=True)
+    exp_type = settings.Setting(0, schema_only=True)
 
     proc_type: int
-    proc_type = settings.Setting(None, schema_only=True)
+    proc_type = settings.Setting(0, schema_only=True)
 
     input_annotation: int
-    input_annotation = settings.Setting(None, schema_only=True)
+    input_annotation = settings.Setting(0, schema_only=True)
+
+    selected_orange_data_object: int
+    selected_orange_data_object = settings.Setting(0, schema_only=True)
 
     auto_commit: bool
     auto_commit = settings.Setting(False, schema_only=True)
@@ -751,7 +685,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     class Warning(widget.OWWidget.Warning):
         no_expressions = Msg('Expression data objects not found.')
-        no_data_objects = Msg('No expression data matches the selected filtering options.')
+        no_data_objects = Msg('No expression data matches the selected options.')
         unexpected_feature_type = Msg('Can not import expression data, unexpected feature type "{}".')
         multiple_feature_type = Msg('Can not import expression data, multiple feature types found.')
 
@@ -759,27 +693,45 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         super().__init__()
         ConcurrentWidgetMixin.__init__(self)
 
-        self._res = None
-        self._data_objects: Optional[List[Data]] = None
+        self._res: Optional[ResolweAPI] = None
+
+        # Store collection ID from currently selected row
+        self.selected_collection_id: Optional[str] = None
+        # Store data output options
         self.data_output_options: Optional[DataOutputOptions] = None
+        # List of all available data objects (expressions)
+        self.data_objects: Optional[List[Data]] = None
+        # Subset of data objects based on DataOutputOptions
+        self.filtered_data_objects: Optional[List[Data]] = None
+        # List of orange data objects (clinical data)
+        self.orange_data_objects: Dict[int, Data] = {}
+        # Cache output data table
         self.data_table: Optional[Table] = None
+        # Cache clinical metadata
+        self.clinical_metadata: Optional[Table] = None
 
         # Control area
-        self.info_box = gui.widgetLabel(gui.widgetBox(self.controlArea, "Info", addSpace=True), 'No data on output.')
+        self.info_box = gui.widgetLabel(gui.widgetBox(self.controlArea, "Info", margin=3), 'No data on output.')
 
-        self.exp_type_box = gui.widgetBox(self.controlArea, 'Expression Type')
-        self.exp_type_options = gui.radioButtons(
-            self.exp_type_box, self, 'exp_type', callback=self.on_data_output_option_changed
+        self.exp_type_combo = gui.comboBox(
+            self.controlArea, self, 'exp_type', label='Expression Type', callback=self.on_output_option_changed
         )
-
-        self.proc_type_box = gui.widgetBox(self.controlArea, 'Process Name')
-        self.proc_type_options = gui.radioButtons(
-            self.proc_type_box, self, 'proc_type', callback=self.on_data_output_option_changed
+        self.proc_type_combo = gui.comboBox(
+            self.controlArea, self, 'proc_type', label='Process Name', callback=self.on_output_option_changed
         )
-
-        self.input_anno_box = gui.widgetBox(self.controlArea, 'Expression source')
-        self.input_anno_options = gui.radioButtons(
-            self.input_anno_box, self, 'input_annotation', callback=self.on_data_output_option_changed
+        self.input_anno_combo = gui.comboBox(
+            self.controlArea,
+            self,
+            'input_annotation',
+            label='Expression source',
+            callback=self.on_output_option_changed,
+        )
+        self.orange_data_objects_combo = gui.comboBox(
+            self.controlArea,
+            self,
+            'selected_orange_data_object',
+            label='Clinical Data',
+            callback=self.on_clinical_data_changed,
         )
 
         self.norm_component = NormalizationComponent(self, self.controlArea)
@@ -822,59 +774,6 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         self.sign_in(silent=True)
 
-    def __invalidate(self):
-        self.data_objects = None
-        self.data_table = None
-        self.Warning.no_expressions.clear()
-        self.Warning.multiple_feature_type.clear()
-        self.Warning.unexpected_feature_type.clear()
-        self.info.set_output_summary(StateInfo.NoOutput)
-        self.update_info_box()
-
-    def set_input_annotation_options(self) -> None:
-        for btn in self.input_anno_options.buttons:
-            btn.deleteLater()
-        self.input_anno_options.buttons = []
-
-        if not self.data_output_options:
-            return
-
-        for source, species, build in self.data_output_options.input_annotation:
-            tooltip = f'{source}, {species}, {build}'
-            text = f'{species}, {build}'
-            gui.appendRadioButton(self.input_anno_options, text, tooltip=tooltip)
-
-        if len(self.input_anno_options.buttons):
-            self.input_annotation = 0
-
-    def set_proc_type_options(self) -> None:
-        for btn in self.proc_type_options.buttons:
-            btn.deleteLater()
-        self.proc_type_options.buttons = []
-
-        if not self.data_output_options:
-            return
-
-        for proc_type, proc_name in self.data_output_options.process:
-            gui.appendRadioButton(self.proc_type_options, proc_name, tooltip=proc_type)
-
-        if len(self.proc_type_options.buttons):
-            self.proc_type = 0
-
-    def set_exp_type_options(self) -> None:
-        for btn in self.exp_type_options.buttons:
-            btn.deleteLater()
-        self.exp_type_options.buttons = []
-
-        if not self.data_output_options:
-            return
-
-        for _, exp_name in self.data_output_options.expression:
-            gui.appendRadioButton(self.exp_type_options, exp_name)
-
-        if len(self.exp_type_options.buttons) > 1:
-            self.exp_type = 1
-
     @property
     def res(self):
         return self._res
@@ -888,45 +787,26 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             self.__invalidate()
             self.Outputs.table.send(None)
 
-    @property
-    def data_objects(self):
-        return self._data_objects
+    def __invalidate(self):
+        self.data_objects = None
+        self.data_table = None
+        self.selected_collection_id = None
+        self.clinical_metadata = None
+        self.orange_data_objects = {}
 
-    @data_objects.setter
-    def data_objects(self, data_objects: Optional[List[Data]]):
-        self._data_objects = data_objects
-        self.data_output_options = self._available_data_output_options()
+        self.data_output_options = None
+        self.exp_type_combo.clear()
+        self.proc_type_combo.clear()
+        self.input_anno_combo.clear()
+        self.orange_data_objects_combo.clear()
 
-    def _available_data_output_options(self) -> Optional[DataOutputOptions]:
-        """
-        Traverse the data objects in the selected collection and store the
-        information regarding available expression types, process types and
-        input annotations used in the creation of the data object.
-
-        The method returns a named tuple (`DataOutputOptions`) which used for
-        creating radio buttons in the control area.
-        """
-        if not self.data_objects:
-            return
-
-        expression_types = sorted({data.output['exp_type'] for data in self.data_objects})
-        expression_types = (Expression('rc', 'Read Counts'),) + tuple(
-            Expression(exp_type, exp_type) for exp_type in expression_types
-        )
-
-        process_types = sorted({(data.process.type, data.process.name) for data in self.data_objects})
-        process_types = tuple(Process(proc_type, proc_name) for proc_type, proc_name in process_types)
-
-        input_annotations = sorted(
-            {(data.output['source'], data.output['species'], data.output['build']) for data in self.data_objects}
-        )
-        input_annotations = tuple(
-            InputAnnotation(source, species, build) for source, species, build in input_annotations
-        )
-
-        return DataOutputOptions(
-            expression=expression_types, process=process_types, input_annotation=input_annotations
-        )
+        self.Outputs.table.send(None)
+        self.Warning.no_expressions.clear()
+        self.Warning.multiple_feature_type.clear()
+        self.Warning.unexpected_feature_type.clear()
+        self.Warning.no_data_objects.clear()
+        self.info.set_output_summary(StateInfo.NoOutput)
+        self.update_info_box()
 
     def update_user_status(self):
         user = self.res.get_currently_logged_user()
@@ -1060,28 +940,51 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.Warning.no_data_objects.clear()
         self.cancel()
 
-        if self.data_objects and not self.data_table:
-            self.start(
-                runner,
-                self.res,
-                self.data_objects,
-                self.data_output_options,
-                self.exp_type,
-                self.proc_type,
-                self.input_annotation,
+        if not self.filtered_data_objects:
+            self.Warning.no_data_objects()
+            self.Outputs.table.send(None)
+            self.info.set_output_summary(StateInfo.NoOutput)
+            return
+
+        self.start(self.runner)
+
+    def filter_data_objects(self):
+        options = self.data_output_options
+        exp_type = options.expression[self.exp_type].type
+        proc_type = options.process[self.proc_type].type
+        source = options.input_annotation[self.input_annotation].source
+        species = options.input_annotation[self.input_annotation].species
+        build = options.input_annotation[self.input_annotation].build
+
+        def is_selected(obj):
+            return all(
+                [
+                    obj.process.type == proc_type,
+                    obj.output['source'] == source,
+                    obj.output['species'] == species,
+                    obj.output['build'] == build,
+                    obj.output['exp_type'] == exp_type if exp_type != 'rc' else True,
+                ]
             )
-        else:
-            self.Outputs.table.send(self.normalize(self.data_table))
 
-    def on_data_output_option_changed(self):
+        return [data_object for data_object in self.data_objects if is_selected(data_object)]
+
+    def fetch_clinical_metadata(self):
+        data_object = self.orange_data_objects.get(self.selected_orange_data_object, None)
+        if data_object is not None:
+            return self.res.get_clinical_metadata(data_object.id, data_object.output['table']['file'])
+
+    def on_output_option_changed(self):
         self.data_table = None
+        self.filtered_data_objects = self.filter_data_objects()
+        self.commit()
 
-        if self.data_objects:
-            self.commit()
+    def on_clinical_data_changed(self):
+        self.clinical_metadata = self.fetch_clinical_metadata()
+        self.commit()
 
     def on_normalization_changed(self):
-        if self.data_objects:
-            self.commit()
+        self.commit()
 
     def on_selection_changed(self):
         self.__invalidate()
@@ -1090,10 +993,33 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         if not collection_id:
             return
 
+        self.selected_collection_id = collection_id
         self.data_objects = self.res.get_expression_data_objects(collection_id)
-        self.set_exp_type_options()
-        self.set_proc_type_options()
-        self.set_input_annotation_options()
+        self.orange_data_objects = {
+            idx: data for idx, data in enumerate(self.res.get_orange_data_objects(collection_id))
+        }
+
+        self.data_output_options = available_data_output_options(self.data_objects)
+
+        self.exp_type_combo.addItems(exp_name for _, exp_name in self.data_output_options.expression)
+        if self.exp_type >= len(self.data_output_options.expression):
+            self.exp_type = 0
+        self.exp_type_combo.setCurrentIndex(self.exp_type)
+
+        self.proc_type_combo.addItems(proc_name for _, proc_name in self.data_output_options.process)
+        if self.proc_type >= len(self.data_output_options.process):
+            self.proc_type = 0
+        self.proc_type_combo.setCurrentIndex(self.proc_type)
+
+        self.input_anno_combo.addItems(
+            f'{species}, {build}' for _, species, build in self.data_output_options.input_annotation
+        )
+        if self.input_annotation >= len(self.data_output_options.input_annotation):
+            self.input_annotation = 0
+        self.input_anno_combo.setCurrentIndex(self.input_annotation)
+
+        self.orange_data_objects_combo.addItems(data.name for data in self.orange_data_objects.values())
+        self.clinical_metadata = self.fetch_clinical_metadata()
 
         if not self.data_objects:
             self.Warning.no_expressions()
@@ -1115,7 +1041,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             self.data_objects = []
             return
 
-        self.commit()
+        self.on_output_option_changed()
 
     def get_selected_row_data(self, column: int) -> Optional[str]:
         selection_model = self.table_view.selectionModel()
@@ -1128,10 +1054,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     def on_done(self, table: Table):
         if table:
             samples, genes = table.X.shape
-            self.data_table = table
             self.info.set_output_summary(f'Samples: {samples} Genes: {genes}')
             self.update_info_box()
-            self.Outputs.table.send(self.normalize(table))
+            self.Outputs.table.send(table)
 
     def on_exception(self, ex):
         if isinstance(ex, ResolweDataObjectsNotFound):
@@ -1152,6 +1077,73 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     def sizeHint(self):
         return QSize(1280, 620)
+
+    def runner(self, state: TaskState) -> Table:
+        data_objects = self.filtered_data_objects
+        exp_type = self.data_output_options.expression[self.exp_type].type
+        species = self.data_output_options.input_annotation[self.input_annotation].species
+        output_field = 'exp' if exp_type != 'rc' else exp_type
+        collection_id = self.selected_collection_id
+
+        table = self.data_table
+        step, steps = 0, 4
+
+        def set_progress():
+            nonlocal step
+            step += 1
+            state.set_progress_value(100 * (step / steps))
+
+        if not table:
+            steps += len(data_objects)
+            state.set_status('Downloading ...')
+            data_frames = []
+
+            for data_object in data_objects:
+                set_progress()
+
+                response = self.res.download(data_object.id, data_object.output[output_field]['file'])
+                with io.BytesIO() as f:
+                    f.write(response.content)
+                    f.seek(0)
+                    # expressions to data frame
+                    df = pd.read_csv(f, sep='\t', compression='gzip')
+                    df = df.set_index('Gene').T.reset_index(drop=True)
+                    data_frames.append(df)
+
+            state.set_status('Concatenating samples ...')
+            df = pd.concat(data_frames, axis=0)
+
+            state.set_status('To data table ...')
+            table = table_from_frame(df)
+            set_progress()
+
+            state.set_status('Matching genes ...')
+            tax_id = species_name_to_taxid(species)
+            gm = GeneMatcher(tax_id)
+            table = gm.match_table_attributes(table, rename=True)
+            table.attributes[TableAnnotation.tax_id] = tax_id
+            table.attributes[TableAnnotation.gene_as_attr_name] = True
+            table.attributes[TableAnnotation.gene_id_attribute] = 'Entrez ID'
+
+            self.data_table = table
+            set_progress()
+
+        state.set_status('Adding metadata ...')
+        metadata = self.res.aggregate_sample_metadata([data.sample for data in data_objects], collection_id)
+        domain = Domain(table.domain.attributes, table.domain.class_vars, list(metadata.keys()))
+        table = table.transform(domain)
+        for key, value in metadata.items():
+            table[:, key] = np.reshape(value, (-1, 1))
+
+        if self.clinical_metadata:
+            table = merge_clinical_data(table, self.clinical_metadata)
+        set_progress()
+
+        state.set_status('Normalizing ...')
+        table = self.normalize(table)
+        set_progress()
+
+        return table
 
 
 if __name__ == "__main__":
