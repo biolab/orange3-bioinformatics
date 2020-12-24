@@ -232,6 +232,9 @@ class TestOWMarkerGenes(WidgetTest):
         file_path = serverfiles.localpath_download(SERVER_FILES_DOMAIN, file_name)
         cls.cell_markers = Table.from_file(file_path)
 
+    def test_minimum_size(self):
+        pass
+
     def setUp(self):
         self.widget = self.create_widget(OWMarkerGenes)
 

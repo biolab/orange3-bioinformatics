@@ -1,5 +1,6 @@
 # Test methods with long descriptive names can omit docstrings
 # pylint: disable=missing-docstring,arguments-differ
+import platform
 import unittest
 from itertools import chain
 from unittest.mock import Mock, patch
@@ -331,6 +332,10 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.send_signal(self.widget.Inputs.data, tsne_output)
         self.wait_until_finished()
         self.send_signal(self.widget.Inputs.secondary_data, self.secondary_data)
+
+    @unittest.skipIf(platform.system() == 'Windows', 'Windows fatal exception: access violation')
+    def test_send_report(self):
+        super().test_send_report()
 
 
 if __name__ == "__main__":
