@@ -14,6 +14,9 @@ class TestOWGEODatasets(WidgetTest):
         self.test_organism = '10090'
         self.widget = self.create_widget(OWGEODatasets)
 
+    def test_minimum_size(self):
+        pass
+
     def test_output_data(self):
         self.widget.auto_commit = True
 
