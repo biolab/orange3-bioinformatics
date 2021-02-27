@@ -28,7 +28,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: dist_files
-          path: dist/*.tar.gz
+          path: dist/*
 
 #  upload_release_assets:
 #    name:  Upload Release Assets
