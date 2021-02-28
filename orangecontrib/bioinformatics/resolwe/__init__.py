@@ -45,5 +45,5 @@ def connect(username=None, password=None, url=None, server_type='resolwe'):
 
     try:
         return _api(username, password, url)
-    except ValueError as e:
+    except Exception as e:
         raise ResolweAuthException(e.args[0]) from e

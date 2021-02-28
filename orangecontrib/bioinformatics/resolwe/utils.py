@@ -21,7 +21,7 @@ RESOLWEAPI_CACHE = os.path.join(LOCAL_CACHE_DIR, 'ResolweAPI_cache')
 
 
 def transpose_table(table):
-    """ Transpose the rows and columns of the table.
+    """Transpose the rows and columns of the table.
 
     Args:
         table: Data in :obj:`Orange.data.Table`
@@ -46,7 +46,7 @@ def transpose_table(table):
 
 
 def etc_to_table(etc_json, time_var=False):
-    """ Converts data from Json to :obj:`Orange.data.table`
+    """Converts data from Json to :obj:`Orange.data.table`
 
     Args:
         etc_json (dict): Data in json like format from genesis
@@ -73,7 +73,7 @@ def etc_to_table(etc_json, time_var=False):
         gene_expression.append(row)
         table.append(gene_expression)
 
-    orange_table = Table(domain, table)
+    orange_table = Table.from_list(domain, table)
 
     if time_var:
         orange_table = transpose_table(orange_table)
