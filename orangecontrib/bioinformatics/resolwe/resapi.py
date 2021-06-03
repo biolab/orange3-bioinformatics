@@ -1,17 +1,10 @@
 """ ResolweAPI """
 from typing import Dict, List
-from pathlib import Path
-from tempfile import NamedTemporaryFile
 from urllib.parse import urljoin
 
 import requests
 from resdk import Resolwe
-from requests import Response
-from resdk.resources.data import Data, Sample
-
-from Orange.data import Table, Variable
-
-from orangecontrib.bioinformatics.resolwe import sample_metadata
+from resdk.resources.data import Data, Collection
 
 DEFAULT_URL: str = 'https://app.genialis.com'
 RESOLWE_URLS: List[str] = [DEFAULT_URL, 'https://imaps.genialis.com', 'https://bcm.genialis.com']
@@ -34,6 +27,16 @@ class ResolweAPI:
         'contributor__username',
         'tags',
     )
+
+    DATA_FIELDS = [
+        'output__source',
+        'output__species',
+        'output__build',
+        'output__exp_type',
+        'output__feature_type',
+        'process__slug',
+        'process__name',
+    ]
 
     def __init__(self, username=None, password=None, url=DEFAULT_URL):
         self._res = Resolwe(username, password, url)
@@ -83,45 +86,12 @@ class ResolweAPI:
 
         return col_to_species
 
-    def download(self, data_id, data_file_name) -> Response:
-        file_url = urljoin(self.url, f'data/{data_id}/{data_file_name}')
-        response = self.session.get(file_url, auth=self._res.auth)
-        response.raise_for_status()
-        return response
+    def get_collection_by_id(self, collection_id: str) -> Collection:
+        return self._res.collection.get(id=collection_id)
 
     def get_expression_data_objects(self, collection_id: str) -> List[Data]:
         """ Get all expression data objects from a collection. """
-        return self._res.data.filter(type='data:expression', collection=collection_id)
-
-    def get_orange_data_objects(self, collection_id: str) -> List[Data]:
-        return self._res.data.filter(type='data:metadata:orange', collection=collection_id, ordering='-modified')
-
-    def get_sample_relations(self, rel_type: str, collection_id: str):
-        """ Get all relations (by type) from a collection. """
-        return self._res.relation.filter(collection=collection_id).filter(type=rel_type)
-
-    def get_samples_by_id(self, sample_ids: List[str]) -> List[Sample]:
-        return self._res.sample.filter(id__in=sample_ids)
-
-    def aggregate_sample_metadata(self, samples: List[Sample], collection_id: str) -> Dict[Variable, List[List[str]]]:
-        replicate_groups = list(self.get_sample_relations('group', collection_id))
-        replicate_series = list(self.get_sample_relations('series', collection_id))
-
-        descriptors = sample_metadata.descriptors(samples)
-        relations = sample_metadata.relations(samples, replicate_groups + replicate_series)
-
-        metadata = {}
-        metadata.update(descriptors)
-        metadata.update(relations)
-
-        return metadata
-
-    def get_clinical_metadata(self, data_id, data_file_name) -> Table:
-        response = self.download(data_id, data_file_name)
-        with NamedTemporaryFile(suffix=''.join(Path(data_file_name).suffixes)) as f:
-            f.write(response.content)
-            f.seek(0)
-            return Table.from_file(f.name)
+        return self._res.data.filter(type='data:expression', collection=collection_id, fields=self.DATA_FIELDS)
 
 
 if __name__ == '__main__':

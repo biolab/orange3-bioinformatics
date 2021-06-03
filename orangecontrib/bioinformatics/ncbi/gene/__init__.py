@@ -5,6 +5,7 @@ import contextlib
 from typing import Dict, List, Tuple, Optional
 
 from Orange.data import Table, Domain, StringVariable
+from Orange.data.util import get_unique_names_domain
 
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
@@ -223,7 +224,7 @@ class GeneMatcher:
 
             return new_data
 
-    def match_table_attributes(self, data_table, rename=False, source_name='Source ID') -> Table:
+    def match_table_attributes(self, data_table, run=True, rename=False, source_name='Source ID') -> Table:
         """Helper function for gene name matching with :class:`Orange.data.Table`.
 
         Match table attributes and if a unique match is found create a new column attribute
@@ -242,9 +243,9 @@ class GeneMatcher:
             Data table column attributes are populated with Entrez Ids
 
         """
-
         # run gene matcher
-        self.genes = [var.name for var in data_table.domain.attributes]
+        if run:
+            self.genes = [var.name for var in data_table.domain.attributes]
 
         def helper(gene, attribute):
             if gene.gene_id:
@@ -256,8 +257,16 @@ class GeneMatcher:
             return attribute
 
         attributes = [helper(gene, attr) for gene, attr in zip(self.genes, data_table.domain.attributes)]
-        domain = Domain(attributes, data_table.domain.class_vars, data_table.domain.metas)
+        metas = data_table.domain.metas
+        (attr_deduplicated, _, metas_deduplicated), renamed = get_unique_names_domain(
+            [a.name for a in attributes], metas=[m.name for m in metas]
+        )
 
+        if len(renamed):
+            attributes = [attr.renamed(new_name) for attr, new_name in zip(attributes, attr_deduplicated)]
+            metas = [meta.renamed(new_name) for meta, new_name in zip(metas, metas_deduplicated)]
+
+        domain = Domain(attributes, data_table.domain.class_vars, metas)
         return data_table.transform(domain)
 
     def match_genes(self):
