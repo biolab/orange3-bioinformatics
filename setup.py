@@ -13,7 +13,7 @@ if __name__ == '__main__':
             'requests',
             'requests-cache',
             'serverfiles',
-            'resdk',
+            'resdk>=13.3.0',
             'genesis-pyapi',
             # Versions are determined by Orange
             'numpy',
