@@ -13,8 +13,9 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import sys
+
 from recommonmark.parser import CommonMarkParser
 
 import orangecontrib.bioinformatics
@@ -120,7 +121,7 @@ todo_include_todos = False
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = "alabaster"
+html_theme = "sphinx_rtd_theme"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -129,7 +130,6 @@ html_theme_options = {
     "show_related": False,
     "show_powered_by": False,
     "fixed_sidebar": True,
-
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -155,6 +155,8 @@ html_theme_options = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+html_css_files = ['custom.css']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -192,7 +194,7 @@ html_sidebars = {'**': ['about.html', 'useful_links.html', 'globaltoc.html']}
 # html_domain_indices = True
 
 # If false, no index is generated.
-#html_use_index = True
+# html_use_index = True
 
 # If true, the index is split into individual pages for each letter.
 # html_split_index = False
@@ -236,13 +238,10 @@ htmlhelp_basename = 'Orange3 Bioinformatics addon doc'
 latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
     # 'papersize': 'letterpaper',
-
     # The font size ('10pt', '11pt' or '12pt').
     # 'pointsize': '10pt',
-
     # Additional stuff for the LaTeX preamble.
     # 'preamble': '',
-
     # Latex figure (float) alignment
     # 'figure_align': 'htbp',
 }
@@ -251,8 +250,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  (master_doc, 'orange3-bioinformatics.tex', 'Orange3 Bioinformatics Documentation',
-   'Biolab', 'manual'),
+    (master_doc, 'orange3-bioinformatics.tex', 'Orange3 Bioinformatics Documentation', 'Biolab', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -280,13 +278,10 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'orange3-bioinformatics', 'Orange3 Bioinformatics Documentation',
-     [author], 1)
-]
+man_pages = [(master_doc, 'orange3-bioinformatics', 'Orange3 Bioinformatics Documentation', [author], 1)]
 
 # If true, show URL addresses after external links.
-#man_show_urls = False
+# man_show_urls = False
 
 
 # -- Options for Texinfo output -------------------------------------------
@@ -295,9 +290,15 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  (master_doc, 'Orange3-bioinformatics', 'Orange3 Bioinformatics Documentation',
-   author, 'orange3-bioinformatics', 'One line description of project.',
-   'Miscellaneous'),
+    (
+        master_doc,
+        'Orange3-bioinformatics',
+        'Orange3 Bioinformatics Documentation',
+        author,
+        'orange3-bioinformatics',
+        'One line description of project.',
+        'Miscellaneous',
+    ),
 ]
 
 # Documents to append as an appendix to all manuals.
