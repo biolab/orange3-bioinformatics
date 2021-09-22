@@ -40,6 +40,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
+    'recommonmark',
 ]
 
 # The suffix(es) of source filenames.
