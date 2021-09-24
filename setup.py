@@ -7,6 +7,7 @@ if __name__ == '__main__':
         setup_requires=['setuptools-scm', 'setuptools>=40.0'],
         install_requires=[
             'Orange3>=3.22.0',
+            'orange-widget-base>=4.14.1',
             'scipy>=1.5.0',
             'pyclipper>=1.2.0',
             'point-annotator~=2.0',
