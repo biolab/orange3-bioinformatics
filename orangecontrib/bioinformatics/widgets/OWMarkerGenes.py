@@ -839,7 +839,7 @@ class OWMarkerGenes(widget.OWWidget):
         """
         self._available_sources = value
 
-        items = sorted(list(value.keys()), reverse=True)  # panglao first
+        items = sorted(value.keys(), reverse=True)  # panglao first
         try:
             idx = items.index(self.selected_source)
         except ValueError:
@@ -1036,13 +1036,6 @@ class OWMarkerGenes(widget.OWWidget):
                 f"<b>Reference:</b> <a href='{data_row['URL']}'>{data_row['Reference']}</a>"
             )
 
-    def _update_data_info(self) -> None:
-        """
-        Updates output info in the control area.
-        """
-        sel_model = self.selected_markers_view.model().sourceModel()
-        self.info.set_output_summary(f"Selected: {str(len(sel_model))}")
-
     # callback functions
 
     def _selected_markers_changed(self) -> None:
@@ -1051,7 +1044,6 @@ class OWMarkerGenes(widget.OWWidget):
         """
         rows = self.selected_markers_view.model().sourceModel().rootItem.get_data_rows()
         self.selected_genes = [row["Entrez ID"].value + row["Cell Type"].value for row in rows]
-        self._update_data_info()
         self.commit()
 
     def _on_selection_changed(self, view: TreeView) -> None:
