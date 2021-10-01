@@ -19,7 +19,7 @@ if __name__ == '__main__':
             'numpy',
         ],
         extras_require={
-            'doc': ['sphinx', 'recommonmark'],
+            'doc': ['sphinx', 'recommonmark', 'sphinx_rtd_theme'],
             'test': [
                 'flake8',
                 'flake8-comprehensions',
