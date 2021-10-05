@@ -1,9 +1,10 @@
 """ Resolwe module """
 from .utils import GENAPI_CACHE, CACHE_BACKEND, RESOLWEAPI_CACHE
-from .genapi import DEFAULT_EMAIL, DEFAULT_PASSWD, GenAPI
+from .genapi import GenAPI
 from .resapi import ResolweAPI
 
-__all__ = ('DEFAULT_EMAIL', 'DEFAULT_PASSWD')
+RESOLWE_PLATFORM = 'resolwe'
+GENESIS_PLATFORM = 'genesis'
 
 
 class ResolweAuthException(Exception):
@@ -36,9 +37,9 @@ def connect(username=None, password=None, url=None, server_type='resolwe'):
     :return: Instance of GenAPI or ResolweAPI
     """
 
-    if server_type == 'resolwe':
+    if server_type == RESOLWE_PLATFORM:
         _api = ResolweAPI
-    elif server_type == 'genesis':
+    elif server_type == GENESIS_PLATFORM:
         _api = GenAPI
     else:
         raise ResolweServerTypeException(f'Unknown server type {server_type}')

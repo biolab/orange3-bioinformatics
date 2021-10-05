@@ -1,21 +1,20 @@
 """ dictyExpress widget """
-import sys
-import threading
+from typing import Optional
 
 from requests.exceptions import ConnectionError
 
 from AnyQt.QtGui import QFont
-from AnyQt.QtCore import Qt, QSize, QThreadPool
-from AnyQt.QtWidgets import QFrame, QLabel, QLineEdit, QTreeWidget, QApplication, QTreeWidgetItem
+from AnyQt.QtCore import Qt, QSize
+from AnyQt.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem
 
 from Orange.data import Table, StringVariable
 from Orange.widgets import gui, settings
 from Orange.widgets.widget import Msg, OWWidget
-from Orange.widgets.credentials import CredentialManager
 from Orange.widgets.utils.signals import Output
 from Orange.widgets.utils.concurrent import ConcurrentWidgetMixin
 
 from orangecontrib.bioinformatics import resolwe
+from orangecontrib.bioinformatics.resolwe import genapi, connect
 from orangecontrib.bioinformatics.ncbi.gene import ENTREZ_ID, GeneMatcher
 from orangecontrib.bioinformatics.resolwe.utils import etc_to_table
 from orangecontrib.bioinformatics.widgets.utils.data import (
@@ -24,6 +23,7 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
     GENE_ID_ATTRIBUTE,
     GENE_AS_ATTRIBUTE_NAME,
 )
+from orangecontrib.bioinformatics.widgets.components.resolwe import SignIn, get_credential_manager
 
 Labels = [
     (" ", " "),
@@ -34,14 +34,6 @@ Labels = [
     ("var.treatment", "Treatment"),
     ("var.strain", "Strain"),
 ]
-
-
-# Creates line separator
-def h_line():
-    line = QFrame()
-    line.setFrameShape(QFrame.HLine)
-    line.setFrameShadow(QFrame.Sunken)
-    return line
 
 
 class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
@@ -71,43 +63,31 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
         super().__init__()
         ConcurrentWidgetMixin.__init__(self)
 
-        self.res = None
+        self._res: Optional[genapi.GenAPI] = None
         self.organism = '44689'
         self.server = 'https://dictyexpress.research.bcm.edu'
         self.headerLabels = [x[1] for x in Labels]
         self.searchString = ""
         self.items = []
-        self.cm: CredentialManager = CredentialManager('genapi_credentials')
-
-        self.progress_bar = None
-        # threads
-        self.threadpool = QThreadPool()
+        self.genapi_pub_auth = {
+            'url': genapi.DEFAULT_URL,
+            'username': genapi.DEFAULT_EMAIL,
+            'password': genapi.DEFAULT_PASSWD,
+        }
 
         # Login Section
-        box = gui.widgetBox(self.controlArea, 'Login')
-
-        self.username_line_edit = gui.lineEdit(
-            box, self, "", "Username:", labelWidth=100, orientation='horizontal', callback=self.handle_sign_in_btn
-        )
-
-        self.password_line_edit = gui.lineEdit(
-            box, self, "", "Password:", labelWidth=100, orientation='horizontal', callback=self.handle_sign_in_btn
-        )
-        self.password_line_edit.setEchoMode(QLineEdit.Password)
+        box = gui.widgetBox(self.controlArea, 'Sign in')
+        self.user_info = gui.label(box, self, '')
+        self.server_info = gui.label(box, self, '')
 
         box = gui.widgetBox(box, orientation=Qt.Horizontal)
-        self.sign_in_btn = gui.button(box, self, 'Sign In', autoDefault=False, callback=self.sign_in)
-        self.sign_out_btn = gui.button(box, self, 'Sign Out', autoDefault=False, callback=self.sign_out)
-        self.sign_in_btn.setDisabled(True)
+        self.sign_in_btn = gui.button(box, self, 'Sign In', callback=self.sign_in, autoDefault=False)
+        self.sign_out_btn = gui.button(box, self, 'Sign Out', callback=self.sign_out, autoDefault=False)
 
-        self.controlArea.layout().addWidget(h_line())
-
-        box = gui.widgetBox(self.controlArea, "Output", addSpace=True)
+        box = gui.widgetBox(self.controlArea, "Output")
         gui.radioButtonsInBox(
             box, self, "gene_as_attr_name", ["Genes in rows", "Genes in columns"], callback=self.invalidate
         )
-
-        self.controlArea.layout().addWidget(h_line())
 
         self.clear_cache_btn = gui.button(
             self.controlArea, self, "Clear cache", autoDefault=False, callback=self.clear_cache
@@ -125,8 +105,6 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
         label.setFont(my_font)
         self.mainArea.layout().addWidget(label)
 
-        self.mainArea.layout().addWidget(h_line())
-
         self.filter = gui.lineEdit(
             self.mainArea, self, "searchString", "Filter:", callbackOnType=True, callback=self.search_update
         )
@@ -142,51 +120,61 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
         self.experimentsWidget.setHeaderLabels(self.headerLabels)
         self.mainArea.layout().addWidget(self.experimentsWidget)
 
-        self.sign_in()
+        self.sign_in(silent=True)
         self.sizeHint()
 
     def sizeHint(self):
         return QSize(1400, 680)
 
-    def handle_sign_in_btn(self):
-        self.sign_in_btn.setEnabled(
-            True if self.username_line_edit.text() and self.password_line_edit.text() else False
-        )
+    @property
+    def res(self):
+        return self._res
+
+    @res.setter
+    def res(self, value: genapi.GenAPI):
+        if isinstance(value, genapi.GenAPI):
+            self._res = value
+            self.Error.clear()
+            self.reset()
+            self.load_experiments()
+            self.update_user_status()
+            self.Outputs.etc_data.send(None)
+
+    def sign_in(self, silent=False):
+        dialog = SignIn(self, server_type='genesis')
+
+        if silent:
+            dialog.sign_in()
+            if dialog.resolwe_instance is not None:
+                self.res = dialog.resolwe_instance
+            else:
+                self.res = connect(**self.genapi_pub_auth, server_type=resolwe.GENESIS_PLATFORM)
+
+        if not silent and dialog.exec_():
+            self.res = dialog.resolwe_instance
 
     def sign_out(self):
-        self.username_line_edit.setText(None)
-        self.password_line_edit.setText(None)
-        del self.cm.username
-        del self.cm.password
-        self.reset()
-        self.sign_in()
+        # Remove username and password
+        cm = get_credential_manager(resolwe.GENESIS_PLATFORM)
+        del cm.username
+        del cm.password
+        # Use public credentials when user signs out
+        self.res = connect(**self.genapi_pub_auth, server_type=resolwe.GENESIS_PLATFORM)
 
-    def sign_in(self):
-        self.res = None
-        self.Error.clear()
-        self.reset()
+    def update_user_status(self):
+        cm = get_credential_manager(resolwe.GENESIS_PLATFORM)
 
-        username = self.cm.username if self.cm.username else self.username_line_edit.text()
-        password = self.cm.password if self.cm.password else self.password_line_edit.text()
-
-        try:
-            self.res = resolwe.connect(
-                username if username else resolwe.DEFAULT_EMAIL,
-                password if password else resolwe.DEFAULT_PASSWD,
-                self.server,
-                'genesis',
-            )
-
-        except resolwe.ResolweAuthException:
-            self.Error.invalid_credentials()
+        if cm.username:
+            user_info = f"User: {cm.username}"
+            self.sign_in_btn.setEnabled(False)
+            self.sign_out_btn.setEnabled(True)
         else:
-            self.load_experiments()
-            # self.handle_cache_button(True)
+            user_info = 'User: Anonymous'
+            self.sign_in_btn.setEnabled(True)
+            self.sign_out_btn.setEnabled(False)
 
-            self.cm.username = username
-            self.cm.password = password
-            self.username_line_edit.setText(username)
-            self.password_line_edit.setText(password)
+        self.user_info.setText(user_info)
+        self.server_info.setText(f'Server: {self.res._gen.url[8:]}')
 
     def clear_cache(self):
         resolwe.GenAPI.clear_cache()
@@ -203,17 +191,6 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
         parts = self.searchString.split()
         for item in self.items:
             item.setHidden(not all(s in item for s in parts))
-
-    def progress_advance(self):
-        # GUI should be updated in main thread. That's why we are calling advance method here
-        assert threading.current_thread() == threading.main_thread()
-        if self.progress_bar:
-            self.progress_bar.advance()
-
-    def load_experiments_result(self, experiments):
-        self.load_tree_items(experiments)
-        self.progress_bar.finish()
-        self.setStatusMessage('')
 
     def on_exception(self, ex):
         if isinstance(ex, ConnectionError) or isinstance(ex, ValueError):
@@ -340,13 +317,6 @@ class CustomTreeItem(QTreeWidgetItem):
 
 
 if __name__ == "__main__":
+    from orangewidget.utils.widgetpreview import WidgetPreview
 
-    def test_main():
-        app = QApplication(sys.argv)
-        w = OWdictyExpress()
-        w.show()
-        r = app.exec_()
-        w.saveSettings()
-        return r
-
-    sys.exit(test_main())
+    WidgetPreview(OWdictyExpress).run()

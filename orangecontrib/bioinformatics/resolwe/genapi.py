@@ -11,6 +11,7 @@ view_model = ['experiment', 'growth', 'genotype', 'treatment', 'strain', 'time',
 DEFAULT_EMAIL = 'anonymous@genialis.com'
 DEFAULT_PASSWD = 'anonymous'
 DEFAULT_URL = 'https://dictyexpress.research.bcm.edu'
+CREDENTIAL_MANAGER_SERVICE: str = 'genapi_credentials'
 
 
 class GenAPI:
