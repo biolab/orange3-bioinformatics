@@ -11,7 +11,7 @@ if __name__ == '__main__':
             'pyclipper>=1.2.0',
             'point-annotator~=2.0',
             'requests',
-            'requests-cache',
+            'requests-cache>=0.8.0',
             'serverfiles',
             'resdk>=13.3.0',
             'genesis-pyapi',

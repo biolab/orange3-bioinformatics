@@ -32,11 +32,11 @@ class GenAPI:
 
     def get_cached_ids(self):
         with requests_cache.enabled(cache_name=GENAPI_CACHE, backend=CACHE_BACKEND):
-            cached_object = requests_cache.core.get_cache()
-            responses = [cached_object.get_response_and_time(response) for response in cached_object.responses]
+            cached_object = requests_cache.get_cache()
+            responses = [cached_object.get_response(response) for response in cached_object.responses]
             gen_ids = []
 
-            for url in [response.url for response, _ in responses]:
+            for url in [response.url for response in responses]:
                 gen_id = re.search(r'{}(.*?)/'.format(self._data_endpoint), url)
 
                 if gen_id is not None:
