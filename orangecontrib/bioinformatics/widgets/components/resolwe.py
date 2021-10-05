@@ -33,7 +33,7 @@ from Orange.widgets.credentials import CredentialManager
 from orangecontrib.bioinformatics.resolwe import (
     GENESIS_PLATFORM,
     RESOLWE_PLATFORM,
-    ResolweAuthException,
+    ResolweAuthError,
     genapi,
     resapi,
     connect,
@@ -129,7 +129,7 @@ class SignIn(QDialog):
 
         try:
             self.resolwe_instance = connect(username, password, url=server, server_type=self.server_type)
-        except ResolweAuthException:
+        except ResolweAuthError:
             self.error_msg.show()
             return
 
@@ -320,7 +320,7 @@ class CollapsibleFilterComponent(OWComponent, QObject):
         content_animation.setEndValue(content_height)
 
     def on_toggle(self):
-        """ Start animation """
+        """Start animation"""
         checked = self.toggle_button.isChecked()
         self.toggle_button.setArrowType(Qt.DownArrow if not checked else Qt.RightArrow)
         self.toggle_animation.setDirection(QAbstractAnimation.Forward if not checked else QAbstractAnimation.Backward)
@@ -410,7 +410,7 @@ class PaginationComponent(OWComponent, QObject):
 
 
 class NormalizationComponent(OWComponent, QObject):
-    """ Gene expression normalization component """
+    """Gene expression normalization component"""
 
     options_changed = pyqtSignal()
 

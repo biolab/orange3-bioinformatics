@@ -7,7 +7,7 @@ from Orange.widgets.tests.base import GuiTest, WidgetTest
 from Orange.widgets.credentials import CredentialManager
 from Orange.widgets.tests.utils import simulate
 
-from orangecontrib.bioinformatics.resolwe import ResolweAuthException
+from orangecontrib.bioinformatics.resolwe import ResolweAuthError
 from orangecontrib.bioinformatics.widgets.components.resolwe import SignIn
 from orangecontrib.bioinformatics.widgets.OWGenialisExpressions import SortBy, ItemsPerPage, FilterByDateModified
 from orangecontrib.bioinformatics.tests.widgets.test_OWGenialisExpressions import MockWidget
@@ -50,7 +50,7 @@ class TestSignInForm(GuiTest):
         'orangecontrib.bioinformatics.widgets.components.resolwe.get_credential_manager',
         return_value=CredentialManager('resolwe_credentials_test'),
     )
-    @patch('orangecontrib.bioinformatics.widgets.components.resolwe.connect', side_effect=ResolweAuthException())
+    @patch('orangecontrib.bioinformatics.widgets.components.resolwe.connect', side_effect=ResolweAuthError())
     def test_dialog_fail(self, mocked_connect, mocked_cm):
         widget = MockWidget()
         dialog = SignIn(widget)

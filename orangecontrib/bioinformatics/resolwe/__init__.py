@@ -7,16 +7,12 @@ RESOLWE_PLATFORM = 'resolwe'
 GENESIS_PLATFORM = 'genesis'
 
 
-class ResolweAuthException(Exception):
-    """ A login error occurred. """
+class ResolweAuthError(Exception):
+    """A login error occurred."""
 
 
-class ResolweServerTypeException(Exception):
-    """ Unknown server type """
-
-
-class ResolweDataObjectsNotFound(Exception):
-    """ Data Objects not found """
+class ResolweServerTypeError(Exception):
+    """Unknown server type"""
 
 
 def connect(username=None, password=None, url=None, server_type='resolwe'):
@@ -42,9 +38,9 @@ def connect(username=None, password=None, url=None, server_type='resolwe'):
     elif server_type == GENESIS_PLATFORM:
         _api = GenAPI
     else:
-        raise ResolweServerTypeException(f'Unknown server type {server_type}')
+        raise ResolweServerTypeError(f'Unknown server type {server_type}')
 
     try:
         return _api(username, password, url)
     except Exception as e:
-        raise ResolweAuthException(e.args[0]) from e
+        raise ResolweAuthError(e.args[0]) from e
