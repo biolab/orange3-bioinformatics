@@ -262,8 +262,8 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase):
         if labels is None:
             return
         for label_per, (x, y), _ in labels:
-            text = "\n".join([l for l, _ in label_per[: self.n_cluster_labels]])
-            ttip = "\n".join([f"{round(p * 100)}%  {l}" for l, p in label_per])
+            text = "\n".join([label for label, _ in label_per[: self.n_cluster_labels]])
+            ttip = "\n".join([f"{round(p * 100)}%  {label}" for label, p in label_per])
             item = CenteredTextItem(self.view_box, x, y, text, ttip)
             self.plot_widget.addItem(item)
             self.cluster_labels_items.append(item)
@@ -321,8 +321,6 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
     GRAPH_CLASS = OWAnnotateProjectionGraph
     graph = SettingProvider(OWAnnotateProjectionGraph)
-    # remove this line when https://github.com/biolab/orange3/pull/3863 is released
-    left_side_scrolling = True
 
     attr_x = ContextSetting(None)
     attr_y = ContextSetting(None)
@@ -363,7 +361,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         missing_cell_type = Msg("'Cell Type' is missing in Genes table.")
         missing_tax_id_genes = Msg(f"'{TAX_ID}' is missing in Genes table. " f"Try using 'Marker Genes' widget.")
         different_tax_id = Msg(f"Data and Genes appear to describe different " f"organisms (mismatching {TAX_ID}).")
-        same_axis_features = Msg(f"Selected features for Axis x and " f"Axis y should differ.")
+        same_axis_features = Msg("Selected features for Axis x and " "Axis y should differ.")
 
     class Error(OWDataProjectionWidget.Error):
         no_reference_data = Msg("Missing Reference data on input.")
@@ -423,7 +421,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             'sendSelectedValue': True,
             'contentsLength': 14,
         }
-        box = gui.vBox(self.controlArea, True)
+        box = gui.vBox(self.controlArea, box='Axes')
         ord = (DomainModel.METAS, DomainModel.ATTRIBUTES, DomainModel.CLASSES)
         mod = DomainModel(ord, valid_types=ContinuousVariable)
         gui.comboBox(
@@ -432,6 +430,8 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         gui.comboBox(
             box, self, "attr_y", label="Axis y:", model=mod, callback=self.__axis_attr_changed, **common_options
         )
+
+        box = gui.vBox(self.controlArea, box='Annotation')
         gui.comboBox(
             box,
             self,
@@ -900,6 +900,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
 if __name__ == "__main__":
     from Orange.projection import PCA
+
     from orangecontrib.bioinformatics.utils import serverfiles
 
     data_path = "https://datasets.biolab.si/sc/aml-1k.tab.gz"
