@@ -1,12 +1,11 @@
 import unittest
-from unittest.mock import Mock
 
 import numpy as np
-from orangewidget.tests.base import WidgetTest
 
 from AnyQt.QtCore import QModelIndex, QItemSelectionModel
 
 from Orange.data import Table
+from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
 
 from orangecontrib.bioinformatics.utils import serverfiles
@@ -220,7 +219,7 @@ class TestTreeItem(unittest.TestCase):
 class TestOWMarkerGenes(WidgetTest):
     @classmethod
     def setUpClass(cls):
-        """ Code executed only once for all tests """
+        """Code executed only once for all tests"""
         super().setUpClass()
         file_name = "panglao_gene_markers.tab"
         serverfiles.update(SERVER_FILES_DOMAIN, file_name)
@@ -546,45 +545,6 @@ class TestOWMarkerGenes(WidgetTest):
         # description for first gene
         dest_view.selectionModel().select(gene_index, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
         self.assertIn(first_gene_info, self.widget.descriptionlabel.toPlainText())
-
-    def test_output_info(self):
-        """
-        Test whether the output info in a status bar is set correctly.
-        """
-        # mocks
-        output_sum = self.widget.info.set_output_summary = Mock()
-
-        # views
-        src_view = self.widget.available_markers_view
-        dest_view = self.widget.selected_markers_view
-
-        # move elements
-        parent_index = src_view.model().index(0, 0)
-        gene_index = src_view.model().index(0, 0, parent_index)
-        gene_index1 = src_view.model().index(1, 0, parent_index)
-        src_view.selectionModel().select(gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.widget.move_button.click()
-
-        output_sum.assert_called_with("Selected: 1")
-
-        # move one more
-        src_view.selectionModel().select(gene_index1, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.widget.move_button.click()
-
-        output_sum.assert_called_with("Selected: 2")
-
-        # move complete parent
-        src_view.selectionModel().select(parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.widget.move_button.click()
-
-        output_sum.assert_called_with(f"Selected: {len(dest_view.model().sourceModel())}")
-
-        # move everthing back
-        parent_index = dest_view.model().index(0, 0)
-        dest_view.selectionModel().select(parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.widget.move_button.click()
-
-        output_sum.assert_called_with("Selected: 0")
 
     def test_extend_collapse_both_views(self):
         """
