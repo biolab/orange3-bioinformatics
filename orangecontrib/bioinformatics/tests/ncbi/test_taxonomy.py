@@ -47,7 +47,7 @@ class TestTaxonomy(unittest.TestCase):
         self.assertGreater(len(self.tax_obj.get_all_strains(self.human)), 0)
 
         subnodes = self.tax_obj.subnodes(self.human)
-        self.assertTrue(len(subnodes) == 2)
+        self.assertTrue(len(subnodes) >= 2)
         self.assertTrue('63221' in subnodes)
         self.assertTrue('741158' in subnodes)
 

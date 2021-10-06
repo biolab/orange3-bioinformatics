@@ -215,19 +215,12 @@ class GEODatasetsModel(itemmodels.PyTableModel):
         self.wrap(self.table[self.filter_table(filter_pattern).any(axis=1), :])
         self.sort(self._sort_column, self._sort_order)
 
-    def wrap(self, table):
-        self.beginResetModel()
-        self._table = table
-        self._roleData = self._RoleData()
-        self.resetSorting()
-        self.endResetModel()
-
 
 class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     name = "GEO Data Sets"
     description = "Access to Gene Expression Omnibus data sets."
     icon = "icons/OWGEODatasets.svg"
-    priority = 2
+    priority = 10
 
     class Warning(OWWidget.Warning):
         using_local_files = Msg("Can't connect to serverfiles. Using cached files.")

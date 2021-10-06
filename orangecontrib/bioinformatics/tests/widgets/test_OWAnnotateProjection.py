@@ -1,5 +1,6 @@
 # Test methods with long descriptive names can omit docstrings
 # pylint: disable=missing-docstring,arguments-differ
+import platform
 import unittest
 from itertools import chain
 from unittest.mock import Mock, patch
@@ -153,7 +154,7 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         output2 = self.get_output(self.widget.Outputs.annotated_data)
         np.testing.assert_array_equal(output1.X, output2.X)
         np.testing.assert_array_equal(output1.Y, output2.Y)
-        self.assertFalse((output1.metas == output2.metas).all())
+        self.assertFalse(output1.metas.shape == output2.metas.shape and np.equal(output1.metas, output2.metas).all())
         self._patch_annotation_functions()
 
     def test_p_threshold_control(self):
@@ -331,6 +332,10 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.send_signal(self.widget.Inputs.data, tsne_output)
         self.wait_until_finished()
         self.send_signal(self.widget.Inputs.secondary_data, self.secondary_data)
+
+    @unittest.skipIf(platform.system() == 'Windows', 'Windows fatal exception: access violation')
+    def test_send_report(self):
+        super().test_send_report()
 
 
 if __name__ == "__main__":

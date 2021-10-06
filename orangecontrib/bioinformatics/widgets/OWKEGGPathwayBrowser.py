@@ -2,7 +2,9 @@
 import gc
 import sys
 import webbrowser
+from typing import Dict, List, Tuple, TypeVar, Iterable, Sequence
 from functools import reduce, partial
+from itertools import chain
 from contextlib import contextmanager
 from collections import defaultdict
 
@@ -37,15 +39,19 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
     ERROR_ON_MISSING_ANNOTATION,
 )
 
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+D = TypeVar("D")
 
-def relation_list_to_multimap(rellist, ncbi_gene_ids):
+
+def relation_list_to_multimap(rellist: Sequence[Tuple[A, B]]) -> Dict[A, Sequence[B]]:
     """
-    Convert a 'relations' list into a multimap and convert them to ncbi_ids on the fly
+    Convert a 'relations' list into a multimap
 
     Parameters
     ----------
     rellist : Iterable[Tuple[Hashable[K], Any]]
-    ncbi_gene_ids :
 
     Returns
     -------
@@ -53,17 +59,30 @@ def relation_list_to_multimap(rellist, ncbi_gene_ids):
 
     Example
     -------
-    relation_list_to_multimap([(1, "a"), (2, "c"), (1, "b")])
-    {1: ['a', 'b'], 2: OWKEGGPathwayBrowser['c']}
+    >>> relation_list_to_multimap([(1, "a"), (2, "c"), (1, "b")])
+    {1: ['a', 'b'], 2: ['c']}
     """
     mmap = defaultdict(list)
     for key, val in rellist:
-        try:
-            mmap[key].append(ncbi_gene_ids[val.upper()])
-        except KeyError:
-            # this means that gene id from paths do not exist in kegg gene databse, skip!
-            pass
+        mmap[key].append(val)
     return dict(mmap)
+
+
+def relation_join(rela: Sequence[Tuple[A, B]], relb: Sequence[Tuple[C, D]]) -> Sequence[Tuple[A, D]]:
+    res = []
+    relb_mmap = relation_list_to_multimap(relb)
+    for a, b in rela:
+        res.extend((a, d) for d in relb_mmap.get(b, ()))
+    return res
+
+
+def relation_map(relation: Sequence[Tuple[A, B]], values: Sequence[A]) -> Sequence[Tuple[A, Sequence[B]]]:
+    rel_mmap = relation_list_to_multimap(relation)
+    return [rel_mmap.get(v, []) for v in values]
+
+
+def flatten(seq: Iterable[Iterable[A]]) -> Sequence[A]:
+    return list(chain.from_iterable(seq))
 
 
 def split_and_strip(string, sep=None):
@@ -238,7 +257,7 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
     name = "KEGG Pathways"
     description = "Browse KEGG pathways that include an input set of genes."
     icon = "../widgets/icons/OWKEGGPathwayBrowser.svg"
-    priority = 8
+    priority = 70
 
     inputs = [("Data", Orange.data.Table, "SetData", widget.Default), ("Reference", Orange.data.Table, "SetRefData")]
     outputs = [("Selected Data", Orange.data.Table, widget.Default), ("Unselected Data", Orange.data.Table)]
@@ -344,6 +363,7 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         self.ref_gene_id_column = None
 
         self.pathways = {}
+        self.ncbi_gene_map = []
         self.org = None
 
         self._executor = concurrent.ThreadExecutor()
@@ -598,7 +618,10 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
     def _onPathwayTaskFinshed(self):
         self.setEnabled(True)
         pathway_id, self.pathway = self._pathwayTask.result()
-        self.pathwayView.SetPathway(self.pathway, self.pathways.get(pathway_id, [[]])[0])
+        objects = self.pathways.get(pathway_id, [[]])[0]  # [ncbi_gene_id]
+        # map ncbi_gene_id to keg_id for display
+        objects = flatten(relation_map(self.ncbi_gene_map, objects))
+        self.pathwayView.SetPathway(self.pathway, objects)
 
     def UpdatePathwayViewTransform(self):
         self.pathwayView.updateTransform()
@@ -631,28 +654,27 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         else:
             self.ref_genes = self.org.get_ncbi_ids()
 
-        def run_enrichment(genes, reference, progress=None):
+        def run_enrichment(org_code, genes, reference, progress=None):
             # We use the kegg pathway gene sets provided by 'geneset' for
             # the enrichment calculation.
 
             kegg_api = kegg.api.CachedKeggApi()
-            linkmap = kegg_api.link(self.org.org_code, "pathway")
-            converted_ids = kegg_api.conv(self.org.org_code, 'ncbi-geneid')
-            kegg_sets = relation_list_to_multimap(
-                linkmap, {gene.upper(): ncbi.split(':')[-1] for ncbi, gene in converted_ids}
-            )
-
+            link_map = kegg_api.link(org_code, "pathway")  # [(pathway_id, kegg_gene_id)]
+            ncbi_gene_map = kegg_api.conv(org_code, 'ncbi-geneid')  # [(ncbi_gene_id, kegg_gene_id)]
+            ncbi_gene_map = [(_1.split(":", 1)[1], _2) for _1, _2 in ncbi_gene_map]
+            link_map = relation_join(link_map, [(_2, _1) for _1, _2 in ncbi_gene_map])  # [(pathway_id, ncbi_gene_id)]
+            kegg_sets = relation_list_to_multimap(link_map)  #  {pathway_id -> [ncbi_gene_ids]}
+            # map kegg gene ids to ncbi_gene_ids.
             kegg_sets = geneset.GeneSets(
                 sets=[geneset.GeneSet(gs_id=ddi, genes=set(genes)) for ddi, genes in kegg_sets.items()]
             )
-
             pathways = pathway_enrichment(kegg_sets, genes, reference, callback=progress)
             # Ensure that pathway entries are pre-cached for later use in the
             # list/tree view
             kegg_pathways = kegg.KEGGPathways()
             kegg_pathways.pre_cache(pathways.keys(), progress_callback=progress)
 
-            return pathways
+            return pathways, ncbi_gene_map
 
         self.progressBarInit()
         self.setEnabled(False)
@@ -660,7 +682,8 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
         progress = concurrent.methodinvoke(self, "setProgress", (float,))
 
-        self._enrichTask = concurrent.Task(function=lambda: run_enrichment(self.input_genes, self.ref_genes, progress))
+        run_func = partial(run_enrichment, self.org.org_code, self.input_genes, self.ref_genes, progress)
+        self._enrichTask = concurrent.Task(function=run_func)
         self._enrichTask.finished.connect(self._onEnrichTaskFinished)
         self._executor.submit(self._enrichTask)
 
@@ -668,13 +691,14 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         self.setEnabled(True)
         self.setBlocking(False)
         try:
-            pathways = self._enrichTask.result()
+            pathways, ncbi_gene_map = self._enrichTask.result()
         except Exception:
             raise
 
         self.progressBarFinished()
 
         self.pathways = pathways
+        self.ncbi_gene_map = ncbi_gene_map
 
         if not self.pathways:
             self.warning(0, "No enriched pathways found.")
@@ -745,6 +769,9 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         if self.data:
             selectedItems = self.pathwayView.scene().selectedItems()
             selectedGenes = reduce(set.union, [item.marked_objects for item in selectedItems], set())
+            # map kegg_ids back to ncbi_gene_id
+            backmap = [(_2, _1) for _1, _2 in self.ncbi_gene_map]
+            selectedGenes = set(flatten(relation_map(backmap, selectedGenes)))
             if self.use_attr_names:
                 selected = [
                     column

@@ -1,11 +1,22 @@
 """ Resolwe module """
-from .genapi import DEFAULT_EMAIL, DEFAULT_PASSWD, GenAPI, cache_name, cache_backend
+from .utils import GENAPI_CACHE, CACHE_BACKEND, RESOLWEAPI_CACHE
+from .genapi import GenAPI
+from .resapi import ResolweAPI
 
-__all__ = ('DEFAULT_EMAIL', 'DEFAULT_PASSWD', 'cache_name', 'cache_backend')
+RESOLWE_PLATFORM = 'resolwe'
+GENESIS_PLATFORM = 'genesis'
 
 
-def connect(username, password, url, server_type):
-    """ Connect to Resolwe server
+class ResolweAuthError(Exception):
+    """A login error occurred."""
+
+
+class ResolweServerTypeError(Exception):
+    """Unknown server type"""
+
+
+def connect(username=None, password=None, url=None, server_type='resolwe'):
+    """Connect to Resolwe server
 
     :param username:
     :type username: str
@@ -22,16 +33,14 @@ def connect(username, password, url, server_type):
     :return: Instance of GenAPI or ResolweAPI
     """
 
-    if server_type == 'genesis':
-        try:
-            return GenAPI(username, password, url)
-        except Exception as e:
-            print(e)
-            raise ResolweAuthException(e.args[0]) from e
+    if server_type == RESOLWE_PLATFORM:
+        _api = ResolweAPI
+    elif server_type == GENESIS_PLATFORM:
+        _api = GenAPI
     else:
-        """ Not yet supported """
-        pass
+        raise ResolweServerTypeError(f'Unknown server type {server_type}')
 
-
-class ResolweAuthException(Exception):
-    """ A login error occurred. """
+    try:
+        return _api(username, password, url)
+    except Exception as e:
+        raise ResolweAuthError(e.args[0]) from e

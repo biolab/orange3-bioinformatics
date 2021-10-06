@@ -720,7 +720,7 @@ class TreeView(QTreeView):
 class OWMarkerGenes(widget.OWWidget):
     name = "Marker Genes"
     icon = 'icons/OWMarkerGenes.svg'
-    priority = 170
+    priority = 130
 
     replaces = ['orangecontrib.single_cell.widgets.owmarkergenes.OWMarkerGenes']
 
@@ -733,15 +733,15 @@ class OWMarkerGenes(widget.OWWidget):
     want_main_area = True
     want_control_area = True
 
-    organism_index = Setting(0)
-    source_index = Setting(0)
     auto_commit = Setting(True)
     selected_source = Setting("")
     selected_organism = Setting("")
     selected_root_attribute = Setting(0)
 
-    settingsHandler = MarkerGroupContextHandler()
+    settingsHandler = MarkerGroupContextHandler()  # noqa: N815
     selected_genes = settings.ContextSetting([])
+
+    settings_version = 2
 
     _data = None
     _available_sources = None
@@ -791,7 +791,7 @@ class OWMarkerGenes(widget.OWWidget):
         """
         box = gui.widgetBox(self.mainArea, "Description", addToLayout=False)
         self.descriptionlabel = QTextBrowser(
-            openExternalLinks=True, textInteractionFlags=(Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse),
+            openExternalLinks=True, textInteractionFlags=(Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse)
         )
         box.setMaximumHeight(self.descriptionlabel.fontMetrics().height() * (NUM_LINES_TEXT + 3))
 
@@ -808,10 +808,12 @@ class OWMarkerGenes(widget.OWWidget):
         Function defines dropdowns and the button in the control area.
         """
         box = gui.widgetBox(self.controlArea, 'Database', margin=0)
+        self.source_index = -1
         self.db_source_cb = gui.comboBox(box, self, 'source_index')
         self.db_source_cb.activated[int].connect(self._set_db_source_index)
 
         box = gui.widgetBox(self.controlArea, 'Organism', margin=0)
+        self.organism_index = -1
         self.group_cb = gui.comboBox(box, self, 'organism_index')
         self.group_cb.activated[int].connect(self._set_group_index)
 
@@ -837,7 +839,7 @@ class OWMarkerGenes(widget.OWWidget):
         """
         self._available_sources = value
 
-        items = sorted(list(value.keys()), reverse=True)  # panglao first
+        items = sorted(value.keys(), reverse=True)  # panglao first
         try:
             idx = items.index(self.selected_source)
         except ValueError:
@@ -1034,13 +1036,6 @@ class OWMarkerGenes(widget.OWWidget):
                 f"<b>Reference:</b> <a href='{data_row['URL']}'>{data_row['Reference']}</a>"
             )
 
-    def _update_data_info(self) -> None:
-        """
-        Updates output info in the control area.
-        """
-        sel_model = self.selected_markers_view.model().sourceModel()
-        self.info.set_output_summary(f"Selected: {str(len(sel_model))}")
-
     # callback functions
 
     def _selected_markers_changed(self) -> None:
@@ -1049,7 +1044,6 @@ class OWMarkerGenes(widget.OWWidget):
         """
         rows = self.selected_markers_view.model().sourceModel().rootItem.get_data_rows()
         self.selected_genes = [row["Entrez ID"].value + row["Cell Type"].value for row in rows]
-        self._update_data_info()
         self.commit()
 
     def _on_selection_changed(self, view: TreeView) -> None:
@@ -1113,6 +1107,18 @@ class OWMarkerGenes(widget.OWWidget):
         """
         rows = view.selectionModel().selectedRows()
         return list(map(view.model().mapToSource, rows))
+
+    @classmethod
+    def migrate_settings(cls, settings, version=0):
+        def migrate_to_version_2():
+            settings["selected_source"] = settings.pop("selected_db_source", "")
+            settings["selected_organism"] = settings.pop("selected_group", "")
+            if "context_settings" in settings:
+                for co in settings["context_settings"]:
+                    co.values["selected_genes"] = [g[0] + g[1] for g in co.values["selected_genes"]]
+
+        if version < 2:
+            migrate_to_version_2()
 
 
 if __name__ == "__main__":

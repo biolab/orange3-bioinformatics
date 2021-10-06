@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import Mock
 
 import numpy as np
 
@@ -9,7 +8,8 @@ from Orange.data import Table
 from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
 
-from orangecontrib.bioinformatics.widgets.OWMarkerGenes import TreeItem, TreeView, OWMarkerGenes
+from orangecontrib.bioinformatics.utils import serverfiles
+from orangecontrib.bioinformatics.widgets.OWMarkerGenes import SERVER_FILES_DOMAIN, TreeItem, TreeView, OWMarkerGenes
 
 
 class TestTreeItem(unittest.TestCase):
@@ -217,6 +217,23 @@ class TestTreeItem(unittest.TestCase):
 
 
 class TestOWMarkerGenes(WidgetTest):
+    @classmethod
+    def setUpClass(cls):
+        """Code executed only once for all tests"""
+        super().setUpClass()
+        file_name = "panglao_gene_markers.tab"
+        serverfiles.update(SERVER_FILES_DOMAIN, file_name)
+        file_path = serverfiles.localpath_download(SERVER_FILES_DOMAIN, file_name)
+        cls.panglao = Table.from_file(file_path)
+
+        file_name = "cellMarker_gene_markers.tab"
+        serverfiles.update(SERVER_FILES_DOMAIN, file_name)
+        file_path = serverfiles.localpath_download(SERVER_FILES_DOMAIN, file_name)
+        cls.cell_markers = Table.from_file(file_path)
+
+    def test_minimum_size(self):
+        pass
+
     def setUp(self):
         self.widget = self.create_widget(OWMarkerGenes)
 
@@ -268,19 +285,19 @@ class TestOWMarkerGenes(WidgetTest):
         # cell marker data
         self.assertEqual("Panglao", self.widget.db_source_cb.currentText())
         self.assertTrue(isinstance(self.widget.data, Table))
-        self.assertEqual(15669, len(self.widget.data))
+        self.assertEqual(len(self.panglao), len(self.widget.data))
 
         # Panglao data
         simulate.combobox_activate_index(self.widget.controls.source_index, 1)
         self.assertEqual("CellMarker", self.widget.db_source_cb.currentText())
         self.assertTrue(isinstance(self.widget.data, Table))
-        self.assertEqual(41457, len(self.widget.data))
+        self.assertEqual(len(self.cell_markers), len(self.widget.data))
 
         # cell marker data
         simulate.combobox_activate_index(self.widget.controls.source_index, 0)
         self.assertEqual("Panglao", self.widget.db_source_cb.currentText())
         self.assertTrue(isinstance(self.widget.data, Table))
-        self.assertEqual(15669, len(self.widget.data))
+        self.assertEqual(len(self.panglao), len(self.widget.data))
 
     def test_organism_changed(self):
         """
@@ -295,7 +312,7 @@ class TestOWMarkerGenes(WidgetTest):
         cell_types = self.widget.data.get_column_view("Cell Type")[0]
 
         model = self.widget.available_markers_view.model().sourceModel()
-        self.assertEqual(7795, len(model))
+        self.assertEqual(sum(self.panglao.get_column_view("Organism")[0] == "Human"), len(model))
         self.assertEqual(len(np.unique(cell_types[human_rows])), len(model.rootItem.childItems))
 
         simulate.combobox_activate_index(self.widget.controls.source_index, 0)
@@ -304,7 +321,7 @@ class TestOWMarkerGenes(WidgetTest):
         self.assertEqual("Mouse", self.widget.group_cb.currentText())
 
         model = self.widget.available_markers_view.model().sourceModel()
-        self.assertEqual(7874, len(model))
+        self.assertEqual(sum(self.panglao.get_column_view("Organism")[0] == "Mouse"), len(model))
         self.assertEqual(len(np.unique(cell_types[~human_rows])), len(model.rootItem.childItems))
 
         simulate.combobox_activate_index(self.widget.controls.source_index, 1)
@@ -316,7 +333,7 @@ class TestOWMarkerGenes(WidgetTest):
         cell_types = self.widget.data.get_column_view("Cell Type")[0]
 
         model = self.widget.available_markers_view.model().sourceModel()
-        self.assertEqual(26138, len(model))
+        self.assertEqual(sum(self.cell_markers.get_column_view("Organism")[0] == "Human"), len(model))
         self.assertEqual(len(np.unique(cell_types[human_rows])), len(model.rootItem.childItems))
 
         simulate.combobox_activate_index(self.widget.controls.source_index, 1)
@@ -325,7 +342,7 @@ class TestOWMarkerGenes(WidgetTest):
         self.assertEqual("Mouse", self.widget.group_cb.currentText())
 
         model = self.widget.available_markers_view.model().sourceModel()
-        self.assertEqual(15319, len(model))
+        self.assertEqual(sum(self.cell_markers.get_column_view("Organism")[0] == "Mouse"), len(model))
         self.assertEqual(len(np.unique(cell_types[~human_rows])), len(model.rootItem.childItems))
 
     def test_group_by_changed(self):
@@ -528,45 +545,6 @@ class TestOWMarkerGenes(WidgetTest):
         # description for first gene
         dest_view.selectionModel().select(gene_index, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
         self.assertIn(first_gene_info, self.widget.descriptionlabel.toPlainText())
-
-    def test_output_info(self):
-        """
-        Test whether the output info in a status bar is set correctly.
-        """
-        # mocks
-        output_sum = self.widget.info.set_output_summary = Mock()
-
-        # views
-        src_view = self.widget.available_markers_view
-        dest_view = self.widget.selected_markers_view
-
-        # move elements
-        parent_index = src_view.model().index(0, 0)
-        gene_index = src_view.model().index(0, 0, parent_index)
-        gene_index1 = src_view.model().index(1, 0, parent_index)
-        src_view.selectionModel().select(gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.widget.move_button.click()
-
-        output_sum.assert_called_with("Selected: 1")
-
-        # move one more
-        src_view.selectionModel().select(gene_index1, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.widget.move_button.click()
-
-        output_sum.assert_called_with("Selected: 2")
-
-        # move complete parent
-        src_view.selectionModel().select(parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.widget.move_button.click()
-
-        output_sum.assert_called_with(f"Selected: {len(dest_view.model().sourceModel())}")
-
-        # move everthing back
-        parent_index = dest_view.model().index(0, 0)
-        dest_view.selectionModel().select(parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.widget.move_button.click()
-
-        output_sum.assert_called_with("Selected: 0")
 
     def test_extend_collapse_both_views(self):
         """

@@ -1,0 +1,46 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: False
+      matrix:
+        python: [3.8]
+        os: [ubuntu-18.04]
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit install
+          pre-commit autoupdate
+
+      - name: Changed files
+        run: git diff --name-only HEAD^ HEAD
+
+      - name: Run pre-commit
+        run: git diff --name-only HEAD^ HEAD | xargs pre-commit run --show-diff-on-failure --files
+
+#      - name: Lint Code Base
+#        uses: docker://github/super-linter:v2.2.0
+#        env:
+#          VALIDATE_ALL_CODEBASE: false

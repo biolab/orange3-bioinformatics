@@ -5,6 +5,7 @@ import contextlib
 from typing import Dict, List, Tuple, Optional
 
 from Orange.data import Table, Domain, StringVariable
+from Orange.data.util import get_unique_names_domain
 
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
@@ -42,7 +43,7 @@ class Gene:
             setattr(self, attr, json.loads(val) if attr in ('synonyms', 'db_refs', 'homologs') else val)
 
     def homolog_gene(self, taxonomy_id: str) -> Optional[str]:
-        """ Returns gene homolog for given organism.
+        """Returns gene homolog for given organism.
 
         Parameters
         ----------
@@ -95,7 +96,7 @@ class GeneMatcher:
             self._match()
 
     def get_known_genes(self) -> List[Gene]:
-        """ Return Genes with known Entrez ID
+        """Return Genes with known Entrez ID
 
         Returns
         -------
@@ -106,7 +107,7 @@ class GeneMatcher:
         return [gene for gene in self.genes if gene.gene_id]
 
     def to_data_table(self, selected_genes: Optional[List[str]] = None) -> Table:
-        """ Transform GeneMatcher results to Orange data table.
+        """Transform GeneMatcher results to Orange data table.
 
         Optionally we can provide a list of genes (Entrez Ids).
         The table on the output will be populated only with provided genes.
@@ -184,7 +185,7 @@ class GeneMatcher:
     def match_table_column(
         self, data_table: Table, column_name: str, target_column: Optional[StringVariable] = None
     ) -> Table:
-        """ Helper function for gene name matching with :class:`Orange.data.Table`.
+        """Helper function for gene name matching with :class:`Orange.data.Table`.
 
         Give a column of genes, GeneMatcher will try to map genes to their
         corresponding Entrez Ids.
@@ -223,8 +224,8 @@ class GeneMatcher:
 
             return new_data
 
-    def match_table_attributes(self, data_table):
-        """ Helper function for gene name matching with :class:`Orange.data.Table`.
+    def match_table_attributes(self, data_table, run=True, rename=False, source_name='Source ID') -> Table:
+        """Helper function for gene name matching with :class:`Orange.data.Table`.
 
         Match table attributes and if a unique match is found create a new column attribute
         for Entrez Id. Attribute name is defined here: `orangecontrib.bioinformatics.ncbi.gene.config.NCBI_ID`
@@ -237,18 +238,36 @@ class GeneMatcher:
 
         Returns
         -------
+
         :class:`Orange.data.Table`
             Data table column attributes are populated with Entrez Ids
 
         """
-        input_gene_names = [var.name for var in data_table.domain.attributes]
+        # run gene matcher
+        if run:
+            self.genes = [var.name for var in data_table.domain.attributes]
 
-        if input_gene_names:
-            self.genes = input_gene_names
+        def helper(gene, attribute):
+            if gene.gene_id:
+                if rename:
+                    attribute = attribute.renamed(gene.symbol)
+                    attribute.attributes[source_name] = gene.input_identifier
 
-            for gene in self.genes:
-                if gene.gene_id:
-                    data_table.domain[gene.input_identifier].attributes[ENTREZ_ID] = gene.gene_id
+                attribute.attributes[ENTREZ_ID] = gene.gene_id
+            return attribute
+
+        attributes = [helper(gene, attr) for gene, attr in zip(self.genes, data_table.domain.attributes)]
+        metas = data_table.domain.metas
+        (attr_deduplicated, _, metas_deduplicated), renamed = get_unique_names_domain(
+            [a.name for a in attributes], metas=[m.name for m in metas]
+        )
+
+        if len(renamed):
+            attributes = [attr.renamed(new_name) for attr, new_name in zip(attributes, attr_deduplicated)]
+            metas = [meta.renamed(new_name) for meta, new_name in zip(metas, metas_deduplicated)]
+
+        domain = Domain(attributes, data_table.domain.class_vars, metas)
+        return data_table.transform(domain)
 
     def match_genes(self):
         self._match()
@@ -299,7 +318,7 @@ class GeneMatcher:
 
 class GeneInfo(dict):
     def __init__(self, tax_id: str):
-        """ Loads genes for given organism in a dict.
+        """Loads genes for given organism in a dict.
 
         Each instance of :class:`Gene` is mapped to corresponding Entrez ID
 

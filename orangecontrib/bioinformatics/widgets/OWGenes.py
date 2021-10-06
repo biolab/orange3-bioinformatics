@@ -213,7 +213,7 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
     name = "Genes"
     description = "Tool for working with genes"
     icon = "../widgets/icons/OWGeneInfo.svg"
-    priority = 5
+    priority = 40
     want_main_area = True
 
     selected_organism: int = Setting(11)
@@ -430,8 +430,7 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
         self.organism_select_combobox.addItems([tax_id[1] for tax_id in available_organism])
 
     def gene_names_from_table(self):
-        """ Extract and return gene names from `Orange.data.Table`.
-        """
+        """Extract and return gene names from `Orange.data.Table`."""
         self.input_genes = []
         if self.input_data:
             if self.use_attr_names:
@@ -481,11 +480,11 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
         return best_candidate
 
     def find_genes_location(self):
-        """ Try locate the genes in the input data when we first load the data.
+        """Try locate the genes in the input data when we first load the data.
 
-            Proposed rules:
-                - when no suitable feature names are present, check the columns.
-                - find the most suitable column, that is, the one with most unique values.
+        Proposed rules:
+            - when no suitable feature names are present, check the columns.
+            - find the most suitable column, that is, the one with most unique values.
 
         """
         domain = self.input_data.domain
@@ -572,20 +571,7 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
             else:
                 domain = self.input_data.domain.copy()
                 table = self.input_data.transform(domain)
-
-                for gene in self.gene_matcher.genes:
-                    if gene.input_identifier in table.domain:
-
-                        table.domain[gene.input_identifier].attributes[self.target_database] = (
-                            str(gene.gene_id) if gene.gene_id else '?'
-                        )
-
-                        if self.replace_id_with_symbol:
-                            try:
-                                table.domain[gene.input_identifier].name = str(gene.symbol)
-                            except AttributeError:
-                                # TODO: missing gene symbol, need to handle this?
-                                pass
+                table = self.gene_matcher.match_table_attributes(table, run=False, rename=self.replace_id_with_symbol)
 
                 # filter selected columns
                 selected_genes_set = set(selected_genes)
@@ -636,8 +622,9 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
 if __name__ == "__main__":
 
     def main_test():
-        from AnyQt.QtWidgets import QApplication
         import sys
+
+        from AnyQt.QtWidgets import QApplication
 
         app = QApplication([])
         w = OWGenes()

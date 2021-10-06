@@ -9,19 +9,19 @@ from Orange.data import Table, Domain, TimeVariable, StringVariable, ContinuousV
 from orangecontrib.bioinformatics.utils import local_cache
 
 #  Support cache with requests_cache module
-cache_path = os.path.join(local_cache, "resolwe")
-
+LOCAL_CACHE_DIR = os.path.join(local_cache, 'resolwe')
 try:
-    os.makedirs(cache_path)
+    os.makedirs(LOCAL_CACHE_DIR)
 except OSError:
     pass
 
-cache_name = os.path.join(cache_path, 'GenAPI_requests_cache')
-cache_backend = 'sqlite'
+CACHE_BACKEND = 'sqlite'
+GENAPI_CACHE = os.path.join(LOCAL_CACHE_DIR, 'GenAPI_cache')
+RESOLWEAPI_CACHE = os.path.join(LOCAL_CACHE_DIR, 'ResolweAPI_cache')
 
 
 def transpose_table(table):
-    """ Transpose the rows and columns of the table.
+    """Transpose the rows and columns of the table.
 
     Args:
         table: Data in :obj:`Orange.data.Table`
@@ -46,7 +46,7 @@ def transpose_table(table):
 
 
 def etc_to_table(etc_json, time_var=False):
-    """ Converts data from Json to :obj:`Orange.data.table`
+    """Converts data from Json to :obj:`Orange.data.table`
 
     Args:
         etc_json (dict): Data in json like format from genesis
@@ -69,11 +69,11 @@ def etc_to_table(etc_json, time_var=False):
 
     table = []
     for row in etc_json['etc']['genes']:
-        gene_expression = [exp for exp in etc_json['etc']['genes'][row]]
+        gene_expression = list(etc_json['etc']['genes'][row])
         gene_expression.append(row)
         table.append(gene_expression)
 
-    orange_table = Table(domain, table)
+    orange_table = Table.from_list(domain, table)
 
     if time_var:
         orange_table = transpose_table(orange_table)
