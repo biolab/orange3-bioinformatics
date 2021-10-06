@@ -8,7 +8,7 @@ from itertools import chain
 import numpy as np
 import pyqtgraph as pg
 
-from AnyQt.QtGui import QColor, QFont
+from AnyQt.QtGui import QFont, QColor
 from AnyQt.QtCore import Qt, QRectF, QObject
 
 from Orange.data import Table, Domain, DiscreteVariable, ContinuousVariable
@@ -23,9 +23,9 @@ from Orange.widgets.utils.itemmodels import DomainModel
 from Orange.widgets.utils.colorpalette import ColorPaletteGenerator
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.utils.widget import OWDataProjectionWidget
+from Orange.widgets.visualize.owscatterplotgraph import ParameterSetter as Setter
+from Orange.widgets.visualize.owscatterplotgraph import OWScatterPlotBase
 from Orange.widgets.visualize.utils.customizableplot import Updater
-from Orange.widgets.visualize.owscatterplotgraph import OWScatterPlotBase, \
-    ParameterSetter as Setter
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 from orangecontrib.bioinformatics.annotation.annotate_samples import (
@@ -201,14 +201,11 @@ class ParameterSetter(Setter):
     DEFAULT_HULL_ALPHA = 255
 
     initial_settings = copy.deepcopy(Setter.initial_settings)
-    initial_settings[Setter.LABELS_BOX].update({
-        CLUSTER_LABEL: Updater.FONT_SETTING
-    })
+    initial_settings[Setter.LABELS_BOX].update({CLUSTER_LABEL: Updater.FONT_SETTING})
     initial_settings[Setter.PLOT_BOX] = {
         HULL_LABEL: {
             Updater.WIDTH_LABEL: (range(1, 15), DEFAULT_HULL_WIDTH),
-            Updater.STYLE_LABEL: (list(Updater.LINE_STYLES),
-                                  DEFAULT_HULL_STYLE),
+            Updater.STYLE_LABEL: (list(Updater.LINE_STYLES), DEFAULT_HULL_STYLE),
             Updater.ALPHA_LABEL: (range(0, 255, 5), DEFAULT_HULL_ALPHA),
         },
     }
@@ -224,16 +221,14 @@ class ParameterSetter(Setter):
 
     def update_setters(self):
         def update_cluster_label(**settings):
-            self.cluster_label_font = Updater.change_font(
-                self.cluster_label_font, settings)
+            self.cluster_label_font = Updater.change_font(self.cluster_label_font, settings)
             for item in self.cluster_labels_items:
                 item.setFont(self.cluster_label_font)
                 item.center()
 
         def update_cluster_hull(**settings):
             self.cluster_hull_settings.update(**settings)
-            Updater.update_lines(self.cluster_hulls_items,
-                                 **self.cluster_hull_settings)
+            Updater.update_lines(self.cluster_hulls_items, **self.cluster_hull_settings)
 
         super().update_setters()
         self._setters[self.LABELS_BOX][self.CLUSTER_LABEL] = update_cluster_label
@@ -305,8 +300,7 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase, ParameterSetter):
             item = pg.PlotCurveItem(x=hull[:, 0], y=hull[:, 1], pen=pen, antialias=True)
             self.plot_widget.addItem(item)
             self.cluster_hulls_items.append(item)
-        Updater.update_lines(self.cluster_hulls_items,
-                             **self.cluster_hull_settings)
+        Updater.update_lines(self.cluster_hulls_items, **self.cluster_hull_settings)
 
     def _update_cluster_labels(self):
         for item in self.cluster_labels_items:
