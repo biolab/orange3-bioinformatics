@@ -1,4 +1,5 @@
 # pylint: disable=too-many-ancestors
+import copy
 from enum import IntEnum
 from types import SimpleNamespace
 from typing import Dict, Tuple, Optional
@@ -7,7 +8,7 @@ from itertools import chain
 import numpy as np
 import pyqtgraph as pg
 
-from AnyQt.QtGui import QColor
+from AnyQt.QtGui import QColor, QFont
 from AnyQt.QtCore import Qt, QRectF, QObject
 
 from Orange.data import Table, Domain, DiscreteVariable, ContinuousVariable
@@ -22,7 +23,9 @@ from Orange.widgets.utils.itemmodels import DomainModel
 from Orange.widgets.utils.colorpalette import ColorPaletteGenerator
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.utils.widget import OWDataProjectionWidget
-from Orange.widgets.visualize.owscatterplotgraph import OWScatterPlotBase
+from Orange.widgets.visualize.utils.customizableplot import Updater
+from Orange.widgets.visualize.owscatterplotgraph import OWScatterPlotBase, \
+    ParameterSetter as Setter
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
 from orangecontrib.bioinformatics.annotation.annotate_samples import (
@@ -164,7 +167,7 @@ class Runner:
 
 
 class CenteredTextItem(pg.TextItem):
-    def __init__(self, view_box, x, y, text, tooltip):
+    def __init__(self, view_box, x, y, text, tooltip, font):
         bg_color = QColor(Qt.white)
         bg_color.setAlpha(200)
         color = QColor(Qt.black)
@@ -176,6 +179,7 @@ class CenteredTextItem(pg.TextItem):
         self.textItem.setToolTip(tooltip)
         self.setPos(x, y)
         self.center()
+        self.setFont(font)
 
     def center(self):
         br = self.boundingRect()
@@ -189,7 +193,54 @@ class EventDelegate(QObject):
         return False
 
 
-class OWAnnotateProjectionGraph(OWScatterPlotBase):
+class ParameterSetter(Setter):
+    CLUSTER_LABEL = "Cluster"
+    HULL_LABEL = "Hulls"
+    DEFAULT_HULL_WIDTH = 3
+    DEFAULT_HULL_STYLE = "Dash line"
+    DEFAULT_HULL_ALPHA = 255
+
+    initial_settings = copy.deepcopy(Setter.initial_settings)
+    initial_settings[Setter.LABELS_BOX].update({
+        CLUSTER_LABEL: Updater.FONT_SETTING
+    })
+    initial_settings[Setter.PLOT_BOX] = {
+        HULL_LABEL: {
+            Updater.WIDTH_LABEL: (range(1, 15), DEFAULT_HULL_WIDTH),
+            Updater.STYLE_LABEL: (list(Updater.LINE_STYLES),
+                                  DEFAULT_HULL_STYLE),
+            Updater.ALPHA_LABEL: (range(0, 255, 5), DEFAULT_HULL_ALPHA),
+        },
+    }
+
+    def __init__(self):
+        self.cluster_label_font = QFont()
+        self.cluster_hull_settings = {
+            Updater.WIDTH_LABEL: self.DEFAULT_HULL_WIDTH,
+            Updater.STYLE_LABEL: self.DEFAULT_HULL_STYLE,
+            Updater.ALPHA_LABEL: self.DEFAULT_HULL_ALPHA,
+        }
+        super().__init__()
+
+    def update_setters(self):
+        def update_cluster_label(**settings):
+            self.cluster_label_font = Updater.change_font(
+                self.cluster_label_font, settings)
+            for item in self.cluster_labels_items:
+                item.setFont(self.cluster_label_font)
+                item.center()
+
+        def update_cluster_hull(**settings):
+            self.cluster_hull_settings.update(**settings)
+            Updater.update_lines(self.cluster_hulls_items,
+                                 **self.cluster_hull_settings)
+
+        super().update_setters()
+        self._setters[self.LABELS_BOX][self.CLUSTER_LABEL] = update_cluster_label
+        self._setters[self.PLOT_BOX] = {self.HULL_LABEL: update_cluster_hull}
+
+
+class OWAnnotateProjectionGraph(OWScatterPlotBase, ParameterSetter):
     show_cluster_hull = Setting(True)
     n_cluster_labels = Setting(1)
     show_ref_data = Setting(True)
@@ -247,11 +298,15 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase):
         hulls = self.master.get_cluster_hulls()
         if hulls is None:
             return
+        # width = self.cluster_hull_settings[self.HULL_WIDTH]
+        # style = self.HULL_STYLES[self.cluster_hull_settings[self.HULL_STYLE]]
         for hull, color in hulls:
-            pen = pg.mkPen(color=QColor(*color), style=Qt.DashLine, width=3)
+            pen = pg.mkPen(color=QColor(*color))
             item = pg.PlotCurveItem(x=hull[:, 0], y=hull[:, 1], pen=pen, antialias=True)
             self.plot_widget.addItem(item)
             self.cluster_hulls_items.append(item)
+        Updater.update_lines(self.cluster_hulls_items,
+                             **self.cluster_hull_settings)
 
     def _update_cluster_labels(self):
         for item in self.cluster_labels_items:
