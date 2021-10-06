@@ -19,7 +19,10 @@ class TestGenome(unittest.TestCase):
             self.assertIsInstance(entry.name, six.string_types)
             self.assertIsInstance(entry.taxid, six.string_types)
 
-        self.assertEqual(genome.search("homo sapiens")[0], "hsa")
+        search_result = genome.search("homo sapiens")[0]
+        org_code, name = search_result.split(';')
+        self.assertEqual("hsa", org_code.strip())
+        self.assertEqual("Homo sapiens (human)", name.strip())
         entry = genome['hsa']
         self.assertEqual(entry.taxid, "9606")
 
