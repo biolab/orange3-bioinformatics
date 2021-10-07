@@ -3,7 +3,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [4.5.0] - 2021-10-07
+
+### Changed
+- [#290](https://github.com/biolab/orange3-bioinformatics/pull/290): (OWAnnotateProjection) follow widget UI style guidelines
+- [#289](https://github.com/biolab/orange3-bioinformatics/pull/289): Refactor GUI components of resolwe widgets
+- [#286](https://github.com/biolab/orange3-bioinformatics/pull/286): Change the documentation theme
+
+### Fixed
+- [#289](https://github.com/biolab/orange3-bioinformatics/pull/289): Fix for breaking changes in requests-cache package
+- [#288](https://github.com/biolab/orange3-bioinformatics/pull/288): Fix for issues that occurred after changes in widget auto-summary were introduced
+
+
 ## [4.4.0] - 2021-06-08
+
 ### Changed
 - [#282](https://github.com/biolab/orange3-bioinformatics/pull/285): (OWGenialisExpressions) use CollectionTables to fetch data
 

@@ -1,10 +1,6 @@
 Orange3-bioinformatics
 =======================
 
-<a href="https://dev.azure.com/orange-biolab/orange3-bioinformatics/">
-  <img src="https://dev.azure.com/orange-biolab/orange3-bioinformatics/_apis/build/status/biolab.orange3-bioinformatics?branchName=master" />
-</a>
-
 <a href='https://orange3-bioinformatics.readthedocs.io/en/latest/?badge=latest'>
     <img src='https://readthedocs.org/projects/orange3-bioinformatics/badge/?version=latest' alt='Documentation Status' />
 </a>
