@@ -20,7 +20,9 @@ if __name__ == '__main__':
             'numpy',
         ],
         extras_require={
-            'doc': ['sphinx', 'recommonmark', 'sphinx_rtd_theme'],
+            # docutils changed html in 0.17; fixing to 0.16 until parser fixed
+            # todo: remove docutils when parser fixed in widget-base and released
+            'doc': ['sphinx', 'recommonmark', 'sphinx_rtd_theme', 'docutils<0.17'],
             'test': [
                 'flake8',
                 'flake8-comprehensions',
