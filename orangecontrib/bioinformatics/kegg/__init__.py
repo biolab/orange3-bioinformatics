@@ -233,7 +233,7 @@ class Organism(object):
         return KEGGPathway(pathway_id).compounds()
 
     def get_pathways_by_genes(self, gene_ids):
-        """ Pathways that include all genes in gene_ids. """
+        """Pathways that include all genes in gene_ids."""
         l = self.api.get_genes_pathway_organism(self.org_code)
         gene_ids = set(gene_ids)
         gtp = defaultdict(set)
@@ -295,12 +295,12 @@ def organism_name_search(name):
         if name not in genome:
             ids = genome.search(name)
             if ids:
-                name = ids.pop(0) if ids else name
+                name = ids[0].split(';')[0]
             else:
                 raise taxonomy.UnknownSpeciesIdentifier(name)
 
         try:
-            return genome[name].organism_code
+            return genome[name].org_code
         except Exception as e:
             raise taxonomy.UnknownSpeciesIdentifier(name)
 

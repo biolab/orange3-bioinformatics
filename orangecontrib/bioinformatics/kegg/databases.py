@@ -289,6 +289,7 @@ class GenomeEntry(entry.DBEntry):
 
     FIELDS = [
         ("ENTRY", fields.DBEntryField),
+        ("ORG_CODE", fields.DBOrgCodeField),
         ("NAME", fields.DBNameField),
         ("DEFINITION", fields.DBDefinitionField),
         ("ANNOTATION", fields.DBSimpleField),
@@ -310,22 +311,11 @@ class GenomeEntry(entry.DBEntry):
         entry.DBEntry.__init__(self, text)
 
     @property
-    def organism_code(self):
-        """
-        A three or four letter KEGG organism code (e.g. 'hsa', 'sce', ...)
-        """
-        return self.name.split(",", 1)[0]
-
-    @property
     def taxid(self):
         """
         Organism NCBI taxonomy id.
         """
         return self.TAXONOMY.taxid
-
-    def org_code(self):
-        # for backwards compatibility; return the `organism_code`
-        return self.organism_code
 
 
 class Genome(DBDataBase):

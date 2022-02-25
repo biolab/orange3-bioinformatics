@@ -55,6 +55,11 @@ class DBEntryField(DBSimpleField):
     TITLE = "ENTRY"
 
 
+class DBOrgCodeField(DBSimpleField):
+    __SLOTS__ = ["text"]
+    TITLE = "ORG_CODE"
+
+
 class DBNameField(DBSimpleField):
     __SLOTS__ = ["text"]
     TITLE = "NAME"
