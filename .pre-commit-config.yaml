@@ -1,12 +1,12 @@
 repos:
 -   repo: https://github.com/psf/black
-    rev: 21.9b0
+    rev: 22.1.0
     hooks:
     - id: black
       language_version: python3
 
 -   repo: https://github.com/timothycrosley/isort
-    rev: 5.9.3
+    rev: 5.10.1
     hooks:
     - id: isort
       language_version: python3
@@ -17,3 +17,4 @@ repos:
     - id: flake8
       language_version: python3
       additional_dependencies: ['flake8-comprehensions', 'pep8-naming', 'flake8-black']
+      exclude: '^$|orangecontrib/bioinformatics/kegg/*|orangecontrib/bioinformatics/widgets/utils/gui/*|'
