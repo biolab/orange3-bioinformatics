@@ -540,7 +540,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         if self.task is not None:
             self.cancel()
             self.run_button.setText("Resume")
-            self.commit()
+            self.commit.deferred()
         else:
             self._run()
 
@@ -586,7 +586,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         if result.clusters.epsilon is not None:
             self.epsilon = result.clusters.epsilon
         self.run_button.setText("Start")
-        self.commit()
+        self.commit.deferred()
 
     def on_exception(self, ex: Exception):
         self.Error.proj_error(ex)
