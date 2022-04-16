@@ -5,7 +5,8 @@ from datetime import datetime
 from collections import Counter
 
 import numpy as np
-import resdk
+import pandas as pd
+import resdk.tables
 from resdk.resources.data import Data
 from resdk.resources.utils import iterate_schema
 
@@ -208,6 +209,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     exp_source: int
     exp_source = settings.Setting(0, schema_only=True)
 
+    append_qc_data: bool
+    append_qc_data = settings.Setting(False, schema_only=True)
+
     auto_commit: bool
     auto_commit = settings.Setting(False, schema_only=True)
 
@@ -254,6 +258,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         self.norm_component = NormalizationComponent(self, self.controlArea)
         self.norm_component.options_changed.connect(self.on_normalization_changed)
+
+        box = gui.widgetBox(self.controlArea, 'Sample QC')
+        gui.checkBox(box, self, 'append_qc_data', 'Append QC data', callback=self.on_output_option_changed)
 
         gui.rubber(self.controlArea)
         box = gui.widgetBox(self.controlArea, 'Sign in')
@@ -569,7 +576,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         if not table:
             collection = self.res.get_collection_by_id(collection_id)
-            coll_table = resdk.CollectionTables(
+            coll_table = resdk.tables.RNATables(
                 collection,
                 expression_source=exp_source,
                 expression_process_slug=proc_slug,
@@ -582,7 +589,18 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             df_exp = coll_table.exp if exp_type != 'rc' else coll_table.rc
+            df_exp = df_exp.rename(index=coll_table.readable_index)
             df_metas = coll_table.meta
+            df_metas = df_metas.rename(index=coll_table.readable_index)
+            df_qc = None
+            if self.append_qc_data:
+                # TODO: check if there is a way to detect if collection
+                #       table contains QC data
+                try:
+                    df_qc = coll_table.qc
+                    df_qc = df_qc.rename(index=coll_table.readable_index)
+                except ValueError:
+                    pass
             loop.close()
 
             state.set_status('To data table ...')
@@ -616,6 +634,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             df_metas = df_metas.fillna(np.nan)
             df_metas = df_metas.replace('nan', np.nan)
             df_metas = df_metas.rename(columns=column_labels)
+            if df_qc is not None:
+                df_metas = pd.merge(df_metas, df_qc, left_index=True, right_index=True)
+
             xym, domain_metas = vars_from_df(df_metas)
             x, _, m = xym
             x_metas = np.hstack((x, m))
