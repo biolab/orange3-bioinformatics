@@ -5,7 +5,7 @@ import sqlite3
 import tarfile
 import tempfile
 import textwrap
-import collections
+import collections.abc
 from collections import namedtuple
 from urllib.request import urlopen
 
@@ -136,7 +136,7 @@ _INIT_TABLES = textwrap.dedent(
 )
 
 
-class TaxonomyDB(collections.Mapping):
+class TaxonomyDB(collections.abc.Mapping):
     SCHEMA_VERSION = (0, 0, 1)
 
     def __init__(self, taxdb):
