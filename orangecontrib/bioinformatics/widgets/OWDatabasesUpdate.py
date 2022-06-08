@@ -103,7 +103,7 @@ class UpdateOptionsItemDelegate(QStyledItemDelegate):
         item = parent.itemFromIndex(index)
         widget = parent.itemWidget(item, 0)
         if widget:
-            size = QSize(size.width(), widget.sizeHint().height() / 2)
+            size = QSize(size.width(), widget.sizeHint().height() // 2)
         return size
 
 
