@@ -19,7 +19,7 @@ from Orange.widgets.settings import Setting, ContextSetting, SettingProvider
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import DomainModel
-from Orange.widgets.utils.colorpalette import ColorPaletteGenerator
+from Orange.widgets.utils.colorpalettes import LimitedDiscretePalette
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.utils.widget import OWDataProjectionWidget
 from Orange.widgets.visualize.owscatterplotgraph import OWScatterPlotBase
@@ -786,7 +786,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         return (
             self.clusters.table.domain["Clusters"].palette
             if hasattr(self.clusters.table.domain["Clusters"], "palette")
-            else ColorPaletteGenerator(number_of_colors=len(colors), rgb_colors=colors)
+            else LimitedDiscretePalette(number_of_colors=len(colors))
         )
 
     def get_cluster_hulls(self):
