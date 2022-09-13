@@ -831,9 +831,10 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
         def get_augmented_data(table, scores_x, clusters_x):
             new_table = table.transform(domain)
-            if scores_x is not None:
-                new_table.metas[:, :n_sco] = scores_x
-            new_table.metas[:, n_sco:n_clu] = clusters_x
+            with new_table.unlocked(new_table.metas):
+                if scores_x is not None:
+                    new_table.metas[:, :n_sco] = scores_x
+                new_table.metas[:, n_sco:n_clu] = clusters_x
             return new_table
 
         n_sco = self.scores.table.X.shape[1]

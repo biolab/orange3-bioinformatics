@@ -220,7 +220,8 @@ class GeneMatcher:
             )
 
             new_data = data_table.transform(new_domain)
-            new_data[:, target_column] = [[str(gene.gene_id) if gene.gene_id else '?'] for gene in self.genes]
+            with new_data.unlocked(new_data.metas):
+                new_data[:, target_column] = [[str(gene.gene_id) if gene.gene_id else '?'] for gene in self.genes]
 
             return new_data
 

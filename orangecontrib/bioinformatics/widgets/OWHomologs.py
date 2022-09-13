@@ -199,10 +199,11 @@ class OWHomologs(widget.OWWidget):
                 )
 
                 table = self.data.transform(domain)
-                col, _ = table.get_column_view(homolog)
-                col[:] = [g.symbol if g else "?" for g in homologs]
-                col, _ = table.get_column_view(homolog_id)
-                col[:] = [g.gene_id if g else "?" for g in homologs]
+                with table.unlocked(table.metas):
+                    col, _ = table.get_column_view(homolog)
+                    col[:] = [g.symbol if g else "?" for g in homologs]
+                    col, _ = table.get_column_view(homolog_id)
+                    col[:] = [g.gene_id if g else "?" for g in homologs]
 
                 # note: filter out rows with unknown homologs
                 table = table[table.get_column_view(homolog_id)[0] != "?"]

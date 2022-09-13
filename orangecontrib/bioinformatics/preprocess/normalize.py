@@ -9,7 +9,8 @@ from Orange.preprocess.preprocess import Preprocess
 class LogarithmicScale(Preprocess):
     def __call__(self, data) -> Table:
         _data = data.copy()
-        _data.X = np.log2(data.X + 1)
+        with _data.unlocked(_data.X):
+            _data.X = np.log2(data.X + 1)
         return _data
 
 
@@ -25,8 +26,9 @@ class ZScore(Preprocess):
 
     def __call__(self, data) -> Table:
         _data = data.copy()
-        _data.X = zscore(data.X, axis=self.axis)
-        _data.X[np.isnan(_data.X)] = 0
+        with _data.unlocked(_data.X):
+            _data.X = zscore(data.X, axis=self.axis)
+            _data.X[np.isnan(_data.X)] = 0
         return _data
 
 
@@ -70,6 +72,7 @@ class QuantileNormalization(Preprocess):
 
         rank_floor = rank.astype(int)
         rank_ceil = np.ceil(rank).astype(int)
-        _data.X = (mean.take(rank_floor) + mean.take(rank_ceil)) / 2
+        with _data.unlocked(_data.X):
+            _data.X = (mean.take(rank_floor) + mean.take(rank_ceil)) / 2
 
         return _data

@@ -80,7 +80,8 @@ class TestAnnotateProjection(unittest.TestCase):
         self.assertEqual(float, type(eps))
 
     def test_example_not_clustered(self):
-        self.data[-1] = [23, 23]
+        with self.data.unlocked():
+            self.data[-1] = [23, 23]
         clusters, clusters_meta, eps = annotate_projection(
             self.annotations, self.data, clustering_algorithm=DBSCAN, eps=2, min_samples=3
         )
@@ -190,13 +191,14 @@ class TestAnnotateProjection(unittest.TestCase):
         self.assertGreater(len(clusters_meta["C1"][2]), 0)
 
     def test_socres_with_nan(self):
-        self.annotations.X[0, 0] = np.nan
-        self.annotations.X[1, 1] = np.nan
-        self.annotations.X[1, 2] = np.nan
+        with self.annotations.unlocked():
+            self.annotations.X[0, 0] = np.nan
+            self.annotations.X[1, 1] = np.nan
+            self.annotations.X[1, 2] = np.nan
 
-        self.annotations.X[2, 0] = np.nan
-        self.annotations.X[2, 1] = np.nan
-        self.annotations.X[2, 2] = np.nan
+            self.annotations.X[2, 0] = np.nan
+            self.annotations.X[2, 1] = np.nan
+            self.annotations.X[2, 2] = np.nan
 
         clusters = Table.from_numpy(
             Domain([DiscreteVariable("Cluster", values=["C1", "C3"])]), np.array([[0] * 5 + [1] * 7]).reshape(-1, 1)
@@ -209,7 +211,8 @@ class TestAnnotateProjection(unittest.TestCase):
         self.assertTupleEqual((0.4, 0.4), list(zip(*labels_dict["C1"]))[1])
 
         # check all nans
-        self.annotations.X[:, :] = np.nan
+        with self.annotations.unlocked():
+            self.annotations.X[:, :] = np.nan
         labels_dict, labels_items = assign_labels(clusters, self.annotations, 3)
         transformed_labels = list(map(labels_items.domain.attributes[0].repr_val, labels_items.X[:, 0]))
         self.assertListEqual(['?'] * len(self.annotations), transformed_labels)
