@@ -14,7 +14,7 @@ from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
 
 class Gene:
-    """ Representation of gene summary. """
+    """Representation of gene summary."""
 
     __slots__ = gene_info_attributes + ('input_identifier',)
 
@@ -59,7 +59,7 @@ class Gene:
 
 
 class GeneMatcher:
-    """ Gene name matching interface. """
+    """Gene name matching interface."""
 
     def __init__(self, tax_id: str, progress_callback=None, auto_start=True):
         """
