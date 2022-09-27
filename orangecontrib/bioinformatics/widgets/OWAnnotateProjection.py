@@ -463,13 +463,16 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
     @property
     def effective_variables(self):
-        return self.reference_data.domain.attributes
+        attr_x, attr_y = self.attr_x, self.attr_y
+        if attr_x and attr_y:
+            if attr_x == attr_y:
+                return [attr_x]
+            return [attr_x, attr_y]
+        return []
 
     @property
     def effective_data(self):
-        return self.reference_data.transform(
-            Domain(self.effective_variables, self.reference_data.domain.class_vars, self.reference_data.domain.metas)
-        )
+        return self.reference_data.transform(Domain(self.effective_variables))
 
     @property
     def can_annotate(self):
