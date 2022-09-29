@@ -876,8 +876,9 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         metas = chain(domain.metas, [source_attr])
         domain = Domain(domain.attributes, domain.class_vars, metas)
         data = data.transform(domain)
-        data.metas[: len(self.reference_data), -1] = 0
-        data.metas[len(self.reference_data) :, -1] = 1
+        with data.unlocked(data.metas):
+            data.metas[: len(self.reference_data), -1] = 0
+            data.metas[len(self.reference_data) :, -1] = 1
         return data
 
     def _get_send_report_caption(self):

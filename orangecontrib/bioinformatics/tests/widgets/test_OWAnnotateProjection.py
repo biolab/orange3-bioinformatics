@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, ContinuousVariable
 from Orange.projection import PCA
 from Orange.data.filter import Values, FilterString
 from Orange.widgets.tests.base import WidgetTest, WidgetOutputsTestMixin, ProjectionWidgetTestMixin, simulate
@@ -62,20 +62,22 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
     def _patch_annotation_functions(self):
         def mann_whitney_test(data):
             table = data.copy()
-            table.X = np.random.random(data.X.shape)
+            with table.unlocked(table.X):
+                table.X = np.random.random(data.X.shape)
             return table
 
-        def assign_annotations(*args, **_):
-            table = args[0].copy()
-            table = table[:, 200]
+        def assign_annotations(data, cell_types, *args, **kwargs):
+            columns = set(cell_types.get_column_view(cell_types.domain["Cell Type"])[0])
+            domain = Domain([ContinuousVariable(c) for c in columns])
+            table = Table(domain, np.random.random((len(data), len(domain))))
             return table, table
 
         self.patcher1 = patch(
-            "orangecontrib.bioinformatics.annotation." "annotate_samples.AnnotateSamples.mann_whitney_test",
+            "orangecontrib.bioinformatics.annotation.annotate_samples.AnnotateSamplesMeta.mann_whitney_test",
             Mock(side_effect=mann_whitney_test),
         )
         self.patcher2 = patch(
-            "orangecontrib.bioinformatics.annotation." "annotate_samples.AnnotateSamples.assign_annotations",
+            "orangecontrib.bioinformatics.annotation.annotate_samples.AnnotateSamplesMeta.assign_annotations",
             Mock(side_effect=assign_annotations),
         )
 
@@ -143,8 +145,8 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
 
     def test_statistical_test_control(self):
         self._restore_annotation_functions()
-        self.send_signal(self.widget.Inputs.genes, self.genes)
-        self.send_signal(self.widget.Inputs.data, self.data)
+        self.send_signal(self.widget.Inputs.genes, self.genes[::50])
+        self.send_signal(self.widget.Inputs.data, self.data[:10])
         self.wait_until_finished(timeout=TIMEOUT)
         output1 = self.get_output(self.widget.Outputs.annotated_data)
         cbox = self.widget.controls.statistical_test
