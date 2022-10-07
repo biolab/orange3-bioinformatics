@@ -314,9 +314,17 @@ def pathways(org):
 
 def from_taxid(taxid):
     """
-    Return a KEGG organism code for a an NCBI Taxonomy id string `taxid`.
+    Return a KEGG organism code for a NCBI Taxonomy id string `taxid`.
     """
     with _global_genome_instance() as genome:
+        # NOTE should link using https://www.genome.jp/linkdb/linkdb_api.html
+        # e.g http://rest.genome.jp/link/tax/gn
+        taxid = genome.TAXID_MAP.get(taxid, taxid)
+        for code in genome.essential_organisms() + genome.common_organisms():
+            entry_ = genome.get(code, None)
+            if entry_ is not None and entry_.taxid == taxid:
+                return entry_.org_code
+
         res = genome.search(taxid)
         for r in res:
             e = genome[r]
