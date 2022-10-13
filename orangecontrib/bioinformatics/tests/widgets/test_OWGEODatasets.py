@@ -48,7 +48,7 @@ class TestOWGEODatasets(WidgetTest):
     def test_filter_no_match(self):
         filter_input = 'this will not match'
         self.widget.filter.setText(filter_input)
-        self.assertEqual(self.widget.table_model._table.size, 0)
+        self.assertEqual(self.widget.proxy_model.rowCount(), 0)
         self.assertEqual(self.widget.search_pattern, filter_input)
 
     def test_filter_match(self):
@@ -57,14 +57,13 @@ class TestOWGEODatasets(WidgetTest):
 
         # set filter
         self.widget.filter.setText(filter_input)
-        self.assertEqual(len(self.widget.table_model._table), 1)
+        self.assertEqual(self.widget.proxy_model.rowCount(), 1)
         self.assertEqual(self.widget.search_pattern, filter_input)
-        self.assertEqual(self.widget.table_model.get_row_index(gds_id), 0)
-        self.assertTrue(gds_id in self.widget.table_model._table)
+        self.assertEqual(self.widget.proxy_model.index(0, 1).data(), gds_id)
 
         # remove filter
         self.widget.filter.clear()
-        self.assertEqual(self.widget.table_model._table.shape, self.widget.table_model.table.shape)
+        self.assertEqual(self.widget.proxy_model.rowCount(), len(self.widget.gds_info))
 
 
 if __name__ == '__main__':

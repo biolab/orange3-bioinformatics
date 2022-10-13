@@ -2,14 +2,11 @@
 import sys
 from types import SimpleNamespace
 from typing import Any, Optional, DefaultDict
-from functools import lru_cache
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
-import numpy as np
 import requests
 
-from AnyQt.QtGui import QFont, QColor
-from AnyQt.QtCore import Qt, QSize, QVariant, QModelIndex
+from AnyQt.QtCore import Qt, QSize, QModelIndex
 from AnyQt.QtWidgets import (
     QStyle,
     QSplitter,
@@ -18,7 +15,10 @@ from AnyQt.QtWidgets import (
     QTreeWidgetItem,
     QAbstractItemView,
     QAbstractScrollArea,
+    QStyleOptionViewItem,
 )
+
+from orangewidget.utils.itemdelegates import DataDelegate
 
 from Orange.data import Table
 from Orange.widgets.gui import (
@@ -33,7 +33,6 @@ from Orange.widgets.gui import (
     widgetLabel,
     radioButtonsInBox,
 )
-from Orange.widgets.utils import itemmodels
 from Orange.widgets.widget import Msg, OWWidget
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output
@@ -41,6 +40,8 @@ from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 
 from orangecontrib.bioinformatics.geo import is_cached, pubmed_url, local_files
 from orangecontrib.bioinformatics.geo.dataset import GDSInfo, get_samples, dataset_download
+from orangecontrib.bioinformatics.widgets.utils.gui import FilterProxyModel
+from orangecontrib.bioinformatics.widgets.utils.itemmodels import TableModel
 
 
 class Result(SimpleNamespace):
@@ -62,158 +63,142 @@ def run_download_task(gds_id: str, samples: DefaultDict[str, list], transpose: b
     return res
 
 
-class GEODatasetsModel(itemmodels.PyTableModel):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class GEODatasetsModel(TableModel):
+    (
+        indicator_col,
+        gds_id_col,
+        pubmed_id_col,
+        organism_col,
+        samples_col,
+        features_col,
+        genes_col,
+        subsets_col,
+        title_col,
+    ) = range(9)
 
-        self.setHorizontalHeaderLabels(
-            ['', 'ID', 'PubMedID', 'Organism', 'Samples', 'Features', 'Genes', 'Subsets', 'Title']
-        )
+    def __init__(self, gds: GDSInfo):
+        items = list(gds.values())
+        pubmed_ids = [g.get("pubmed_id", None) for g in items]
 
-        (
-            self.indicator_col,
-            self.gds_id_col,
-            self.pubmed_id_col,
-            self.organism_col,
-            self.samples_col,
-            self.features_col,
-            self.genes_col,
-            self.subsets_col,
-            self.title_col,
-        ) = range(9)
+        def title(name: str):
+            return {Qt.DisplayRole: name}
 
-        self.info = None
-        self.table = None
-        self._sort_column = self.gds_id_col
-        self._sort_order = Qt.AscendingOrder
+        def pubmed_id(row: int) -> Optional[str]:
+            pubmed = pubmed_ids[row]
+            if isinstance(pubmed, list):
+                return pubmed[0] if len(pubmed) > 0 else None
+            else:
+                return pubmed
 
-        self.font = QFont()
-        self.font.setUnderline(True)
-        self.color = QColor(Qt.blue)
+        def render_pubmed_url(row):
+            id_ = pubmed_id(row)
+            if id_:
+                return pubmed_url.format(id_)
+            return None
 
-        @lru_cache(maxsize=10000)
-        def _row_instance(row, column):
-            return self[int(row)][int(column)]
+        columns = [
+            TableModel.Column(
+                title(""),
+                {
+                    Qt.DisplayRole: lambda row: " " if is_cached(items[row]["name"]) else "",
+                    Qt.UserRole: lambda row: items[row],
+                },
+            ),
+            TableModel.Column(
+                title("ID"),
+                {
+                    Qt.DisplayRole: lambda row: items[row]["name"],
+                    Qt.UserRole: lambda row: items[row],
+                },
+            ),
+            TableModel.Column(
+                title("PubMedID"),
+                {
+                    Qt.DisplayRole: pubmed_id,
+                    LinkRole: render_pubmed_url,
+                    Qt.ToolTipRole: render_pubmed_url,
+                },
+            ),
+            TableModel.Column(
+                title("Organism"),
+                {
+                    Qt.DisplayRole: lambda row: items[row]["sample_organism"],
+                },
+            ),
+            TableModel.Column(
+                title("Samples"),
+                {
+                    Qt.DisplayRole: lambda row: len(get_samples(items[row])),
+                },
+            ),
+            TableModel.Column(
+                title("Features"),
+                {
+                    Qt.DisplayRole: lambda row: items[row]["variables"],
+                },
+            ),
+            TableModel.Column(
+                title("Genes"),
+                {
+                    Qt.DisplayRole: lambda row: items[row]["genes"],
+                },
+            ),
+            TableModel.Column(
+                title("Subsets"),
+                {
+                    Qt.DisplayRole: lambda row: len(items[row]["subsets"]),
+                },
+            ),
+            TableModel.Column(
+                title("Title"),
+                {
+                    Qt.DisplayRole: lambda row: items[row]["title"],
+                    Qt.ToolTipRole: lambda row: items[row]["title"],
+                },
+            ),
+        ]
+        super().__init__(len(items), columns)
+        self.info = gds
 
-        self._row_instance = _row_instance
-
-    def initialize(self, info: OrderedDict):
-        self.info = info
-
-        def _gds_to_row(gds: dict):
-            gds_id = gds['name']
-            title = gds['title']
-            organism = gds['sample_organism']
-            samples = len(get_samples(gds))
-            features = gds['variables']
-            genes = gds['genes']
-            subsets = len(gds['subsets'])
-
-            pubmed = gds.get('pubmed_id', '')
-            pubmed_id = pubmed
-            if isinstance(pubmed, list) and len(pubmed) > 0:
-                pubmed_id = pubmed[0]
-
-            return [
-                ' ' if is_cached(gds_id) else '',
-                gds_id,
-                pubmed_id,
-                organism,
-                samples,
-                features,
-                genes,
-                subsets,
-                title,
-            ]
-
-        self.table = np.asarray([_gds_to_row(gds) for gds in info.values()])
-        self.show_table()
-
-    def _argsortData(self, data: np.ndarray, order) -> Optional[np.ndarray]:
-        if not data.size:
-            return
-
-        # store order choice.
-        self._sort_column = column = self.sortColumn()
-        self._sort_order = self.sortOrder()
-
+    def sortColumnData(self, column):
         if column == self.gds_id_col:
-            data = np.char.replace(data, 'GDS', '')
-            data = data.astype(int)
-
-        elif column in (self.samples_col, self.features_col, self.genes_col, self.subsets_col, self.pubmed_id_col):
-            data[data == ''] = '0'
-            data = data.astype(int)
-
-        indices = np.argsort(data, kind='mergesort')
-        if order == Qt.DescendingOrder:
-            indices = indices[::-1]
-        return indices
-
-    def columnCount(self, parent=QModelIndex()):
-        return 0 if parent.isValid() else self._table.shape[1]
-
-    def data(
-        self,
-        index,
-        role,
-        _str=str,
-        _Qt_DisplayRole=Qt.DisplayRole,  # noqa: N803
-        _Qt_EditRole=Qt.EditRole,
-        _Qt_FontRole=Qt.FontRole,
-        _Qt_ForegroundRole=Qt.ForegroundRole,
-        _LinkRolee=LinkRole,
-        _recognizedRoles=frozenset([Qt.DisplayRole, Qt.EditRole, Qt.FontRole, Qt.ForegroundRole, LinkRole]),
-    ):
-
-        if role not in _recognizedRoles:
-            return None
-
-        row, col = index.row(), index.column()
-        if not 0 <= row <= self.rowCount():
-            return None
-        row = self.mapToSourceRows(row)
-
-        try:
-            # value = self[row][col]
-            value = self._row_instance(row, col)
-        except IndexError:
-            return
-
-        if role == Qt.DisplayRole:
-            return QVariant(str(value))
-        elif role == Qt.ToolTipRole:
-            return QVariant(str(value))
-
-        if col == self.pubmed_id_col:
-            if role == _Qt_ForegroundRole:
-                return self.color
-            elif role == _Qt_FontRole:
-                return self.font
-            elif role == _LinkRolee:
-                return pubmed_url.format(value)
-
-    def get_row_index(self, gds_name):
-        # test = self._table[self._table[:, 1] == gds_name, :]
-        rows, _ = np.where(np.isin(self._table, gds_name))
-        if rows is not None and len(rows) > 0:
-            return self.mapFromSourceRows(rows[0])
-
-    def filter_table(self, filter_pattern: str):
-        selection = np.full(self.table.shape, True)
-        for search_word in filter_pattern.split():
-            match_result = np.core.defchararray.find(np.char.lower(self.table), search_word.lower()) >= 0
-            selection = selection & match_result
-        return selection
+            items = [g["name"] for g in self.info.values()]
+            items = [int(name.strip('GDS')) for name in items]
+            return items
+        if column == self.pubmed_id_col:
+            items = [
+                self.data(self.index(i, column), Qt.DisplayRole)
+                for i in self.mapFromSourceRows(range(self.rowCount()))
+            ]
+            items = [int(pid or 0) for pid in items]
+            return items
+        return super().sortColumnData(column)
 
     def update_cache_indicator(self):
-        self.table[:, 0] = [' ' if is_cached(gid) else '' for gid in self.table[:, self.gds_id_col]]
+        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 0))
 
-    def show_table(self, filter_pattern=''):
-        # clear cache if model changes
-        self._row_instance.cache_clear()
-        self.wrap(self.table[self.filter_table(filter_pattern).any(axis=1), :])
-        self.sort(self._sort_column, self._sort_order)
+
+class LinkStyledItemDelegate(LinkStyledItemDelegate):
+    def initStyleOption(self, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+        super().initStyleOption(option, index)
+        if index.data(LinkRole) is not None:
+            option.font.setUnderline(True)
+
+    def paint(self, painter, option, index):
+        self.initStyleOption(option, index)
+        super().paint(painter, option, index)
+
+
+class FilterProxyModel(FilterProxyModel):
+    def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder) -> None:
+        """
+        Reimplemented.
+
+        Dispatch the sorting to the source model.
+        """
+        source = self.sourceModel()
+        if source is not None:
+            source.sort(column, order)
 
 
 class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
@@ -257,6 +242,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
             return
 
         self.gds_data: Optional[Table] = None
+        self.__updating_filter = False
 
         # Control area
         box = widgetBox(self.controlArea, 'Info', addSpace=True)
@@ -293,9 +279,10 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.table_view.viewport().setMouseTracking(True)
         self.table_view.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
 
-        self.table_model = GEODatasetsModel()
-        self.table_model.initialize(self.gds_info)
-        self.table_view.setModel(self.table_model)
+        self.table_model = GEODatasetsModel(self.gds_info)
+        self.proxy_model = FilterProxyModel()
+        self.proxy_model.setSourceModel(self.table_model)
+        self.table_view.setModel(self.proxy_model)
 
         self.table_view.horizontalHeader().setStretchLastSection(True)
         self.table_view.resizeColumnsToContents()
@@ -308,6 +295,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         v_header.setMinimumSectionSize(5)
 
         # set item delegates
+        self.table_view.setItemDelegate(DataDelegate(self.table_view))
         self.table_view.setItemDelegateForColumn(
             self.table_model.pubmed_id_col, LinkStyledItemDelegate(self.table_view)
         )
@@ -338,7 +326,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
             sp.splitterMoved.connect(self._splitter_moved)
             sp.restoreState(setting)
 
-        self.table_view.selectionModel().selectionChanged.connect(self.on_gds_selection_changed)
+        self.table_view.selectionModel().selectionChanged.connect(self.__on_selection_changed)
         self._apply_filter()
 
         self.commit()
@@ -378,15 +366,25 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
     def _set_selection(self):
         if self.selected_gds is not None:
-            index = self.table_model.get_row_index(self.selected_gds.get('name'))
+            index = None
+            ids = self.proxy_model.match(
+                self.proxy_model.index(0, 1),
+                Qt.DisplayRole,
+                self.selected_gds["name"],
+                1,
+                Qt.MatchCaseSensitive | Qt.MatchExactly,
+            )
+            if ids:
+                index = ids[0]
+
             if index is not None:
                 self.table_view.selectionModel().blockSignals(True)
-                self.table_view.selectRow(index)
+                self.table_view.selectRow(index.row())
                 self._handle_selection_changed()
                 self.table_view.selectionModel().blockSignals(False)
 
     def _handle_selection_changed(self):
-        if self.table_model.table is not None:
+        if self.table_model is not None:
             selection = self.table_view.selectionModel().selectedRows(self.table_model.gds_id_col)
             selected_gds_name = selection[0].data() if len(selection) > 0 else None
 
@@ -401,10 +399,32 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
             self.update_info()
 
     def _apply_filter(self):
-        if self.table_model.table is not None:
-            self.table_model.show_table(filter_pattern=str(self.search_pattern))
-            self._set_selection()
-            self.update_info()
+        keys = self.search_pattern.lower().split()
+
+        def filter(gds):
+            source = (gds["name"], gds["title"], gds["sample_organism"])
+            source = [t.lower() for t in source]
+            return all(any(k in s for s in source) for k in keys)
+
+        changed = False
+
+        def current_changed():
+            nonlocal changed
+            changed = True
+
+        selmodel = self.table_view.selectionModel()
+        selmodel.selectionChanged.connect(current_changed)
+        try:
+            self.__updating_filter = True
+            self.proxy_model.set_filters([FilterProxyModel.Filter(self.table_model.gds_id_col, Qt.UserRole, filter)])
+            if changed:
+                self.table_view.clearSelection()
+                self._handle_selection_changed()
+        finally:
+            selmodel.selectionChanged.disconnect(current_changed)
+            self.__updating_filter = False
+
+        self._set_selection()
 
     def _run(self):
         self.Warning.using_local_files.clear()
@@ -413,6 +433,10 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
             self.start(
                 run_download_task, self.selected_gds.get('name'), self.get_selected_samples(), self.genes_as_rows
             )
+
+    def __on_selection_changed(self):
+        if not self.__updating_filter:
+            self.on_gds_selection_changed()
 
     def on_gds_selection_changed(self):
         self._handle_selection_changed()
@@ -455,8 +479,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         """
 
         def childiter(item):
-            """ Iterate over the children of an QTreeWidgetItem instance.
-            """
+            """Iterate over the children of an QTreeWidgetItem instance."""
             for i in range(item.childCount()):
                 yield item.child(i)
 
@@ -497,7 +520,6 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
         if self.gds_info:
             self.table_model.update_cache_indicator()
-            self._apply_filter()
 
         self.Outputs.gds_data.send(self.gds_data)
 
