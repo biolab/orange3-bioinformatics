@@ -19,7 +19,7 @@ from Orange.widgets.settings import Setting, ContextSetting, SettingProvider
 from Orange.widgets.utils.sql import check_sql_input
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import DomainModel
-from Orange.widgets.utils.colorpalette import ColorPaletteGenerator
+from Orange.widgets.utils.colorpalettes import LimitedDiscretePalette
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.visualize.utils.widget import OWDataProjectionWidget
 from Orange.widgets.visualize.owscatterplotgraph import OWScatterPlotBase
@@ -463,13 +463,16 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
     @property
     def effective_variables(self):
-        return self.reference_data.domain.attributes
+        attr_x, attr_y = self.attr_x, self.attr_y
+        if attr_x and attr_y:
+            if attr_x == attr_y:
+                return [attr_x]
+            return [attr_x, attr_y]
+        return []
 
     @property
     def effective_data(self):
-        return self.reference_data.transform(
-            Domain(self.effective_variables, self.reference_data.domain.class_vars, self.reference_data.domain.metas)
-        )
+        return self.reference_data.transform(Domain(self.effective_variables))
 
     @property
     def can_annotate(self):
@@ -786,7 +789,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         return (
             self.clusters.table.domain["Clusters"].palette
             if hasattr(self.clusters.table.domain["Clusters"], "palette")
-            else ColorPaletteGenerator(number_of_colors=len(colors), rgb_colors=colors)
+            else LimitedDiscretePalette(number_of_colors=len(colors))
         )
 
     def get_cluster_hulls(self):
@@ -831,9 +834,10 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
         def get_augmented_data(table, scores_x, clusters_x):
             new_table = table.transform(domain)
-            if scores_x is not None:
-                new_table.metas[:, :n_sco] = scores_x
-            new_table.metas[:, n_sco:n_clu] = clusters_x
+            with new_table.unlocked(new_table.metas):
+                if scores_x is not None:
+                    new_table.metas[:, :n_sco] = scores_x
+                new_table.metas[:, n_sco:n_clu] = clusters_x
             return new_table
 
         n_sco = self.scores.table.X.shape[1]
@@ -872,8 +876,9 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         metas = chain(domain.metas, [source_attr])
         domain = Domain(domain.attributes, domain.class_vars, metas)
         data = data.transform(domain)
-        data.metas[: len(self.reference_data), -1] = 0
-        data.metas[len(self.reference_data) :, -1] = 1
+        with data.unlocked(data.metas):
+            data.metas[: len(self.reference_data), -1] = 0
+            data.metas[len(self.reference_data) :, -1] = 1
         return data
 
     def _get_send_report_caption(self):

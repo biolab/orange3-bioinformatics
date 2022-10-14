@@ -83,8 +83,9 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
         _domain = Domain(table.domain.attributes, table.domain.class_vars + (class_var,), table.domain.metas)
 
         table = table.transform(_domain)
-        col, _ = table.get_column_view(class_var)
-        col[:] = [map_class_values[class_val] for class_val in class_values]
+        with table.unlocked(table.Y):
+            col, _ = table.get_column_view(class_var)
+            col[:] = [map_class_values[class_val] for class_val in class_values]
 
     if transpose:
         table = Table.transpose(table, feature_names_column='sample_id', meta_attr_name='genes')
@@ -99,7 +100,8 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
         metas = [var for var in table.domain.metas if var.name != 'Entrez ID'] + [new_var]
         new_domain = Domain(table.domain.attributes, table.domain.class_vars, metas)
         table = table.transform(new_domain)
-        table[:, new_var] = _genes
+        with table.unlocked(table.metas):
+            table[:, new_var] = _genes
 
         # table name is lost after transpose
         table.name = title

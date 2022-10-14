@@ -533,19 +533,20 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
         if known_genes:
             # Genes are in rows (we have a column with genes).
             if not self.use_attr_names:
-
+                t = self.input_data
                 if self.target_database in self.input_data.domain:
-                    gene_var = self.input_data.domain[self.target_database]
-                    metas = self.input_data.domain.metas
+                    gene_var = t.domain[self.target_database]
+                    # new data inserted in current meta column - copy only meta part
+                    table = Table.from_numpy(t.domain, t.X, t.Y, t.metas.copy(), t.W, t.attributes, t.ids)
                 else:
                     gene_var = StringVariable(self.target_database)
-                    metas = self.input_data.domain.metas + (gene_var,)
+                    metas = t.domain.metas + (gene_var,)
+                    domain = Domain(t.domain.attributes, t.domain.class_vars, metas)
+                    table = t.transform(domain)
 
-                domain = Domain(self.input_data.domain.attributes, self.input_data.domain.class_vars, metas)
-
-                table = self.input_data.transform(domain)
-                col, _ = table.get_column_view(gene_var)
-                col[:] = gene_ids
+                with table.unlocked(table.metas):
+                    col, _ = table.get_column_view(gene_var)
+                    col[:] = gene_ids
 
                 # filter selected rows
                 selected_genes_set = set(selected_genes)
@@ -620,21 +621,10 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
 
 
 if __name__ == "__main__":
+    from Orange.widgets.utils.widgetpreview import WidgetPreview
 
-    def main_test():
-        import sys
+    data = None
+    if len(sys.argv) > 1:
+        data = Table(sys.argv[1])
 
-        from AnyQt.QtWidgets import QApplication
-
-        app = QApplication([])
-        w = OWGenes()
-        if len(sys.argv) > 1:
-            data = Table(sys.argv[1])
-            w.handle_input(data)
-        w.show()
-        w.raise_()
-        r = app.exec_()
-        w.saveSettings()
-        return r
-
-    sys.exit(main_test())
+    WidgetPreview(OWGenes).run(data)

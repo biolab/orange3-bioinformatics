@@ -14,7 +14,7 @@ from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
 
 class Gene:
-    """ Representation of gene summary. """
+    """Representation of gene summary."""
 
     __slots__ = gene_info_attributes + ('input_identifier',)
 
@@ -59,7 +59,7 @@ class Gene:
 
 
 class GeneMatcher:
-    """ Gene name matching interface. """
+    """Gene name matching interface."""
 
     def __init__(self, tax_id: str, progress_callback=None, auto_start=True):
         """
@@ -220,7 +220,8 @@ class GeneMatcher:
             )
 
             new_data = data_table.transform(new_domain)
-            new_data[:, target_column] = [[str(gene.gene_id) if gene.gene_id else '?'] for gene in self.genes]
+            with new_data.unlocked(new_data.metas):
+                new_data[:, target_column] = [[str(gene.gene_id) if gene.gene_id else '?'] for gene in self.genes]
 
             return new_data
 

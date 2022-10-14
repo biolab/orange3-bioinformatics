@@ -38,7 +38,7 @@ class TestTaxonomy(unittest.TestCase):
 
         self.assertRaises(taxonomy.utils.UnknownSpeciesIdentifier, self.tax_obj.get_entry, 'unknown_tax')
 
-        self.assertTrue(('man', 'common name') in self.tax_obj.other_names(self.human))
+        self.assertTrue(('human', 'genbank common name') in self.tax_obj.other_names(self.human))
         self.assertEqual(self.tax_obj.rank(self.human), 'species')
         self.assertEqual(self.tax_obj.parent(self.human), '9605')
 

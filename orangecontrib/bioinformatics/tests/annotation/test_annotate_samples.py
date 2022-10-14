@@ -60,7 +60,8 @@ class TestAnnotateSamples(unittest.TestCase):
 
     @dense_sparse
     def test_mann_whitney_test(self, array):
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         d = self.annotator.mann_whitney_test(self.data)
         self.assertEqual(type(d), Table)
         self.assertTupleEqual(self.data.X.shape, d.X.shape)
@@ -79,7 +80,8 @@ class TestAnnotateSamples(unittest.TestCase):
 
     @dense_sparse
     def test_artificial_data(self, array):
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
@@ -109,8 +111,8 @@ class TestAnnotateSamples(unittest.TestCase):
             ["Type 3", "313"],
         ]
         markers = Table(m_domain, np.empty((len(m_data), 0)), None, m_data)
-
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, markers)
 
         self.assertEqual(type(annotations), Table)
@@ -132,7 +134,8 @@ class TestAnnotateSamples(unittest.TestCase):
         """
         Test annotations with hypergeom.sf
         """
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers, p_value_fun=PFUN_HYPERGEOMETRIC)
 
         self.assertEqual(type(annotations), Table)
@@ -144,9 +147,10 @@ class TestAnnotateSamples(unittest.TestCase):
 
     @dense_sparse
     def test_two_example(self, array):
-        self.data = self.data[:2]
+        self.data = self.data[:2].copy()
 
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
@@ -154,8 +158,10 @@ class TestAnnotateSamples(unittest.TestCase):
 
     @dense_sparse
     def test_markers_without_entrez_id(self, array):
-        self.markers[1, "Entrez ID"] = "?"
-        self.data.X = array(self.data.X)
+        with self.markers.unlocked():
+            self.markers[1, "Entrez ID"] = "?"
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers, return_nonzero_annotations=False)
 
         self.assertEqual(type(annotations), Table)
@@ -167,7 +173,8 @@ class TestAnnotateSamples(unittest.TestCase):
 
     @dense_sparse
     def test_select_attributes(self, array):
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         z = self.annotator.mann_whitney_test(self.data)
 
         self.assertEqual(z.X.shape, self.data.X.shape)
@@ -193,7 +200,8 @@ class TestAnnotateSamples(unittest.TestCase):
             {"211", "212", "213", "214"},
         ]
         exp_ann = np.array([[1, 0], [1 / 2, 1 / 4], [1 / 4, 1 / 2], [0, 1]])
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations, fdrs = self.annotator.assign_annotations(z_table, self.markers, self.data[:4])
 
         self.assertEqual(len(attrs), len(annotations))
@@ -213,7 +221,8 @@ class TestAnnotateSamples(unittest.TestCase):
         # https://github.com/pandas-dev/pandas/issues/28992
         if isinstance(array, functools.partial):
             return
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_EXP_RATIO)
 
         self.assertEqual(type(annotations), Table)
@@ -259,7 +268,8 @@ class TestAnnotateSamples(unittest.TestCase):
         for i, att in enumerate(self.data.domain.attributes):
             att.attributes["Entrez ID"] = int(att.attributes["Entrez ID"])
 
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, self.markers)
 
         self.assertEqual(type(annotations), Table)
@@ -288,7 +298,8 @@ class TestAnnotateSamples(unittest.TestCase):
                 )
             ),
         )
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, markers)
 
         self.assertEqual(type(annotations), Table)
@@ -317,7 +328,8 @@ class TestAnnotateSamples(unittest.TestCase):
                 )
             ),
         )
-        self.data.X = array(self.data.X)
+        with self.data.unlocked(self.data.X):
+            self.data.X = array(self.data.X)
         annotations = self.annotate_samples(self.data, markers)
 
         self.assertEqual(type(annotations), Table)
