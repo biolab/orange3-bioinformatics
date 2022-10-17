@@ -6,11 +6,9 @@ from collections import defaultdict
 
 import requests
 
-from AnyQt.QtCore import Qt, QSize, QModelIndex
+from AnyQt.QtCore import Qt, QModelIndex
 from AnyQt.QtWidgets import (
-    QStyle,
     QSplitter,
-    QTableView,
     QTreeWidget,
     QTreeWidgetItem,
     QAbstractItemView,
@@ -36,6 +34,7 @@ from Orange.widgets.gui import (
 from Orange.widgets.widget import Msg, OWWidget
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.signals import Output
+from Orange.widgets.utils.tableview import TableView
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 
 from orangecontrib.bioinformatics.geo import is_cached, pubmed_url, local_files
@@ -268,16 +267,18 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.mainArea.layout().addWidget(splitter_vertical)
 
         # set table view
-        self.table_view = QTableView(splitter_vertical)
-        self.table_view.setShowGrid(False)
-        self.table_view.setSortingEnabled(True)
+        self.table_view = TableView(
+            splitter_vertical,
+            showGrid=False,
+            sortingEnabled=True,
+            alternatingRowColors=True,
+            selectionBehavior=QAbstractItemView.SelectRows,
+            selectionMode=QAbstractItemView.SingleSelection,
+            sizeAdjustPolicy=QAbstractScrollArea.AdjustToContents,
+        )
         self.table_view.sortByColumn(1, Qt.AscendingOrder)
-        self.table_view.setAlternatingRowColors(True)
         self.table_view.verticalHeader().setVisible(False)
-        self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table_view.viewport().setMouseTracking(True)
-        self.table_view.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
 
         self.table_model = GEODatasetsModel(self.gds_info)
         self.proxy_model = FilterProxyModel()
@@ -286,13 +287,6 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
         self.table_view.horizontalHeader().setStretchLastSection(True)
         self.table_view.resizeColumnsToContents()
-
-        v_header = self.table_view.verticalHeader()
-        option = self.table_view.viewOptions()
-        size = self.table_view.style().sizeFromContents(QStyle.CT_ItemViewItem, option, QSize(20, 20), self.table_view)
-
-        v_header.setDefaultSectionSize(size.height() + 2)
-        v_header.setMinimumSectionSize(5)
 
         # set item delegates
         self.table_view.setItemDelegate(DataDelegate(self.table_view))
