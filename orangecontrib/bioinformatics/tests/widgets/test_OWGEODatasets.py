@@ -13,6 +13,8 @@ class TestOWGEODatasets(WidgetTest):
         self.test_sample = 'GDS1001'
         self.test_organism = '10090'
         self.widget = self.create_widget(OWGEODatasets)
+        self.wait_until_finished(self.widget)
+        self.process_events()
 
     def test_minimum_size(self):
         pass
