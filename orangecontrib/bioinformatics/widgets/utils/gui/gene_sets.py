@@ -74,7 +74,7 @@ class GeneSetsSelection(QWidget):
 
         for gene_set in gene_sets:
             g_sets = load_gene_sets(gene_set, tax_id)
-            self.gs_object.update([g_set for g_set in g_sets])
+            self.gs_object.update(list(g_sets))
 
         self.set_selected_hierarchies()
 
@@ -108,7 +108,7 @@ class GeneSetsSelection(QWidget):
             item.hierarchy = key
 
             if value:
-                item.setFlags(item.flags() | Qt.ItemIsTristate)
+                item.setFlags(item.flags() | Qt.ItemIsUserTristate)
                 self.set_hierarchy_model(item, value)
             else:
                 if item.parent():
@@ -118,8 +118,7 @@ class GeneSetsSelection(QWidget):
                 item.hierarchy = (key,)
 
     def get_hierarchies(self, **kwargs):
-        """ return selected hierarchy
-        """
+        """return selected hierarchy"""
         only_selected = kwargs.get('only_selected', None)
 
         sets_to_display = []

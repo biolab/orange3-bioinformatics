@@ -135,7 +135,7 @@ class GeneSetSelection(OWComponent, QObject):
             parent.setCheckState(0, Qt.Unchecked)
             parent.setExpanded(True)
             parent.hierarchy = (domain,)
-            parent.setFlags(parent.flags() | Qt.ItemIsTristate)
+            parent.setFlags(parent.flags() | Qt.ItemIsUserTristate)
 
             for sub_domain in sub_domains:
                 if sub_domain is None:
@@ -159,7 +159,7 @@ class GeneSetSelection(OWComponent, QObject):
         self.selection_changed.emit()
 
     def _get_selection(self) -> List[Tuple[str, ...]]:
-        """ Return a list of selected hierarchies """
+        """Return a list of selected hierarchies"""
         iterator = QTreeWidgetItemIterator(self.hierarchy_tree_widget, flags=QTreeWidgetItemIterator.Checked)
 
         selected: List[Tuple[str, ...]] = []
