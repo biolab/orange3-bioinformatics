@@ -3,6 +3,19 @@ build-backend = "setuptools.build_meta"
 requires = ["setuptools", "setuptools-scm", "wheel"]
 
 [tool.black]
-line-length = 119
 skip_string_normalization = "1"
-target-version = ["py36", "py37", "py38"]
+
+[tool.isort]
+profile = 'black'
+length_sort = 'True'
+multi_line_output = 3
+force_grid_wrap = 0
+use_parentheses = 'True'
+include_trailing_comma = 'True'
+known_third_party = ['numpy','scipy','pandas','requests']
+known_anyqt = 'AnyQt'
+known_orange = 'Orange'
+known_first_party = 'orangecontrib.bioinformatics'
+sections = ['FUTURE','STDLIB','THIRDPARTY','ANYQT','ORANGE','FIRSTPARTY','LOCALFOLDER']
+default_section = 'THIRDPARTY'
+not_skip = '__init__.py'
