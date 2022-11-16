@@ -8,7 +8,7 @@ from AnyQt.QtGui import QColor, QStandardItem, QStandardItemModel
 from AnyQt.QtCore import Qt, QSize
 from AnyQt.QtWidgets import QTreeView, QHBoxLayout, QHeaderView
 
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, StringVariable, ContinuousVariable
 from Orange.data import filter as table_filter
 from Orange.widgets.gui import (
     LinkRole,
@@ -178,6 +178,7 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
 
     class Outputs:
         matched_genes = Output('Matched Genes', Table)
+        enrichment_report = Output('Enrichment Report', Table)
 
     class Warning(OWWidget.Warning):
         all_sets_filtered = Msg('All sets were filtered out.')
@@ -347,6 +348,29 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
     def on_partial_result(self, _):
         pass
 
+    def prepare_enrichment_report(self) -> Table:
+        model = self.filter_proxy_model.sourceModel()
+
+        data = []
+        for index in range(model.rowCount()):
+            p_val = model.item(index, Header.p_val).data(role=Qt.DisplayRole)
+            fdr = model.item(index, Header.fdr).data(role=Qt.DisplayRole)
+            enrichment = model.item(index, Header.enrichment).data(role=Qt.DisplayRole)
+            term = model.item(index, Header.term).data(role=Qt.DisplayRole)
+            category = model.item(index, Header.category).data(role=Qt.DisplayRole)
+            data.append([category, term, enrichment, p_val, fdr])
+
+        str_vars = [
+            StringVariable(Header.labels()[index])
+            for index in [Header.category, Header.term]
+        ]
+        continuous_vars = [
+            ContinuousVariable(Header.labels()[index])
+            for index in [Header.enrichment, Header.p_val, Header.fdr]
+        ]
+        domain = Domain(attributes=[], metas=str_vars + continuous_vars)
+        return Table.from_list(domain=domain, rows=data)
+
     def on_done(self, result: Results):
         model = QStandardItemModel()
         for item in result.items:
@@ -359,8 +383,9 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
         self.filter_proxy_model.reset_filters()
         self._update_fdr()
         self.filter_view()
-        self.update_info_box()
         self.tree_view.selectionModel().selectionChanged.connect(self.commit)
+
+        self.Outputs.enrichment_report.send(self.prepare_enrichment_report())
 
     def on_exception(self, ex):
         # TODO: handle possible exceptions
