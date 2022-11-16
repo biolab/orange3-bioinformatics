@@ -4,7 +4,7 @@ import os
 import gzip
 import json
 
-from Orange.data import Table, Domain, TimeVariable, StringVariable, ContinuousVariable
+from Orange.data import Table, Domain, StringVariable, ContinuousVariable
 
 from orangecontrib.bioinformatics.utils import local_cache
 
@@ -20,37 +20,13 @@ GENAPI_CACHE = os.path.join(LOCAL_CACHE_DIR, 'GenAPI_cache')
 RESOLWEAPI_CACHE = os.path.join(LOCAL_CACHE_DIR, 'ResolweAPI_cache')
 
 
-def transpose_table(table):
-    """Transpose the rows and columns of the table.
-
-    Args:
-        table: Data in :obj:`Orange.data.Table`
-
-    Returns:
-         Transposed :obj:`Orange.data.Table`. (Genes as columns)
-    """
-
-    # TODO: remove this and use Orange.data.Table.transpose
-
-    attrs = table.domain.attributes
-    attr = [ContinuousVariable.make(ex['Gene'].value) for ex in table]
-    #  Set metas
-    new_metas = [
-        StringVariable.make(name) if name != 'Time' else TimeVariable.make(name)
-        for name in sorted(table.domain.variables[0].attributes.keys())
-    ]
-    domain = Domain(attr, metas=new_metas)
-    meta_values = [[exp.attributes[var.name] for var in domain.metas] for exp in attrs]
-
-    return Table(domain, table.X.transpose(), metas=meta_values)
-
-
-def etc_to_table(etc_json, time_var=False):
+def etc_to_table(etc_json, transpose=False):
     """Converts data from Json to :obj:`Orange.data.table`
 
     Args:
         etc_json (dict): Data in json like format from genesis
-        time_var (bool): Create column of time points. Default is set to False.
+        transpose (bool): Transpose table so that genes are in columns.
+                          Default is set to False.
 
     Returns:
         :obj:`Orange.data.Table`
@@ -74,9 +50,13 @@ def etc_to_table(etc_json, time_var=False):
         table.append(gene_expression)
 
     orange_table = Table.from_list(domain, table)
-
-    if time_var:
-        orange_table = transpose_table(orange_table)
+    if transpose:
+        orange_table = Table.transpose(
+            orange_table,
+            feature_names_column=meta_attr.name,
+            meta_attr_name='Time Points',
+            remove_redundant_inst=True,
+        )
 
     return orange_table
 
@@ -86,7 +66,9 @@ def response_to_json(response):
         response.raise_for_status()
 
     response_gzipped = io.BytesIO(response.content)
-    response_content = io.TextIOWrapper(gzip.GzipFile(fileobj=response_gzipped), encoding='utf-8')
+    response_content = io.TextIOWrapper(
+        gzip.GzipFile(fileobj=response_gzipped), encoding='utf-8'
+    )
 
     try:
         json_object = json.load(response_content)

@@ -23,7 +23,12 @@ from Orange.widgets.utils.itemmodels import PyTableModel
 
 from orangecontrib.bioinformatics import resolwe
 from orangecontrib.bioinformatics.ncbi.gene import GeneMatcher
-from orangecontrib.bioinformatics.preprocess import ZScore, LogarithmicScale, QuantileTransform, QuantileNormalization
+from orangecontrib.bioinformatics.preprocess import (
+    ZScore,
+    LogarithmicScale,
+    QuantileTransform,
+    QuantileNormalization,
+)
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 from orangecontrib.bioinformatics.widgets.components.resolwe import (
@@ -76,7 +81,11 @@ class GenialisExpressionsModel(PyTableModel):
         """
         Disable the row selection by clicking on the first column.
         """
-        return Qt.ItemIsEnabled if index.column() == 0 else Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        return (
+            Qt.ItemIsEnabled
+            if index.column() == 0
+            else Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        )
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
@@ -118,7 +127,9 @@ class GenialisExpressionsModel(PyTableModel):
             if tag:
                 return url
 
-    def set_data(self, collections: List[Dict[str, str]], col_to_species: Dict[str, str]):
+    def set_data(
+        self, collections: List[Dict[str, str]], col_to_species: Dict[str, str]
+    ):
         def model_row(collection: Dict[str, str]) -> List[Any]:
             first_name = collection.get('contributor', {}).get('first_name', '')
             last_name = collection.get('contributor', {}).get('last_name', '')
@@ -138,8 +149,12 @@ class GenialisExpressionsModel(PyTableModel):
                 collection.get('name', ''),
                 collection.get('entity_count', ''),
                 col_to_species.get(collection['id'], ''),
-                datetime.strptime(collection.get('created', ''), '%Y-%m-%dT%H:%M:%S.%f%z'),
-                datetime.strptime(collection.get('modified', ''), '%Y-%m-%dT%H:%M:%S.%f%z'),
+                datetime.strptime(
+                    collection.get('created', ''), '%Y-%m-%dT%H:%M:%S.%f%z'
+                ),
+                datetime.strptime(
+                    collection.get('modified', ''), '%Y-%m-%dT%H:%M:%S.%f%z'
+                ),
                 contributor if contributor else user_name,
                 collection.get('description', ''),
                 tag,
@@ -177,13 +192,19 @@ def available_data_output_options(data_objects: List[Data]) -> DataOutputOptions
         Expression(exp_type, exp_type) for exp_type in expression_types
     )
 
-    process_slugs = sorted({(data.process.slug, data.process.name) for data in data_objects})
-    process_slugs = tuple(Process(proc_slug, proc_name) for proc_slug, proc_name in process_slugs)
+    process_slugs = sorted(
+        {(data.process.slug, data.process.name) for data in data_objects}
+    )
+    process_slugs = tuple(
+        Process(proc_slug, proc_name) for proc_slug, proc_name in process_slugs
+    )
 
     expression_sources = tuple({data.output['source'] for data in data_objects})
 
     return DataOutputOptions(
-        expression_type=expression_types, expression_sources=expression_sources, process=process_slugs
+        expression_type=expression_types,
+        expression_sources=expression_sources,
+        process=process_slugs,
     )
 
 
@@ -221,8 +242,12 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     class Warning(widget.OWWidget.Warning):
         no_expressions = Msg('Expression data objects not found.')
         no_data_objects = Msg('No expression data matches the selected options.')
-        unexpected_feature_type = Msg('Can not import expression data, unexpected feature type "{}".')
-        multiple_feature_type = Msg('Can not import expression data, multiple feature types found.')
+        unexpected_feature_type = Msg(
+            'Can not import expression data, unexpected feature type "{}".'
+        )
+        multiple_feature_type = Msg(
+            'Can not import expression data, multiple feature types found.'
+        )
 
     def __init__(self):
         super().__init__()
@@ -240,13 +265,23 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.clinical_metadata: Optional[Table] = None
 
         # Control area
-        self.info_box = gui.widgetLabel(gui.widgetBox(self.controlArea, "Info", margin=3), 'No data on output.')
+        self.info_box = gui.widgetLabel(
+            gui.widgetBox(self.controlArea, "Info", margin=3), 'No data on output.'
+        )
 
         self.exp_type_combo = gui.comboBox(
-            self.controlArea, self, 'exp_type', label='Expression Type', callback=self.on_output_option_changed
+            self.controlArea,
+            self,
+            'exp_type',
+            label='Expression Type',
+            callback=self.on_output_option_changed,
         )
         self.proc_slug_combo = gui.comboBox(
-            self.controlArea, self, 'proc_slug', label='Process Name', callback=self.on_output_option_changed
+            self.controlArea,
+            self,
+            'proc_slug',
+            label='Process Name',
+            callback=self.on_output_option_changed,
         )
         self.exp_source_combo = gui.comboBox(
             self.controlArea,
@@ -260,7 +295,13 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.norm_component.options_changed.connect(self.on_normalization_changed)
 
         box = gui.widgetBox(self.controlArea, 'Sample QC')
-        gui.checkBox(box, self, 'append_qc_data', 'Append QC data', callback=self.on_output_option_changed)
+        gui.checkBox(
+            box,
+            self,
+            'append_qc_data',
+            'Append QC data',
+            callback=self.on_output_option_changed,
+        )
 
         gui.rubber(self.controlArea)
         box = gui.widgetBox(self.controlArea, 'Sign in')
@@ -268,10 +309,16 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.server_info = gui.label(box, self, '')
 
         box = gui.widgetBox(box, orientation=Qt.Horizontal)
-        self.sign_in_btn = gui.button(box, self, 'Sign In', callback=self.sign_in, autoDefault=False)
-        self.sign_out_btn = gui.button(box, self, 'Sign Out', callback=self.sign_out, autoDefault=False)
+        self.sign_in_btn = gui.button(
+            box, self, 'Sign In', callback=self.sign_in, autoDefault=False
+        )
+        self.sign_out_btn = gui.button(
+            box, self, 'Sign Out', callback=self.sign_out, autoDefault=False
+        )
 
-        self.commit_button = gui.auto_commit(self.controlArea, self, 'auto_commit', '&Commit', box=False)
+        self.commit_button = gui.auto_commit(
+            self.controlArea, self, 'auto_commit', '&Commit', box=False
+        )
         self.commit_button.button.setAutoDefault(False)
 
         # Main area
@@ -280,16 +327,19 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.table_view.viewport().setMouseTracking(True)
         self.table_view.setShowGrid(False)
         self.table_view.verticalHeader().hide()
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.table_view.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeToContents
+        )
         self.table_view.horizontalHeader().setStretchLastSection(True)
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table_view.setSelectionMode(QAbstractItemView.SingleSelection)
-        # self.table_view.setStyleSheet('QTableView::item:selected{background-color: palette(highlight); color: palette(highlightedText);};')
 
         self.model = GenialisExpressionsModel(self)
         self.model.setHorizontalHeaderLabels(TableHeader.labels())
         self.table_view.setModel(self.model)
-        self.table_view.selectionModel().selectionChanged.connect(self.on_selection_changed)
+        self.table_view.selectionModel().selectionChanged.connect(
+            self.on_selection_changed
+        )
 
         self.filter_component = CollapsibleFilterComponent(self, self.mainArea)
         self.filter_component.options_changed.connect(self.on_filter_changed)
@@ -334,8 +384,13 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         user = self.res.get_currently_logged_user()
 
         if user:
-            user_info = f"{user[0].get('first_name', '')} {user[0].get('last_name', '')}".strip()
-            user_info = f"User: {user_info if user_info else user[0].get('username', '')}"
+            user_info = (
+                f"{user[0].get('first_name', '')} "
+                f"{user[0].get('last_name', '')}".strip()
+            )
+            user_info = (
+                f"User: {user_info if user_info else user[0].get('username', '')}"
+            )
             self.sign_in_btn.setEnabled(False)
             self.sign_out_btn.setEnabled(True)
         else:
@@ -349,12 +404,20 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     def update_info_box(self):
         if self.data_table:
             total_genes = len(self.data_table.domain.attributes)
-            known_genes = len([col for col in self.data_table.domain.attributes if len(col.attributes)])
+            known_genes = len(
+                [
+                    col
+                    for col in self.data_table.domain.attributes
+                    if len(col.attributes)
+                ]
+            )
 
             info_text = (
                 '{} genes on output\n'
                 '{} genes match Entrez database\n'
-                '{} genes with match conflicts\n'.format(total_genes, known_genes, total_genes - known_genes)
+                '{} genes with match conflicts\n'.format(
+                    total_genes, known_genes, total_genes - known_genes
+                )
             )
 
         else:
@@ -370,14 +433,18 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             if dialog.resolwe_instance is not None:
                 self.res = dialog.resolwe_instance
             else:
-                self.res = resolwe.connect(url=resolwe.resapi.DEFAULT_URL, server_type=resolwe.RESOLWE_PLATFORM)
+                self.res = resolwe.connect(
+                    url=resolwe.resapi.DEFAULT_URL, server_type=resolwe.RESOLWE_PLATFORM
+                )
 
         if not silent and dialog.exec_():
             self.res = dialog.resolwe_instance
 
     def sign_out(self):
         # Use public credentials when user signs out
-        self.res = resolwe.connect(url=resolwe.resapi.DEFAULT_URL, server_type=resolwe.RESOLWE_PLATFORM)
+        self.res = resolwe.connect(
+            url=resolwe.resapi.DEFAULT_URL, server_type=resolwe.RESOLWE_PLATFORM
+        )
         # Remove username and password
         cm = get_credential_manager(resolwe.RESOLWE_PLATFORM)
         if cm.username:
@@ -408,7 +475,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         if self.filter_component.filter_by_owner:
             params.update({'owners_name': self.filter_component.filter_by_owner})
 
-        last_modified = FilterByDateModified.values()[self.filter_component.filter_by_modified]
+        last_modified = FilterByDateModified.values()[
+            self.filter_component.filter_by_modified
+        ]
         if last_modified:
             params.update({'modified__gte': last_modified.isoformat()})
 
@@ -418,7 +487,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         # Get response from the server
         collections = self.res.get_collections(**self.get_query_parameters())
         # Loop trough collections and store ids
-        collection_ids = [collection['id'] for collection in collections.get('results', [])]
+        collection_ids = [
+            collection['id'] for collection in collections.get('results', [])
+        ]
         # Get species by collection ids
         collection_to_species = self.res.get_species(collection_ids)
 
@@ -429,7 +500,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         # Pass the results to data model
         self.model.set_data(collections.get('results', []), collection_to_species)
-        self.table_view.setItemDelegateForColumn(TableHeader.id, gui.LinkStyledItemDelegate(self.table_view))
+        self.table_view.setItemDelegateForColumn(
+            TableHeader.id, gui.LinkStyledItemDelegate(self.table_view)
+        )
         self.table_view.setColumnHidden(TableHeader.slug, True)
         self.table_view.setColumnHidden(TableHeader.tags, True)
 
@@ -454,8 +527,12 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         if self.norm_component.quantile_transform:
             axis = self.norm_component.quantile_transform_axis
             quantiles = table.X.shape[int(not axis)]
-            distribution = QuantileTransformDist.values()[self.norm_component.quantile_transform_dist]
-            table = QuantileTransform(axis=axis, n_quantiles=quantiles, output_distribution=distribution)(table)
+            distribution = QuantileTransformDist.values()[
+                self.norm_component.quantile_transform_dist
+            ]
+            table = QuantileTransform(
+                axis=axis, n_quantiles=quantiles, output_distribution=distribution
+            )(table)
 
         return table
 
@@ -486,12 +563,16 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         data_objects = self.res.get_expression_data_objects(collection_id)
         self.data_output_options = available_data_output_options(data_objects)
 
-        self.exp_type_combo.addItems(exp_name for _, exp_name in self.data_output_options.expression_type)
+        self.exp_type_combo.addItems(
+            exp_name for _, exp_name in self.data_output_options.expression_type
+        )
         if self.exp_type >= len(self.data_output_options.expression_type):
             self.exp_type = 0
         self.exp_type_combo.setCurrentIndex(self.exp_type)
 
-        self.proc_slug_combo.addItems(proc_name for _, proc_name in self.data_output_options.process)
+        self.proc_slug_combo.addItems(
+            proc_name for _, proc_name in self.data_output_options.process
+        )
         if self.proc_slug >= len(self.data_output_options.process):
             self.proc_slug = 0
         self.proc_slug_combo.setCurrentIndex(self.proc_slug)
@@ -608,16 +689,23 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             duplicates = {
                 item
                 for item, count in Counter(
-                    [label.split('.')[1] for label in df_metas.columns.to_list() if '.' in label]
+                    [
+                        label.split('.')[1]
+                        for label in df_metas.columns.to_list()
+                        if '.' in label
+                    ]
                 ).items()
                 if count > 1
             }
 
             # what happens if there is more nested sections?
-            section_name_to_label = {section['name']: section['label'] for section in sample.descriptor_schema.schema}
+            section_name_to_label = {
+                section['name']: section['label']
+                for section in sample.descriptor_schema.schema
+            }
 
             column_labels = {}
-            for field_schema, fields, path in iterate_schema(
+            for field_schema, _, path in iterate_schema(
                 sample.descriptor, sample.descriptor_schema.schema, path=''
             ):
                 path = path[1:]  # this is ugly, but cant go around it
@@ -626,7 +714,9 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
                 label = field_schema['label']
                 section_name, field_name = path.split('.')
                 column_labels[path] = (
-                    label if field_name not in duplicates else f'{section_name_to_label[section_name]} - {label}'
+                    label
+                    if field_name not in duplicates
+                    else f'{section_name_to_label[section_name]} - {label}'
                 )
 
             df_exp = df_exp.reset_index(drop=True)
@@ -643,7 +733,8 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
             attrs = [ContinuousVariable(col) for col in df_exp.columns]
             metas = domain_metas.attributes + domain_metas.metas
             domain = Domain(attrs, metas=metas)
-            table = Table(domain, df_exp.to_numpy(), metas=x_metas)
+            table = Table.from_numpy(domain, df_exp.to_numpy(), metas=x_metas)
+
             state.set_progress_value(next(progress_steps_download))
 
             state.set_status('Matching genes ...')

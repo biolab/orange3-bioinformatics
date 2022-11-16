@@ -96,7 +96,10 @@ class AnnotateSamplesMeta:
             df = pd.DataFrame.sparse.from_spmatrix(data.X, columns=columns)
         else:
             df = pd.DataFrame(data.X, columns=columns)
-        return (df if columns_subset is None else df.loc[:, columns_subset], columns_subset)
+        return (
+            df if columns_subset is None else df.loc[:, columns_subset],
+            columns_subset,
+        )
 
     @staticmethod
     def mann_whitney_test(data):
@@ -127,23 +130,40 @@ class AnnotateSamplesMeta:
         """
         # transform to string if discrete else keep string
         ct_values = (
-            list(map(ann.domain["Cell Type"].repr_val, ann.get_column_view("Cell Type")[0]))
+            list(
+                map(
+                    ann.domain["Cell Type"].repr_val,
+                    ann.get_column_view("Cell Type")[0],
+                )
+            )
             if ann.domain["Cell Type"].is_discrete
             else ann.get_column_view("Cell Type")[0]
         )
         entrez_values = (
-            list(map(ann.domain["Entrez ID"].repr_val, ann.get_column_view("Entrez ID")[0]))
+            list(
+                map(
+                    ann.domain["Entrez ID"].repr_val,
+                    ann.get_column_view("Entrez ID")[0],
+                )
+            )
             if ann.domain["Entrez ID"].is_discrete
             else ann.get_column_view("Entrez ID")[0]
         )
 
         # the framework recognizes Gene instead of Entrez ID
-        df_available_annotations = pd.DataFrame(list(zip(ct_values, entrez_values)), columns=["Cell Type", "Gene"])
+        df_available_annotations = pd.DataFrame(
+            list(zip(ct_values, entrez_values)), columns=["Cell Type", "Gene"]
+        )
         return df_available_annotations
 
     @staticmethod
     def assign_annotations(
-        z_values, available_annotations, data, z_threshold=1, p_value_fun=PFUN_BINOMIAL, scoring=SCORING_EXP_RATIO
+        z_values,
+        available_annotations,
+        data,
+        z_threshold=1,
+        p_value_fun=PFUN_BINOMIAL,
+        scoring=SCORING_EXP_RATIO,
     ):
         """
         The function gets a set of attributes (e.g. genes) for each cell and
@@ -176,7 +196,9 @@ class AnnotateSamplesMeta:
             Annotation fdrs
         """
         # checks that assures that data are ok
-        assert TAX_ID in data.attributes, "The input table needs to have a " "tax_id attribute"
+        assert TAX_ID in data.attributes, (
+            "The input table needs to have a " "tax_id attribute"
+        )
         assert any(
             "Entrez ID" in x.attributes for x in data.domain.attributes
         ), "Input data do not contain gene expression data."
@@ -188,8 +210,12 @@ class AnnotateSamplesMeta:
         # transform data to pandas dataframe
         df_z_values, _ = AnnotateSamplesMeta._to_pandas(z_values, use_entrez_id=True)
         df_data, _ = AnnotateSamplesMeta._to_pandas(data, use_entrez_id=True)
-        df_available_annotations = AnnotateSamplesMeta._prepare_annotations(available_annotations)
-        df_available_annotations = df_available_annotations[df_available_annotations["Gene"] != "?"]
+        df_available_annotations = AnnotateSamplesMeta._prepare_annotations(
+            available_annotations
+        )
+        df_available_annotations = df_available_annotations[
+            df_available_annotations["Gene"] != "?"
+        ]
 
         # call the method
         scores, fdrs = AnnotateSamples.assign_annotations(
@@ -205,13 +231,15 @@ class AnnotateSamplesMeta:
         )
         # create orange tables
         domain = Domain([ContinuousVariable(ct) for ct in scores.columns.values])
-        scores_table = Table(domain, scores.values)
-        fdrs_table = Table(domain, fdrs.values)
+        scores_table = Table.from_list(domain, scores.values)
+        fdrs_table = Table.from_list(domain, fdrs.values)
 
         return scores_table, fdrs_table
 
     @staticmethod
-    def filter_annotations(scores, p_values, return_nonzero_annotations=True, p_threshold=0.05):
+    def filter_annotations(
+        scores, p_values, return_nonzero_annotations=True, p_threshold=0.05
+    ):
         """
         This function filters the probabilities on places that do not reach the
         threshold for p-value and filter zero columns
@@ -236,8 +264,10 @@ class AnnotateSamplesMeta:
         """
         df_scores, _ = AnnotateSamplesMeta._to_pandas(scores)
         df_p_values, _ = AnnotateSamplesMeta._to_pandas(p_values)
-        scores = AnnotateSamples.filter_annotations(df_scores, df_p_values, return_nonzero_annotations, p_threshold)
+        scores = AnnotateSamples.filter_annotations(
+            df_scores, df_p_values, return_nonzero_annotations, p_threshold
+        )
 
         domain = Domain([ContinuousVariable(ct) for ct in scores.columns.values])
-        scores_table = Table(domain, scores.values)
+        scores_table = Table.from_list(domain, scores.values)
         return scores_table

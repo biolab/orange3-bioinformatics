@@ -27,15 +27,21 @@ class TestOWMHomologs(WidgetTest):
 
         domain = Domain([], (), [name, id])
 
-        data_row = [["CD4", "920"], ["CD44", "960"], ["CD48", "962"], ["CD47", "961"], ["CD46", "4179"]]
-        self.genes_rows = Table(domain, data_row)
+        data_row = [
+            ["CD4", "920"],
+            ["CD44", "960"],
+            ["CD48", "962"],
+            ["CD47", "961"],
+            ["CD46", "4179"],
+        ]
+        self.genes_rows = Table.from_list(domain, data_row)
         self.genes_rows.attributes = attributes_rows
 
         domain_columns = Domain([ContinuousVariable(name) for name, id in data_row])
         for col, id in zip(domain_columns.attributes, data_row):
             col.attributes["Entrez ID"] = id[1]
 
-        self.genes_columns = Table(domain_columns, [[1, 2, 1, 2, 1]])
+        self.genes_columns = Table.from_list(domain_columns, [[1, 2, 1, 2, 1]])
         self.genes_columns.attributes = attributes_columns
 
     def test_homologs_by_rows(self):
@@ -66,7 +72,9 @@ class TestOWMHomologs(WidgetTest):
         self.widget.commit()
 
         out_data = self.get_output("Genes", self.widget)
-        mouse_ids = [(list(att.attributes.values())[2]) for att in out_data.domain.attributes]
+        mouse_ids = [
+            (list(att.attributes.values())[2]) for att in out_data.domain.attributes
+        ]
 
         self.assertEqual(len(self.genes_rows), len(mouse_ids))
 

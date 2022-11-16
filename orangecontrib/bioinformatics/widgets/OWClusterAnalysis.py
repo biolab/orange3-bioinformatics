@@ -8,19 +8,47 @@ from scipy.stats import rankdata
 from AnyQt.QtCore import Qt, QSize
 from AnyQt.QtWidgets import QSplitter, QTableView, QHBoxLayout, QHeaderView, QListWidget
 
-from Orange.data import Table, Domain, StringVariable, DiscreteVariable, ContinuousVariable
+from Orange.data import (
+    Table,
+    Domain,
+    StringVariable,
+    DiscreteVariable,
+    ContinuousVariable,
+)
 from Orange.widgets import settings
-from Orange.widgets.gui import spin, vBox, comboBox, listView, widgetBox, doubleSpin, auto_commit, widgetLabel
+from Orange.widgets.gui import (
+    spin,
+    vBox,
+    comboBox,
+    listView,
+    widgetBox,
+    doubleSpin,
+    auto_commit,
+    widgetLabel,
+)
 from Orange.widgets.utils import itemmodels
 from Orange.widgets.widget import Msg, OWWidget
-from Orange.widgets.settings import Setting, ContextSetting, PerfectDomainContextHandler, vartype
+from Orange.widgets.settings import (
+    Setting,
+    ContextSetting,
+    PerfectDomainContextHandler,
+    vartype,
+)
 from Orange.widgets.utils.signals import Input, Output
 
 from orangecontrib.bioinformatics.geneset.utils import GeneSetException
-from orangecontrib.bioinformatics.cluster_analysis import DISPLAY_GENE_SETS_COUNT, Cluster, ClusterModel
+from orangecontrib.bioinformatics.cluster_analysis import (
+    DISPLAY_GENE_SETS_COUNT,
+    Cluster,
+    ClusterModel,
+)
 from orangecontrib.bioinformatics.ncbi.gene.config import ENTREZ_ID
 from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_test
-from orangecontrib.bioinformatics.widgets.utils.gui import HTMLDelegate, GeneScoringWidget, GeneSetsSelection
+from orangecontrib.bioinformatics.widgets.utils.gui import (
+    HTMLDelegate,
+    GeneScoringWidget,
+    GeneSetsSelection,
+)
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID,
     GENE_ID_COLUMN,
@@ -66,12 +94,18 @@ class OWClusterAnalysis(OWWidget):
 
     class Warning(OWWidget.Warning):
         gene_enrichment = Msg('{}, {}.')
-        no_selected_gene_sets = Msg('No gene set selected, select them from Gene Sets box.')
+        no_selected_gene_sets = Msg(
+            'No gene set selected, select them from Gene Sets box.'
+        )
 
     class Error(OWWidget.Error):
         no_cluster_indicator = Msg('No cluster indicator in the input data')
-        gene_as_attributes = Msg('Genes, in the input data, are expected as column names')
-        organism_mismatch = Msg('Organism in input data and custom gene sets does not match')
+        gene_as_attributes = Msg(
+            'Genes, in the input data, are expected as column names'
+        )
+        organism_mismatch = Msg(
+            'Organism in input data and custom gene sets does not match'
+        )
         cluster_batch_conflict = Msg('Cluster and batch must not be the same variable')
 
     settingsHandler = ClusterAnalysisContextHandler()
@@ -122,7 +156,9 @@ class OWClusterAnalysis(OWWidget):
         self.gene_id_attribute = None
 
         # custom gene set input
-        self.feature_model = itemmodels.DomainModel(valid_types=(DiscreteVariable, StringVariable))
+        self.feature_model = itemmodels.DomainModel(
+            valid_types=(DiscreteVariable, StringVariable)
+        )
         self.custom_data = None
         self.custom_tax_id = None
         self.custom_use_attr_names = None
@@ -143,7 +179,9 @@ class OWClusterAnalysis(OWWidget):
         self.input_info = widgetLabel(info_box)
 
         # Cluster selection
-        self.cluster_indicator_model = itemmodels.DomainModel(valid_types=(DiscreteVariable,), separators=False)
+        self.cluster_indicator_model = itemmodels.DomainModel(
+            valid_types=(DiscreteVariable,), separators=False
+        )
         self.cluster_indicator_box = widgetBox(self.controlArea, 'Cluster Indicator')
 
         self.cluster_indicator_view = listView(
@@ -179,8 +217,12 @@ class OWClusterAnalysis(OWWidget):
 
         # Gene Sets widget
         gene_sets_box = widgetBox(self.controlArea, "Gene Sets")
-        self.gs_widget = GeneSetsSelection(gene_sets_box, self, 'stored_gene_sets_selection')
-        self.gs_widget.hierarchy_tree_widget.itemClicked.connect(self.__gene_sets_enrichment)
+        self.gs_widget = GeneSetsSelection(
+            gene_sets_box, self, 'stored_gene_sets_selection'
+        )
+        self.gs_widget.hierarchy_tree_widget.itemClicked.connect(
+            self.__gene_sets_enrichment
+        )
 
         # custom gene sets area
         box = vBox(self.controlArea, "Custom Gene Sets")
@@ -247,7 +289,9 @@ class OWClusterAnalysis(OWWidget):
             checkCallback=self.filter_genes,
         )
 
-        gene_sets_filter = widgetBox(splitter, 'Filter Gene Sets', orientation=QHBoxLayout())
+        gene_sets_filter = widgetBox(
+            splitter, 'Filter Gene Sets', orientation=QHBoxLayout()
+        )
         spin(
             gene_sets_filter,
             self,
@@ -296,7 +340,9 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_info_view.verticalHeader().setVisible(False)
         self.cluster_info_view.setItemDelegate(HTMLDelegate())
         self.cluster_info_view.horizontalHeader().hide()
-        self.cluster_info_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.cluster_info_view.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
 
         auto_commit(self.controlArea, self, "auto_commit", "&Commit", box=False)
 
@@ -316,7 +362,9 @@ class OWClusterAnalysis(OWWidget):
             info_string += 'No genes on input.\n'
 
         if self.custom_data:
-            info_string += '{} marker genes in {} sets\n'.format(self.custom_data.X.shape[0], self.num_of_custom_sets)
+            info_string += '{} marker genes in {} sets\n'.format(
+                self.custom_data.X.shape[0], self.num_of_custom_sets
+            )
 
         self.input_info.setText(info_string)
 
@@ -333,28 +381,46 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_info_view.selectionModel().selectionChanged.connect(self.commit)
 
     def __create_temp_class_var(self):
-        """ See no evil !"""
+        """See no evil !"""
         cluster_indicator_name = 'Cluster indicators'
         row_profile = None
         new_cluster_values = []
-        var_index_lookup = {val: idx for var in self.cluster_indicators for idx, val in enumerate(var.values)}
+        var_index_lookup = {
+            val: idx
+            for var in self.cluster_indicators
+            for idx, val in enumerate(var.values)
+        }
 
-        cart_prod = itertools.product(*[cluster.values for cluster in self.cluster_indicators])
+        cart_prod = itertools.product(
+            *[cluster.values for cluster in self.cluster_indicators]
+        )
         for comb in cart_prod:
-            new_cluster_values.append(', '.join([val for val in comb]))
+            new_cluster_values.append(', '.join(list(comb)))
             self.new_cluster_profile.append([var_index_lookup[val] for val in comb])
 
         row_profile_lookup = {
-            tuple(profile): indx for indx, (profile, _) in enumerate(zip(self.new_cluster_profile, new_cluster_values))
+            tuple(profile): indx
+            for indx, (profile, _) in enumerate(
+                zip(self.new_cluster_profile, new_cluster_values)
+            )
         }
         for var in self.cluster_indicators:
             if row_profile is None:
-                row_profile = np.asarray(self.input_data.get_column_view(var)[0], dtype=int)
+                row_profile = np.asarray(
+                    self.input_data.get_column_view(var)[0], dtype=int
+                )
             else:
-                row_profile = np.vstack((row_profile, np.asarray(self.input_data.get_column_view(var)[0], dtype=int)))
+                row_profile = np.vstack(
+                    (
+                        row_profile,
+                        np.asarray(self.input_data.get_column_view(var)[0], dtype=int),
+                    )
+                )
 
         ca_ind = DiscreteVariable.make(
-            cluster_indicator_name, values=[val for val in new_cluster_values], ordered=True
+            cluster_indicator_name,
+            values=list(new_cluster_values),
+            ordered=True,
         )
 
         domain = Domain(
@@ -365,7 +431,10 @@ class OWClusterAnalysis(OWWidget):
 
         table = self.input_data.transform(domain)
         table[:, ca_ind] = np.array(
-            [[row_profile_lookup[tuple(row_profile[:, i])]] for i in range(row_profile.shape[1])]
+            [
+                [row_profile_lookup[tuple(row_profile[:, i])]]
+                for i in range(row_profile.shape[1])
+            ]
         )
         self.input_data = table
         return ca_ind
@@ -377,12 +446,17 @@ class OWClusterAnalysis(OWWidget):
 
         if self.cluster_indicators and self.input_data:
 
-            if isinstance(self.cluster_indicators, list) and len(self.cluster_indicators) > 1:
+            if (
+                isinstance(self.cluster_indicators, list)
+                and len(self.cluster_indicators) > 1
+            ):
                 self.cluster_var = self.__create_temp_class_var()
             else:
                 self.cluster_var = self.cluster_indicators[0]
 
-            self.rows_by_cluster = np.asarray(self.input_data.get_column_view(self.cluster_var)[0], dtype=int)
+            self.rows_by_cluster = np.asarray(
+                self.input_data.get_column_view(self.cluster_var)[0], dtype=int
+            )
             for index, name in enumerate(self.cluster_var.values):
                 cluster = Cluster(name, index)
                 self.clusters.append(cluster)
@@ -396,7 +470,9 @@ class OWClusterAnalysis(OWWidget):
             self.Error.cluster_batch_conflict()
             return
         if self.batch_indicator and self.input_data:
-            self.rows_by_batch = np.asarray(self.input_data.get_column_view(self.batch_indicator)[0], dtype=int)
+            self.rows_by_batch = np.asarray(
+                self.input_data.get_column_view(self.batch_indicator)[0], dtype=int
+            )
 
     def __set_genes(self):
         self.input_genes_names = []
@@ -405,7 +481,9 @@ class OWClusterAnalysis(OWWidget):
         if self.use_attr_names:
             for variable in self.input_data.domain.attributes:
                 self.input_genes_names.append(str(variable.name))
-                self.input_genes_ids.append(str(variable.attributes.get(self.gene_id_attribute, np.nan)))
+                self.input_genes_ids.append(
+                    str(variable.attributes.get(self.gene_id_attribute, np.nan))
+                )
 
     def filter_genes(self):
         if self.cluster_info_model:
@@ -438,7 +516,9 @@ class OWClusterAnalysis(OWWidget):
             self.cluster_info_view.resizeRowsToContents()
 
     def __gene_enrichment(self):
-        design = bool(self.gene_scoring.get_selected_desig())  # if true cluster vs. cluster else cluster vs rest
+        design = bool(
+            self.gene_scoring.get_selected_desig()
+        )  # if true cluster vs. cluster else cluster vs rest
         test_type = self.gene_scoring.get_selected_test_type()
         method = self.gene_scoring.get_selected_method()
         try:
@@ -472,7 +552,9 @@ class OWClusterAnalysis(OWWidget):
             ref_genes = set(self.input_genes_ids)
 
             try:
-                self.cluster_info_model.gene_sets_enrichment(self.gs_widget.gs_object, selected_sets, ref_genes)
+                self.cluster_info_model.gene_sets_enrichment(
+                    self.gs_widget.gs_object, selected_sets, ref_genes
+                )
             except Exception as e:
                 # TODO: possible exceptions?
 
@@ -535,18 +617,29 @@ class OWClusterAnalysis(OWWidget):
             self.cluster_indicator_model.set_domain(self.input_data.domain)
             self.batch_indicator_model.set_domain(self.input_data.domain)
 
-            # For Cluster Indicator do not use categorical variables that contain only one value.
-            self.cluster_indicator_model.wrap([item for item in self.cluster_indicator_model if len(item.values) > 1])
+            # For Cluster Indicator do not use categorical variables that contain
+            # only one value.
+            self.cluster_indicator_model.wrap(
+                [item for item in self.cluster_indicator_model if len(item.values) > 1]
+            )
             # First value in batch indicator model is a NoneType,
             # we can skip it when we validate categorical variables
             self.batch_indicator_model.wrap(
                 self.batch_indicator_model[:1]
-                + [item for item in self.batch_indicator_model[1:] if len(item.values) > 1]
+                + [
+                    item
+                    for item in self.batch_indicator_model[1:]
+                    if len(item.values) > 1
+                ]
             )
 
             self.tax_id = self.input_data.attributes.get(TAX_ID, None)
-            self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
-            self.gene_id_attribute = self.input_data.attributes.get(GENE_ID_ATTRIBUTE, None)
+            self.use_attr_names = self.input_data.attributes.get(
+                GENE_AS_ATTRIBUTE_NAME, None
+            )
+            self.gene_id_attribute = self.input_data.attributes.get(
+                GENE_ID_ATTRIBUTE, None
+            )
 
             if not self.cluster_indicator_model:
                 self.Error.no_cluster_indicator()
@@ -587,9 +680,15 @@ class OWClusterAnalysis(OWWidget):
             self.custom_data = data
             self.feature_model.set_domain(self.custom_data.domain)
             self.custom_tax_id = str(self.custom_data.attributes.get(TAX_ID, None))
-            self.custom_use_attr_names = self.custom_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
-            self.custom_gene_id_attribute = self.custom_data.attributes.get(GENE_ID_ATTRIBUTE, None)
-            self.custom_gene_id_column = self.custom_data.attributes.get(GENE_ID_COLUMN, None)
+            self.custom_use_attr_names = self.custom_data.attributes.get(
+                GENE_AS_ATTRIBUTE_NAME, None
+            )
+            self.custom_gene_id_attribute = self.custom_data.attributes.get(
+                GENE_ID_ATTRIBUTE, None
+            )
+            self.custom_gene_id_column = self.custom_data.attributes.get(
+                GENE_ID_COLUMN, None
+            )
 
             self._handle_future_model()
 
@@ -601,7 +700,7 @@ class OWClusterAnalysis(OWWidget):
         self.handle_custom_gene_sets(select_customs_flag=True)
 
     def __check_organism_mismatch(self):
-        """ Check if organisms from different inputs match.
+        """Check if organisms from different inputs match.
 
         :return: True if there is a mismatch
         """
@@ -633,14 +732,23 @@ class OWClusterAnalysis(OWWidget):
                 if isinstance(self.custom_gene_set_indicator, DiscreteVariable):
                     labels = self.custom_gene_set_indicator.values
                     gene_sets_names = [
-                        labels[int(idx)] for idx in self.custom_data.get_column_view(self.custom_gene_set_indicator)[0]
+                        labels[int(idx)]
+                        for idx in self.custom_data.get_column_view(
+                            self.custom_gene_set_indicator
+                        )[0]
                     ]
                 else:
-                    gene_sets_names, _ = self.custom_data.get_column_view(self.custom_gene_set_indicator)
+                    gene_sets_names, _ = self.custom_data.get_column_view(
+                        self.custom_gene_set_indicator
+                    )
 
                 self.num_of_custom_sets = len(set(gene_sets_names))
-                gene_names, _ = self.custom_data.get_column_view(self.custom_gene_id_column)
-                hierarchy_title = (self.custom_data.name if self.custom_data.name else 'Custom sets',)
+                gene_names, _ = self.custom_data.get_column_view(
+                    self.custom_gene_id_column
+                )
+                hierarchy_title = (
+                    self.custom_data.name if self.custom_data.name else 'Custom sets',
+                )
                 try:
                     self.gs_widget.add_custom_sets(
                         gene_sets_names,
@@ -691,14 +799,19 @@ class OWClusterAnalysis(OWWidget):
 
             if len(self.new_cluster_profile):
                 profiles = [[cluster.index] * num_of_genes]
-                [profiles.append([p] * num_of_genes) for p in self.new_cluster_profile[cluster.index]]
+                [
+                    profiles.append([p] * num_of_genes)
+                    for p in self.new_cluster_profile[cluster.index]
+                ]
             else:
                 profiles = [[cluster.index] * num_of_genes]
 
-            for row in zip(*profiles, gene_names, gene_ids, rank, scores, p_vals, fdr_vals):
+            for row in zip(
+                *profiles, gene_names, gene_ids, rank, scores, p_vals, fdr_vals
+            ):
                 data.append(list(row))
 
-        out_data = Table(domain, data)
+        out_data = Table.from_list(domain, data)
         out_data.attributes[TAX_ID] = self.tax_id
         out_data.attributes[GENE_AS_ATTRIBUTE_NAME] = False
         out_data.attributes[GENE_ID_COLUMN] = ENTREZ_ID
@@ -732,7 +845,10 @@ class OWClusterAnalysis(OWWidget):
 
             if len(self.new_cluster_profile):
                 profiles = [[cluster.index] * num_of_sets]
-                [profiles.append([p] * num_of_sets) for p in self.new_cluster_profile[cluster.index]]
+                [
+                    profiles.append([p] * num_of_sets)
+                    for p in self.new_cluster_profile[cluster.index]
+                ]
             else:
                 profiles = [[cluster.index] * num_of_sets]
 
@@ -756,7 +872,10 @@ class OWClusterAnalysis(OWWidget):
             cluster = sel_row.data()
             selected_clusters.append(cluster)
             selected_cluster_indexes.add(cluster.index)
-            [selected_cluster_genes.add(gene.gene_id) for gene in cluster.filtered_genes]
+            [
+                selected_cluster_genes.add(gene.gene_id)
+                for gene in cluster.filtered_genes
+            ]
 
         # get columns of selected clusters
         selected_columns = [
@@ -766,7 +885,11 @@ class OWClusterAnalysis(OWWidget):
             and str(column.attributes[self.gene_id_attribute]) in selected_cluster_genes
         ]
 
-        domain = Domain(selected_columns, self.input_data.domain.class_vars, self.input_data.domain.metas)
+        domain = Domain(
+            selected_columns,
+            self.input_data.domain.class_vars,
+            self.input_data.domain.metas,
+        )
         output_data = self.input_data.from_table(domain, self.input_data)
 
         # get rows of selected clusters
