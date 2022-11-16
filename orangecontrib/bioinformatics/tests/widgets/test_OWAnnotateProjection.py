@@ -10,18 +10,27 @@ import numpy as np
 from Orange.data import Table, Domain, ContinuousVariable
 from Orange.projection import PCA
 from Orange.data.filter import Values, FilterString
-from Orange.widgets.tests.base import WidgetTest, WidgetOutputsTestMixin, ProjectionWidgetTestMixin, simulate
+from Orange.widgets.tests.base import (
+    WidgetTest,
+    WidgetOutputsTestMixin,
+    ProjectionWidgetTestMixin,
+    simulate,
+)
 from Orange.widgets.unsupervised.owtsne import OWtSNE
 from Orange.widgets.unsupervised.tests.test_owtsne import DummyTSNE, DummyTSNEModel
 
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
-from orangecontrib.bioinformatics.widgets.OWAnnotateProjection import OWAnnotateProjection
+from orangecontrib.bioinformatics.widgets.OWAnnotateProjection import (
+    OWAnnotateProjection,
+)
 
 TIMEOUT = 20000
 
 
-class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutputsTestMixin):
+class TestOWAnnotateProjection(
+    WidgetTest, ProjectionWidgetTestMixin, WidgetOutputsTestMixin
+):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -31,7 +40,9 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         cls.signal_data = cls.data
         cls.same_input_output_domain = False
 
-        genes_path = serverfiles.localpath_download("marker_genes", "panglao_gene_markers.tab")
+        genes_path = serverfiles.localpath_download(
+            "marker_genes", "panglao_gene_markers.tab"
+        )
         filter_ = FilterString("Organism", FilterString.Equal, "Human")
         cls.genes = Values([filter_])(Table(genes_path))
         cls.genes.attributes[TAX_ID] = "9606"
@@ -69,15 +80,17 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         def assign_annotations(data, cell_types, *args, **kwargs):
             columns = set(cell_types.get_column_view(cell_types.domain["Cell Type"])[0])
             domain = Domain([ContinuousVariable(c) for c in columns])
-            table = Table(domain, np.random.random((len(data), len(domain))))
+            table = Table.from_list(domain, np.random.random((len(data), len(domain))))
             return table, table
 
         self.patcher1 = patch(
-            "orangecontrib.bioinformatics.annotation.annotate_samples.AnnotateSamplesMeta.mann_whitney_test",
+            "orangecontrib.bioinformatics.annotation.annotate_samples.AnnotateSamplesMeta."
+            "mann_whitney_test",
             Mock(side_effect=mann_whitney_test),
         )
         self.patcher2 = patch(
-            "orangecontrib.bioinformatics.annotation.annotate_samples.AnnotateSamplesMeta.assign_annotations",
+            "orangecontrib.bioinformatics.annotation.annotate_samples.AnnotateSamplesMeta."
+            "assign_annotations",
             Mock(side_effect=assign_annotations),
         )
 
@@ -156,7 +169,10 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         output2 = self.get_output(self.widget.Outputs.annotated_data)
         np.testing.assert_array_equal(output1.X, output2.X)
         np.testing.assert_array_equal(output1.Y, output2.Y)
-        self.assertFalse(output1.metas.shape == output2.metas.shape and np.equal(output1.metas, output2.metas).all())
+        self.assertFalse(
+            output1.metas.shape == output2.metas.shape
+            and np.equal(output1.metas, output2.metas).all()
+        )
         self._patch_annotation_functions()
 
     def test_p_threshold_control(self):
@@ -192,12 +208,16 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         n_metas = len(self.data.domain.metas)
         self.assertGreater(len(output.domain.metas), n_metas + 4)
         self.assertListEqual(
-            ["Clusters", "Annotation"] + [m.name for m in self.data.domain.metas] + ["Selected"],
+            ["Clusters", "Annotation"]
+            + [m.name for m in self.data.domain.metas]
+            + ["Selected"],
             [m.name for m in output.domain.metas[-n_metas - 3 :]],
         )
         np.testing.assert_array_equal(output.X, self.data.X)
         np.testing.assert_array_equal(output.Y, self.data.Y)
-        np.testing.assert_array_equal(output.metas[:, -n_metas - 1 : -1], self.data.metas)
+        np.testing.assert_array_equal(
+            output.metas[:, -n_metas - 1 : -1], self.data.metas
+        )
         self._patch_annotation_functions()
 
     def test_button_no_data(self):
@@ -267,18 +287,26 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.assertTrue(self.widget.controls.attr_color.isEnabled())
 
         simulate.combobox_activate_index(self.widget.controls.attr_color, 0)
-        is_grey = [brush.color().name() == "#808080" for brush in self.widget.graph.scatterplot_item.data['brush']]
+        is_grey = [
+            brush.color().name() == "#808080"
+            for brush in self.widget.graph.scatterplot_item.data['brush']
+        ]
         self.assertTrue(all(is_grey))
         self.widget.controls.color_by_cluster.click()
         self.assertFalse(self.widget.controls.attr_color.isEnabled())
-        is_not_grey = [brush.color().name() != "#808080" for brush in self.widget.graph.scatterplot_item.data['brush']]
+        is_not_grey = [
+            brush.color().name() != "#808080"
+            for brush in self.widget.graph.scatterplot_item.data['brush']
+        ]
         self.assertTrue(any(is_not_grey))
         self._patch_annotation_functions()
 
     def test_attr_label_metas(self):
         self.send_signal(self.widget.Inputs.data, self.data)
         self.wait_until_finished()
-        simulate.combobox_activate_item(self.widget.controls.attr_label, self.data.domain[-1].name)
+        simulate.combobox_activate_item(
+            self.widget.controls.attr_label, self.data.domain[-1].name
+        )
 
     def test_attr_models(self):
         self.send_signal(self.widget.Inputs.data, self.data)
@@ -335,7 +363,9 @@ class TestOWAnnotateProjection(WidgetTest, ProjectionWidgetTestMixin, WidgetOutp
         self.wait_until_finished()
         self.send_signal(self.widget.Inputs.secondary_data, self.secondary_data)
 
-    @unittest.skipIf(platform.system() == 'Windows', 'Windows fatal exception: access violation')
+    @unittest.skipIf(
+        platform.system() == 'Windows', 'Windows fatal exception: access violation'
+    )
     def test_send_report(self):
         super().test_send_report()
 

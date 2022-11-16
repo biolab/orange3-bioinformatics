@@ -71,7 +71,11 @@ def cluster_data(coordinates, clustering_algorithm=DBSCAN, **kwargs):
     clusters = learner(coordinates)
     if not isinstance(clusters, np.ndarray):  # old clustering method
         clusters = clusters(coordinates)
-        clusters = np.array(list(map(int, map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])))).flatten()
+        clusters = np.array(
+            list(
+                map(int, map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0]))
+            )
+        ).flatten()
 
     # sort classes in descending order base on number of cases in the cluster
     sorted_clust_idx = [v for v, _ in Counter(clusters).most_common() if v != -1]
@@ -85,7 +89,12 @@ def cluster_data(coordinates, clustering_algorithm=DBSCAN, **kwargs):
 
     # create the table
     new_domain = Domain(
-        [DiscreteVariable("Clusters", values=["C{}".format(i) for i in range(1, len(sorted_clust_idx) + 1)])]
+        [
+            DiscreteVariable(
+                "Clusters",
+                values=["C{}".format(i) for i in range(1, len(sorted_clust_idx) + 1)],
+            )
+        ]
     )
     return Table(new_domain, new_clustering.reshape((-1, 1)))
 
@@ -116,7 +125,10 @@ def assign_labels(clusters, annotations, labels_per_cluster):
     clusters_unique = set(clusters.domain[0].values)
 
     if len(annotations.domain) == 0:
-        return {}, Table(Domain([DiscreteVariable("Annotation", values=[])]), np.ones((len(clusters), 1)) * np.nan)
+        return {}, Table(
+            Domain([DiscreteVariable("Annotation", values=[])]),
+            np.ones((len(clusters), 1)) * np.nan,
+        )
 
     labels = np.array(list(map(str, annotations.domain.attributes)))
 
@@ -134,7 +146,12 @@ def assign_labels(clusters, annotations, labels_per_cluster):
 
     annotations_clusters = {}
     for cl in clusters_unique:
-        mask = np.array(list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0]))).flatten() == cl
+        mask = (
+            np.array(
+                list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0]))
+            ).flatten()
+            == cl
+        )
         labels_cl = items_annotations[mask]
         # remove nans from labels
         labels_cl_filtered = labels_cl[~(labels_cl == "")]
@@ -143,7 +160,9 @@ def assign_labels(clusters, annotations, labels_per_cluster):
         common_labels = counts.most_common(labels_per_cluster)
 
         if len(common_labels) > 0:
-            annotations_clusters[cl] = [(l, c / len(labels_cl)) for l, c in common_labels]
+            annotations_clusters[cl] = [
+                (label, c / len(labels_cl)) for label, c in common_labels
+            ]
 
     # pack item annotations to Table
     nan_mask = items_annotations == ""
@@ -151,7 +170,7 @@ def assign_labels(clusters, annotations, labels_per_cluster):
     corrected_idx = np.ones(items_annotations.shape) * np.nan
     corrected_idx[~nan_mask] = indices
     domain = Domain([DiscreteVariable("Annotation", values=values)])
-    item_annotations = Table(domain, corrected_idx.reshape((-1, 1)))
+    item_annotations = Table.from_list(domain, corrected_idx.reshape((-1, 1)))
 
     return annotations_clusters, item_annotations
 
@@ -177,7 +196,12 @@ def labels_locations(coordinates, clusters):
     clusters_unique = set(clusters.domain[0].values) - {"-1"}  # -1 is not clustered
     locations = {}
     for cl in clusters_unique:
-        mask = np.array(list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0]))).flatten() == cl
+        mask = (
+            np.array(
+                list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0]))
+            ).flatten()
+            == cl
+        )
         cl_coordinates = coordinates.X[mask, :]
         x, y = 1 / 2 * (np.min(cl_coordinates, axis=0) + np.max(cl_coordinates, axis=0))
         locations[cl] = (x, y)
@@ -287,7 +311,9 @@ def _find_hull(edges_list, points_list, starting_edge):
             # a polygon
             ang = -1
             for i in range(ind_left, ind_right):
-                cur_ang = _angle((poly[-2], poly[-1]), (poly[-1], points_list[edges_list[i][1]]))
+                cur_ang = _angle(
+                    (poly[-2], poly[-1]), (poly[-1], points_list[edges_list[i][1]])
+                )
                 if cur_ang > ang:
                     ang = cur_ang
                     ind_left = i
@@ -410,7 +436,9 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
         return polygon
 
     hulls = {}
-    clusters_array = np.array(list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])))
+    clusters_array = np.array(
+        list(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0]))
+    )
     for cl in set(clusters_array) - {"None", "?"}:
         points = coordinates.X[clusters_array == cl]
 
@@ -440,7 +468,9 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
         # buffer the hull fro epsilon * -2
         pco2 = pyclipper.PyclipperOffset()
         pco2.AddPath(im_solution[0], pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-        solution = pyclipper.scale_from_clipper(pco2.Execute(epsilon * scaling_factor * (-2)), scaling_factor)
+        solution = pyclipper.scale_from_clipper(
+            pco2.Execute(epsilon * scaling_factor * (-2)), scaling_factor
+        )
 
         hulls[cl] = np.array(solution).reshape(-1, 2)
     return hulls
@@ -450,21 +480,44 @@ def _filter_clusters(clusters, clusters_meta):
     """
     Function removes clusters that does not has any labels
     """
-    clust_map = {c: i for i, c in enumerate(c for c in clusters.domain["Clusters"].values if c in clusters_meta)}
+    clust_map = {
+        c: i
+        for i, c in enumerate(
+            c for c in clusters.domain["Clusters"].values if c in clusters_meta
+        )
+    }
 
     # change cluster indices
     clust_idx = np.zeros(clusters.X.shape) * np.nan
-    for i, cl in enumerate(map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])):
+    for i, cl in enumerate(
+        map(clusters.domain.attributes[0].repr_val, clusters.X[:, 0])
+    ):
         clust_idx[i, 0] = clust_map.get(cl, np.nan)
     new_clusters = Table(
-        Domain([DiscreteVariable("Clusters", values=clusters.domain["Clusters"].values[: len(clust_map)])]), clust_idx
+        Domain(
+            [
+                DiscreteVariable(
+                    "Clusters",
+                    values=clusters.domain["Clusters"].values[: len(clust_map)],
+                )
+            ]
+        ),
+        clust_idx,
     )
     # change cluster names in metas
-    new_clusters_meta = {"C{}".format(clust_map[cl] + 1): v for cl, v in clusters_meta.items()}
+    new_clusters_meta = {
+        "C{}".format(clust_map[cl] + 1): v for cl, v in clusters_meta.items()
+    }
     return new_clusters, new_clusters_meta
 
 
-def annotate_projection(annotations, coordinates, clustering_algorithm=DBSCAN, labels_per_cluster=3, **kwargs):
+def annotate_projection(
+    annotations,
+    coordinates,
+    clustering_algorithm=DBSCAN,
+    labels_per_cluster=3,
+    **kwargs
+):
     """
     Function cluster the data based on coordinates, and assigns a certain number
     of labels per cluster. Each cluster gets `labels_per_cluster` number of most
@@ -493,10 +546,14 @@ def annotate_projection(annotations, coordinates, clustering_algorithm=DBSCAN, l
         The coordinates for locating the label. Dictionary with cluster index
         as a key and tuple (x, y) as a value.
     """
-    assert len(annotations) == len(coordinates), "Number of coordinates does not match to number of annotations"
+    assert len(annotations) == len(
+        coordinates
+    ), "Number of coordinates does not match to number of annotations"
     # sklearn clustering want to have one example
     assert len(coordinates) > 0, "At least one data point need to be provided"
-    assert len(coordinates.domain) > 0, "Coordinates need to have at least one attribute"
+    assert (
+        len(coordinates.domain) > 0
+    ), "Coordinates need to have at least one attribute"
 
     eps = kwargs.get("eps", get_epsilon(coordinates))
     if clustering_algorithm == DBSCAN:
@@ -506,7 +563,9 @@ def annotate_projection(annotations, coordinates, clustering_algorithm=DBSCAN, l
     clusters = cluster_data(coordinates, clustering_algorithm, **kwargs)
 
     # assign top n labels to group
-    annotations_cl, item_annotations = assign_labels(clusters, annotations, labels_per_cluster)
+    annotations_cl, item_annotations = assign_labels(
+        clusters, annotations, labels_per_cluster
+    )
 
     labels_loc = labels_locations(coordinates, clusters)
 
@@ -569,7 +628,8 @@ def cluster_additional_points(coordinates, hulls, cluster_attribute=None):
         is_inside = False
 
         for (x1, y1), (x2, y2) in zip(
-            polygon_points, np.concatenate((polygon_points[1:], polygon_points[:1]), axis=0)
+            polygon_points,
+            np.concatenate((polygon_points[1:], polygon_points[:1]), axis=0),
         ):
             # ray crosses the edge if test_y between both y from an edge
             # and if intersection on the right of the test_x
@@ -594,18 +654,21 @@ def cluster_additional_points(coordinates, hulls, cluster_attribute=None):
     # create the table
     new_domain = Domain(
         [
-            DiscreteVariable("Clusters", values=sorted(list(hulls.keys())))
+            DiscreteVariable("Clusters", values=sorted(hulls.keys()))
             if cluster_attribute is None
             else cluster_attribute
         ]
     )
-    return Table(new_domain, np.array(list(map(new_domain[0].to_val, clusters))).reshape(-1, 1))
+    return Table(
+        new_domain, np.array(list(map(new_domain[0].to_val, clusters))).reshape(-1, 1)
+    )
 
 
 if __name__ == "__main__":
     # run hull creation at Iris data
     data = Table("iris")[:, 2:4]
     clustered_data = Table(
-        Domain([DiscreteVariable("cl", values=["1", "2", "3"])]), [[0]] * 50 + [[1]] * 50 + [[2]] * 50
+        Domain([DiscreteVariable("cl", values=["1", "2", "3"])]),
+        [[0]] * 50 + [[1]] * 50 + [[2]] * 50,
     )
     compute_concave_hulls(data, clustered_data, epsilon=0.5)

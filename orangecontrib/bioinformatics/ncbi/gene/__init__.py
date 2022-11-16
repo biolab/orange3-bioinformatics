@@ -9,7 +9,13 @@ from Orange.data.util import get_unique_names_domain
 
 from orangecontrib.bioinformatics.utils import serverfiles
 from orangecontrib.bioinformatics.ncbi.taxonomy import species_name_to_taxid
-from orangecontrib.bioinformatics.ncbi.gene.config import DOMAIN, ENTREZ_ID, query, query_exact, gene_info_attributes
+from orangecontrib.bioinformatics.ncbi.gene.config import (
+    DOMAIN,
+    ENTREZ_ID,
+    query,
+    query_exact,
+    gene_info_attributes,
+)
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
 
@@ -36,11 +42,21 @@ class Gene:
             return None
 
     def __repr__(self):
-        return f'<Gene symbol={self.symbol}, tax_id={self.tax_id}, gene_id={self.gene_id}>'
+        return (
+            f'<Gene symbol={self.symbol}, tax_id={self.tax_id}, gene_id={self.gene_id}>'
+        )
 
-    def load_attributes(self, values: Tuple[str, ...], attributes: Tuple[str, ...] = gene_info_attributes):
+    def load_attributes(
+        self,
+        values: Tuple[str, ...],
+        attributes: Tuple[str, ...] = gene_info_attributes,
+    ):
         for attr, val in zip(attributes, values):
-            setattr(self, attr, json.loads(val) if attr in ('synonyms', 'db_refs', 'homologs') else val)
+            setattr(
+                self,
+                attr,
+                json.loads(val) if attr in ('synonyms', 'db_refs', 'homologs') else val,
+            )
 
     def homolog_gene(self, taxonomy_id: str) -> Optional[str]:
         """Returns gene homolog for given organism.
@@ -146,11 +162,17 @@ class GeneMatcher:
         genes: List[Gene] = self.genes
         if selected_genes is not None:
             selected_genes_set = set(selected_genes)
-            genes = [gene for gene in self.genes if str(gene.gene_id) in selected_genes_set]
+            genes = [
+                gene for gene in self.genes if str(gene.gene_id) in selected_genes_set
+            ]
 
         for gene in genes:
             db_refs = (
-                ', '.join('{}: {}'.format(key, val) for (key, val) in gene.db_refs.items()) if gene.db_refs else ''
+                ', '.join(
+                    '{}: {}'.format(key, val) for (key, val) in gene.db_refs.items()
+                )
+                if gene.db_refs
+                else ''
             )
             synonyms = ', '.join(gene.synonyms) if gene.synonyms else ''
 
@@ -175,7 +197,7 @@ class GeneMatcher:
 
             data_x.append(line)
 
-        table = Table(domain, data_x)
+        table = Table.from_list(domain, data_x)
         table.name = 'Gene Matcher Results'
         table.attributes[TableAnnotation.tax_id] = self.tax_id
         table.attributes[TableAnnotation.gene_as_attr_name] = False
@@ -183,7 +205,10 @@ class GeneMatcher:
         return table
 
     def match_table_column(
-        self, data_table: Table, column_name: str, target_column: Optional[StringVariable] = None
+        self,
+        data_table: Table,
+        column_name: str,
+        target_column: Optional[StringVariable] = None,
     ) -> Table:
         """Helper function for gene name matching with :class:`Orange.data.Table`.
 
@@ -216,20 +241,27 @@ class GeneMatcher:
                 target_column = StringVariable(ENTREZ_ID)
 
             new_domain = Domain(
-                data_table.domain.attributes, data_table.domain.class_vars, data_table.domain.metas + (target_column,)
+                data_table.domain.attributes,
+                data_table.domain.class_vars,
+                data_table.domain.metas + (target_column,),
             )
 
             new_data = data_table.transform(new_domain)
             with new_data.unlocked(new_data.metas):
-                new_data[:, target_column] = [[str(gene.gene_id) if gene.gene_id else '?'] for gene in self.genes]
+                new_data[:, target_column] = [
+                    [str(gene.gene_id) if gene.gene_id else '?'] for gene in self.genes
+                ]
 
             return new_data
 
-    def match_table_attributes(self, data_table, run=True, rename=False, source_name='Source ID') -> Table:
+    def match_table_attributes(
+        self, data_table, run=True, rename=False, source_name='Source ID'
+    ) -> Table:
         """Helper function for gene name matching with :class:`Orange.data.Table`.
 
-        Match table attributes and if a unique match is found create a new column attribute
-        for Entrez Id. Attribute name is defined here: `orangecontrib.bioinformatics.ncbi.gene.config.NCBI_ID`
+        Match table attributes and if a unique match is found create a
+        new column attribute for Entrez Id. Attribute name is defined
+        here: `orangecontrib.bioinformatics.ncbi.gene.config.NCBI_ID`
 
 
         Parameters
@@ -257,15 +289,24 @@ class GeneMatcher:
                 attribute.attributes[ENTREZ_ID] = gene.gene_id
             return attribute
 
-        attributes = [helper(gene, attr) for gene, attr in zip(self.genes, data_table.domain.attributes)]
+        attributes = [
+            helper(gene, attr)
+            for gene, attr in zip(self.genes, data_table.domain.attributes)
+        ]
         metas = data_table.domain.metas
         (attr_deduplicated, _, metas_deduplicated), renamed = get_unique_names_domain(
             [a.name for a in attributes], metas=[m.name for m in metas]
         )
 
         if len(renamed):
-            attributes = [attr.renamed(new_name) for attr, new_name in zip(attributes, attr_deduplicated)]
-            metas = [meta.renamed(new_name) for meta, new_name in zip(metas, metas_deduplicated)]
+            attributes = [
+                attr.renamed(new_name)
+                for attr, new_name in zip(attributes, attr_deduplicated)
+            ]
+            metas = [
+                meta.renamed(new_name)
+                for meta, new_name in zip(metas, metas_deduplicated)
+            ]
 
         domain = Domain(attributes, data_table.domain.class_vars, metas)
         return data_table.transform(domain)
@@ -290,26 +331,40 @@ class GeneMatcher:
 
                     if search_param:
                         match_statement = (
-                            '{gene_id symbol locus_tag symbol_from_nomenclature_authority}:^"' + search_param + '"'
+                            '{gene_id symbol locus_tag symbol_from_nomenclature_authority}:^"'
+                            + search_param
+                            + '"'
                         )
-                        match = cursor.execute(query_exact, (match_statement,) + tuple([search_param] * 4)).fetchall()
+                        match = cursor.execute(
+                            query_exact, (match_statement,) + tuple([search_param] * 4)
+                        ).fetchall()
                         # if unique match
                         if len(match) == 1:
                             gene.load_attributes(match[0])
                             continue
 
-                        match = cursor.execute(query, (f'synonyms:"{search_param}"',)).fetchall()
+                        match = cursor.execute(
+                            query, (f'synonyms:"{search_param}"',)
+                        ).fetchall()
                         synonym_matched_rows = [
-                            m for m in match if search_param in (x.lower() for x in json.loads(m[synonyms]))
+                            m
+                            for m in match
+                            if search_param
+                            in (x.lower() for x in json.loads(m[synonyms]))
                         ]
                         # if unique match
                         if len(synonym_matched_rows) == 1:
                             gene.load_attributes(synonym_matched_rows[0])
                             continue
 
-                        match = cursor.execute(query, (f'db_refs:"{search_param}"',)).fetchall()
+                        match = cursor.execute(
+                            query, (f'db_refs:"{search_param}"',)
+                        ).fetchall()
                         db_ref_matched_rows = [
-                            m for m in match if search_param in (x.lower() for x in json.loads(m[db_refs]).values())
+                            m
+                            for m in match
+                            if search_param
+                            in (x.lower() for x in json.loads(m[db_refs]).values())
                         ]
                         # if unique match
                         if len(db_ref_matched_rows) == 1:
@@ -358,7 +413,9 @@ def load_gene_summary(tax_d: str, genes: List[Optional[str]]) -> List[Optional[G
         with con as cur:
 
             gene_map: Dict[str, Gene] = {}
-            for gene_info in cur.execute(f'SELECT * FROM gene_info WHERE gene_id in ({",".join(_genes)})').fetchall():
+            for gene_info in cur.execute(
+                f'SELECT * FROM gene_info WHERE gene_id in ({",".join(_genes)})'
+            ).fetchall():
                 gene = Gene()
                 gene.load_attributes(gene_info)
                 gene_map[gene.gene_id] = gene
@@ -370,5 +427,7 @@ if __name__ == "__main__":
     gm = GeneMatcher('9606')
     gm.genes = ['CD4', '614535', 'ENSG00000205426', "2'-PDE", 'HB-1Y']
     print(list(zip(gm.genes, [g.input_identifier for g in gm.genes])))
-    _homologs = load_gene_summary('10090', [g.homolog_gene(taxonomy_id='10090') for g in gm.genes])
+    _homologs = load_gene_summary(
+        '10090', [g.homolog_gene(taxonomy_id='10090') for g in gm.genes]
+    )
     print(_homologs)
