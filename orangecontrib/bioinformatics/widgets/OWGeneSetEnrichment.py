@@ -421,8 +421,6 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
             self.gene_info = GeneInfo(self.tax_id)
             self.gs_selection_component.initialize(self.tax_id)
 
-        self.update_info_box()
-
     @Inputs.custom_gene_sets
     def handle_custom_gene_sets_input(self, custom_data):
         self.Outputs.matched_genes.send(None)
@@ -431,8 +429,6 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
             self.gs_selection_component.initialize_custom_gene_sets(custom_data)
         else:
             self.gs_selection_component.initialize_custom_gene_sets(None)
-
-        self.update_info_box()
 
     @Inputs.reference
     @check_table_annotation
@@ -484,32 +480,6 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
                     # apply filter to the data
                     data_table = table_filter.Values([only_known])(self.input_data)
                     self.Outputs.matched_genes.send(data_table)
-
-        self.update_info_box()
-
-    def update_info_box(self):
-        input_string = ''
-        input_number = ''
-
-        if self.input_genes:
-            input_string += '{} unique gene names on input.\n'.format(len(self.input_genes))
-            input_number += str(len(self.input_genes))
-            self.info.set_output_summary(
-                str(self.num_of_selected_genes), '{} genes on output.\n'.format(self.num_of_selected_genes)
-            )
-        else:
-            self.info.set_output_summary(self.info.NoOutput)
-
-        if self.gs_selection_component.data:
-            num_of_genes = self.gs_selection_component.num_of_genes
-            num_of_sets = self.gs_selection_component.num_of_custom_sets
-            input_number += f"{'' if input_number else '0'}|{num_of_genes}"
-            input_string += '{} marker genes in {} sets\n'.format(num_of_genes, num_of_sets)
-
-        if not input_number:
-            self.info.set_input_summary(self.info.NoInput)
-        else:
-            self.info.set_input_summary(input_number, input_string)
 
     def create_filters(self):
         search_term: List[str] = self.search_pattern.lower().strip().split()
