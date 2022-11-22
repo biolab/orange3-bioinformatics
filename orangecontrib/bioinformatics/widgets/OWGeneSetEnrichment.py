@@ -8,7 +8,7 @@ from AnyQt.QtGui import QColor, QStandardItem, QStandardItemModel
 from AnyQt.QtCore import Qt, QSize
 from AnyQt.QtWidgets import QTreeView, QHBoxLayout, QHeaderView
 
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, StringVariable, ContinuousVariable
 from Orange.data import filter as table_filter
 from Orange.widgets.gui import (
     LinkRole,
@@ -29,9 +29,15 @@ from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from orangecontrib.bioinformatics.geneset import GeneSets
 from orangecontrib.bioinformatics.ncbi.gene import GeneInfo
 from orangecontrib.bioinformatics.utils.statistics import FDR
-from orangecontrib.bioinformatics.widgets.utils.gui import FilterProxyModel, NumericalColumnDelegate
+from orangecontrib.bioinformatics.widgets.utils.gui import (
+    FilterProxyModel,
+    NumericalColumnDelegate,
+)
 from orangecontrib.bioinformatics.widgets.components import GeneSetSelection
-from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation, check_table_annotation
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TableAnnotation,
+    check_table_annotation,
+)
 
 
 class Results(SimpleNamespace):
@@ -39,7 +45,11 @@ class Results(SimpleNamespace):
 
 
 def run(
-    gene_sets: GeneSets, selected_gene_sets: List[Tuple[str, ...]], genes, state: TaskState, reference_genes=None
+    gene_sets: GeneSets,
+    selected_gene_sets: List[Tuple[str, ...]],
+    genes,
+    state: TaskState,
+    reference_genes=None,
 ) -> Results:
     results = Results()
     items = []
@@ -65,7 +75,9 @@ def run(
             return results
 
         reference_genes = [] if reference_genes is None else reference_genes
-        enrichemnt_result = gene_set.set_enrichment(reference_genes, genes.intersection(reference_genes))
+        enrichemnt_result = gene_set.set_enrichment(
+            reference_genes, genes.intersection(reference_genes)
+        )
 
         if len(enrichemnt_result.query) > 0:
             category_column = QStandardItem()
@@ -80,7 +92,8 @@ def run(
             category_column.setData(", ".join(gene_set.hierarchy), Qt.DisplayRole)
             term_column.setData(gene_set.name, Qt.DisplayRole)
             term_column.setData(gene_set.name, Qt.ToolTipRole)
-            # there was some cases when link string was not empty string but not valid (e.g. "_")
+            # there were some cases when link string was not empty
+            # string but not valid (e.g. "_")
             if gene_set.link and urlparse(gene_set.link).scheme:
                 term_column.setData(gene_set.link, LinkRole)
                 term_column.setForeground(QColor(Qt.blue))
@@ -89,15 +102,21 @@ def run(
             count_column.setData(set(enrichemnt_result.query), Qt.UserRole)
 
             genes_column.setData(len(gene_set.genes), Qt.DisplayRole)
-            genes_column.setData(set(gene_set.genes), Qt.UserRole)  # store genes to get then on output on selection
+            genes_column.setData(
+                set(gene_set.genes), Qt.UserRole
+            )  # store genes to get then on output on selection
 
             ref_column.setData(len(enrichemnt_result.reference), Qt.DisplayRole)
 
             pval_column.setData(enrichemnt_result.p_value, Qt.DisplayRole)
             pval_column.setData(enrichemnt_result.p_value, Qt.ToolTipRole)
 
-            enrichment_column.setData(enrichemnt_result.enrichment_score, Qt.DisplayRole)
-            enrichment_column.setData(enrichemnt_result.enrichment_score, Qt.ToolTipRole)
+            enrichment_column.setData(
+                enrichemnt_result.enrichment_score, Qt.DisplayRole
+            )
+            enrichment_column.setData(
+                enrichemnt_result.enrichment_score, Qt.ToolTipRole
+            )
 
             items.append(
                 [
@@ -128,7 +147,16 @@ class Header(IntEnum):
 
     @staticmethod
     def labels():
-        return ['Count', 'Reference', 'p-Value', 'FDR', 'Enrichment', 'Genes In Set', 'Category', 'Term']
+        return [
+            'Count',
+            'Reference',
+            'p',
+            'FDR',
+            'Enrichment',
+            'Genes In Set',
+            'Category',
+            'Term',
+        ]
 
 
 class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
@@ -178,15 +206,22 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
 
     class Outputs:
         matched_genes = Output('Matched Genes', Table)
+        enrichment_report = Output('Enrichment Report', Table)
 
     class Warning(OWWidget.Warning):
         all_sets_filtered = Msg('All sets were filtered out.')
 
     class Error(OWWidget.Error):
-        organism_mismatch = Msg('Organism in input data and custom gene sets does not match')
+        organism_mismatch = Msg(
+            'Organism in input data and custom gene sets does not match'
+        )
         cant_reach_host = Msg('Host orange.biolab.si is unreachable.')
-        cant_load_organisms = Msg('No available organisms, please check your connection.')
-        custom_gene_sets_table_format = Msg('Custom gene sets data must have genes represented as rows.')
+        cant_load_organisms = Msg(
+            'No available organisms, please check your connection.'
+        )
+        custom_gene_sets_table_format = Msg(
+            'Custom gene sets data must have genes represented as rows.'
+        )
 
     def __init__(self):
         super().__init__()
@@ -196,14 +231,19 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
         # Control area
         box = vBox(self.controlArea, True, margin=0)
         self.gs_selection_component: GeneSetSelection = GeneSetSelection(self, box)
-        self.gs_selection_component.selection_changed.connect(self._on_selection_changed)
+        self.gs_selection_component.selection_changed.connect(
+            self._on_selection_changed
+        )
 
         self.reference_radio_box = radioButtonsInBox(
             self.controlArea,
             self,
             'use_reference_data',
             ['Entire genome', 'Reference gene set (input)'],
-            tooltips=['Use entire genome (for gene set enrichment)', 'Use reference set of genes'],
+            tooltips=[
+                'Use entire genome (for gene set enrichment)',
+                'Use reference set of genes',
+            ],
             box='Reference',
             callback=self._on_selection_changed,
         )
@@ -221,13 +261,27 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
         self.tree_view.setSelectionMode(QTreeView.ExtendedSelection)
         self.tree_view.setEditTriggers(QTreeView.NoEditTriggers)
         self.tree_view.viewport().setMouseTracking(True)
-        self.tree_view.setItemDelegateForColumn(Header.term, LinkStyledItemDelegate(self.tree_view))
-        self.tree_view.setItemDelegateForColumn(Header.genes, NumericalColumnDelegate(self))
-        self.tree_view.setItemDelegateForColumn(Header.count, NumericalColumnDelegate(self))
-        self.tree_view.setItemDelegateForColumn(Header.p_val, NumericalColumnDelegate(self, precision=2, notation='e'))
-        self.tree_view.setItemDelegateForColumn(Header.fdr, NumericalColumnDelegate(self, precision=2, notation='e'))
-        self.tree_view.setItemDelegateForColumn(Header.enrichment, NumericalColumnDelegate(self, precision=1))
-        self.tree_view.setItemDelegateForColumn(Header.reference, NumericalColumnDelegate(self))
+        self.tree_view.setItemDelegateForColumn(
+            Header.term, LinkStyledItemDelegate(self.tree_view)
+        )
+        self.tree_view.setItemDelegateForColumn(
+            Header.genes, NumericalColumnDelegate(self)
+        )
+        self.tree_view.setItemDelegateForColumn(
+            Header.count, NumericalColumnDelegate(self)
+        )
+        self.tree_view.setItemDelegateForColumn(
+            Header.p_val, NumericalColumnDelegate(self, precision=2, notation='e')
+        )
+        self.tree_view.setItemDelegateForColumn(
+            Header.fdr, NumericalColumnDelegate(self, precision=2, notation='e')
+        )
+        self.tree_view.setItemDelegateForColumn(
+            Header.enrichment, NumericalColumnDelegate(self, precision=1)
+        )
+        self.tree_view.setItemDelegateForColumn(
+            Header.reference, NumericalColumnDelegate(self)
+        )
         self.tree_view.setModel(self.filter_proxy_model)
 
         h_layout = QHBoxLayout()
@@ -285,7 +339,9 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
         self.mainArea.layout().addWidget(self.tree_view)
         self.tree_view.header().setSectionResizeMode(QHeaderView.ResizeToContents)
 
-        self.commit_button = auto_commit(self.controlArea, self, 'auto_commit', '&Commit', box=False)
+        self.commit_button = auto_commit(
+            self.controlArea, self, 'auto_commit', '&Commit', box=False
+        )
 
         self.input_data: Optional[Table] = None
         self.num_of_selected_genes: int = 0
@@ -318,10 +374,13 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
 
         if self.gene_as_attr_name:
             return {
-                str(variable.attributes.get(self.gene_location, '?')) for variable in self.input_data.domain.attributes
+                str(variable.attributes.get(self.gene_location, '?'))
+                for variable in self.input_data.domain.attributes
             }
         else:
-            return {str(g) for g in self.input_data.get_column_view(self.gene_location)[0]}
+            return {
+                str(g) for g in self.input_data.get_column_view(self.gene_location)[0]
+            }
 
     def get_data_from_source_model(self, proxy_row_index, column):
         proxy_index = self.filter_proxy_model.index(proxy_row_index, column)
@@ -334,7 +393,10 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
 
         if model is not None:
             assert isinstance(model, QStandardItemModel)
-            p_values = [(i, self.get_data_from_source_model(i, Header.p_val)) for i in range(proxy.rowCount())]
+            p_values = [
+                (i, self.get_data_from_source_model(i, Header.p_val))
+                for i in range(proxy.rowCount())
+            ]
             fdr_values = FDR([p_val for _, p_val in p_values])
 
             for i, fdr_val in zip([i for i, _ in p_values], fdr_values):
@@ -346,6 +408,29 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
 
     def on_partial_result(self, _):
         pass
+
+    def prepare_enrichment_report(self) -> Table:
+        model = self.filter_proxy_model.sourceModel()
+
+        data = []
+        for index in range(model.rowCount()):
+            p_val = model.item(index, Header.p_val).data(role=Qt.DisplayRole)
+            fdr = model.item(index, Header.fdr).data(role=Qt.DisplayRole)
+            enrichment = model.item(index, Header.enrichment).data(role=Qt.DisplayRole)
+            term = model.item(index, Header.term).data(role=Qt.DisplayRole)
+            category = model.item(index, Header.category).data(role=Qt.DisplayRole)
+            data.append([category, term, enrichment, p_val, fdr])
+
+        str_vars = [
+            StringVariable(Header.labels()[index])
+            for index in [Header.category, Header.term]
+        ]
+        continuous_vars = [
+            ContinuousVariable(Header.labels()[index])
+            for index in [Header.enrichment, Header.p_val, Header.fdr]
+        ]
+        domain = Domain(attributes=[], metas=str_vars + continuous_vars)
+        return Table.from_list(domain=domain, rows=data)
 
     def on_done(self, result: Results):
         model = QStandardItemModel()
@@ -359,8 +444,9 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
         self.filter_proxy_model.reset_filters()
         self._update_fdr()
         self.filter_view()
-        self.update_info_box()
         self.tree_view.selectionModel().selectionChanged.connect(self.commit)
+
+        self.Outputs.enrichment_report.send(self.prepare_enrichment_report())
 
     def on_exception(self, ex):
         # TODO: handle possible exceptions
@@ -396,8 +482,6 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
             self.gene_info = GeneInfo(self.tax_id)
             self.gs_selection_component.initialize(self.tax_id)
 
-        self.update_info_box()
-
     @Inputs.custom_gene_sets
     def handle_custom_gene_sets_input(self, custom_data):
         self.Outputs.matched_genes.send(None)
@@ -406,8 +490,6 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
             self.gs_selection_component.initialize_custom_gene_sets(custom_data)
         else:
             self.gs_selection_component.initialize_custom_gene_sets(None)
-
-        self.update_info_box()
 
     @Inputs.reference
     @check_table_annotation
@@ -421,10 +503,16 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
             if attrs[TableAnnotation.gene_as_attr_name]:
                 for variable in input_data.domain.attributes:
                     self.reference_genes.append(
-                        str(variable.attributes.get(attrs[TableAnnotation.gene_id_attribute], '?'))
+                        str(
+                            variable.attributes.get(
+                                attrs[TableAnnotation.gene_id_attribute], '?'
+                            )
+                        )
                     )
             else:
-                genes, _ = self.reference_data.get_column_view(attrs[TableAnnotation.gene_id_column])
+                genes, _ = self.reference_data.get_column_view(
+                    attrs[TableAnnotation.gene_id_column]
+                )
                 self.reference_genes = [str(g) for g in genes]
 
         self._on_selection_changed()
@@ -435,7 +523,9 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
 
         if selection_model:
             selection = selection_model.selectedRows(Header.count)
-            self.selected_rows = [self.filter_proxy_model.mapToSource(sel).row() for sel in selection]
+            self.selected_rows = [
+                self.filter_proxy_model.mapToSource(sel).row() for sel in selection
+            ]
 
             if selection and self.input_genes:
                 genes = [model_index.data(Qt.UserRole) for model_index in selection]
@@ -450,63 +540,53 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
                         and str(column.attributes[self.gene_location]) in output_genes
                     ]
 
-                    domain = Domain(selected, self.input_data.domain.class_vars, self.input_data.domain.metas)
+                    domain = Domain(
+                        selected,
+                        self.input_data.domain.class_vars,
+                        self.input_data.domain.metas,
+                    )
                     new_data = self.input_data.from_table(domain, self.input_data)
                     self.Outputs.matched_genes.send(new_data)
                 else:
                     # create filter from selected column for genes
-                    only_known = table_filter.FilterStringList(self.gene_location, output_genes)
+                    only_known = table_filter.FilterStringList(
+                        self.gene_location, output_genes
+                    )
                     # apply filter to the data
                     data_table = table_filter.Values([only_known])(self.input_data)
                     self.Outputs.matched_genes.send(data_table)
-
-        self.update_info_box()
-
-    def update_info_box(self):
-        input_string = ''
-        input_number = ''
-
-        if self.input_genes:
-            input_string += '{} unique gene names on input.\n'.format(len(self.input_genes))
-            input_number += str(len(self.input_genes))
-            self.info.set_output_summary(
-                str(self.num_of_selected_genes), '{} genes on output.\n'.format(self.num_of_selected_genes)
-            )
-        else:
-            self.info.set_output_summary(self.info.NoOutput)
-
-        if self.gs_selection_component.data:
-            num_of_genes = self.gs_selection_component.num_of_genes
-            num_of_sets = self.gs_selection_component.num_of_custom_sets
-            input_number += f"{'' if input_number else '0'}|{num_of_genes}"
-            input_string += '{} marker genes in {} sets\n'.format(num_of_genes, num_of_sets)
-
-        if not input_number:
-            self.info.set_input_summary(self.info.NoInput)
-        else:
-            self.info.set_input_summary(input_number, input_string)
 
     def create_filters(self):
         search_term: List[str] = self.search_pattern.lower().strip().split()
 
         filters = [
             FilterProxyModel.Filter(
-                Header.term, Qt.DisplayRole, lambda value: all(fs in value.lower() for fs in search_term)
+                Header.term,
+                Qt.DisplayRole,
+                lambda value: all(fs in value.lower() for fs in search_term),
             )
         ]
 
         if self.use_min_count:
             filters.append(
-                FilterProxyModel.Filter(Header.count, Qt.DisplayRole, lambda value: value >= self.min_count)
+                FilterProxyModel.Filter(
+                    Header.count, Qt.DisplayRole, lambda value: value >= self.min_count
+                )
             )
 
         if self.use_p_value:
             filters.append(
-                FilterProxyModel.Filter(Header.p_val, Qt.DisplayRole, lambda value: value < self.max_p_value)
+                FilterProxyModel.Filter(
+                    Header.p_val, Qt.DisplayRole, lambda value: value < self.max_p_value
+                )
             )
 
         if self.use_max_fdr:
-            filters.append(FilterProxyModel.Filter(Header.fdr, Qt.DisplayRole, lambda value: value < self.max_fdr))
+            filters.append(
+                FilterProxyModel.Filter(
+                    Header.fdr, Qt.DisplayRole, lambda value: value < self.max_fdr
+                )
+            )
 
         return filters
 
