@@ -505,6 +505,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         return table
 
+    @gui.deferred
     def commit(self):
         self.Warning.no_data_objects.clear()
         self.cancel()
@@ -512,14 +513,14 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     def on_output_option_changed(self):
         self.data_table = None
-        self.commit()
+        self.commit.deferred()
 
     def on_clinical_data_changed(self):
         self.clinical_metadata = self.fetch_clinical_metadata()
-        self.commit()
+        self.commit.deferred()
 
     def on_normalization_changed(self):
-        self.commit()
+        self.commit.deferred()
 
     def on_selection_changed(self):
         self.__invalidate()
