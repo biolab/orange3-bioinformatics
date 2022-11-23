@@ -437,7 +437,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
                     url=resolwe.resapi.DEFAULT_URL, server_type=resolwe.RESOLWE_PLATFORM
                 )
 
-        if not silent and dialog.exec_():
+        if not silent and dialog.exec():
             self.res = dialog.resolwe_instance
 
     def sign_out(self):
