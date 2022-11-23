@@ -16,7 +16,7 @@ from AnyQt.QtWidgets import QTableView, QHeaderView, QAbstractItemView
 from Orange.data import Table, Domain, ContinuousVariable
 from Orange.util import wrap_callback
 from Orange.widgets import gui, widget, settings
-from Orange.widgets.widget import Msg, Output, StateInfo
+from Orange.widgets.widget import Msg, Output
 from Orange.data.pandas_compat import vars_from_df
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import PyTableModel
@@ -264,11 +264,6 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         # Cache clinical metadata
         self.clinical_metadata: Optional[Table] = None
 
-        # Control area
-        self.info_box = gui.widgetLabel(
-            gui.widgetBox(self.controlArea, "Info", margin=3), 'No data on output.'
-        )
-
         self.exp_type_combo = gui.comboBox(
             self.controlArea,
             self,
@@ -377,8 +372,6 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
         self.Warning.multiple_feature_type.clear()
         self.Warning.unexpected_feature_type.clear()
         self.Warning.no_data_objects.clear()
-        self.info.set_output_summary(StateInfo.NoOutput)
-        self.update_info_box()
 
     def update_user_status(self):
         user = self.res.get_currently_logged_user()
@@ -400,30 +393,6 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
         self.user_info.setText(user_info)
         self.server_info.setText(f'Server: {self.res.url[8:]}')
-
-    def update_info_box(self):
-        if self.data_table:
-            total_genes = len(self.data_table.domain.attributes)
-            known_genes = len(
-                [
-                    col
-                    for col in self.data_table.domain.attributes
-                    if len(col.attributes)
-                ]
-            )
-
-            info_text = (
-                '{} genes on output\n'
-                '{} genes match Entrez database\n'
-                '{} genes with match conflicts\n'.format(
-                    total_genes, known_genes, total_genes - known_genes
-                )
-            )
-
-        else:
-            info_text = 'No data on output.'
-
-        self.info_box.setText(info_text)
 
     def sign_in(self, silent=False):
         dialog = SignIn(self, server_type=resolwe.RESOLWE_PLATFORM)
@@ -614,9 +583,6 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
 
     def on_done(self, table: Table):
         if table:
-            samples, genes = table.X.shape
-            self.info.set_output_summary(f'Samples: {samples} Genes: {genes}')
-            self.update_info_box()
             self.Outputs.table.send(table)
 
     def on_exception(self, ex):
