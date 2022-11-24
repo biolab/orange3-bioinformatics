@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [4.6.0] - 2022-11-24
+### Changed
+- [#311](https://github.com/biolab/orange3-bioinformatics/pull/311):  Add QC data to Genialis Expression widget
+- [#322](https://github.com/biolab/orange3-bioinformatics/pull/322):  (OWGeneSetEnrichment) Export gene sets enrichment report
+- [#311](https://github.com/biolab/orange3-bioinformatics/pull/311):  Add QC data to Genialis Expression widget
+- 
+### Fixed
+- [#308](https://github.com/biolab/orange3-bioinformatics/pull/308):  Annotate Projection: Fix commit invoke
+- [#313](https://github.com/biolab/orange3-bioinformatics/pull/313):  Fix compatibility with Python 3.10
+- [#314](https://github.com/biolab/orange3-bioinformatics/pull/314):  Replace colorpalette and other necessary fixes
+- [#316](https://github.com/biolab/orange3-bioinformatics/pull/316):  kegg: Fix kegg.from_taxid mapping due to change in api search results
+- [#320](https://github.com/biolab/orange3-bioinformatics/pull/320):  QtCore.Qt.ItemIsTristate is deprecated. Use ItemIsUserTristate instead
+- [#323](https://github.com/biolab/orange3-bioinformatics/pull/323):  (OWGenialisExpressions) fix sign in dialog, remove info box, use defered commit
+
+
 ## [4.5.0] - 2021-10-07
 
 ### Changed
