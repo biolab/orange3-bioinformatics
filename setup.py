@@ -16,6 +16,7 @@ if __name__ == '__main__':
             'serverfiles',
             'resdk>=13.8.0',
             'genesis-pyapi',
+            'single_sample_gsea>=0.2.0',
             # Versions are determined by Orange
             'numpy',
         ],
