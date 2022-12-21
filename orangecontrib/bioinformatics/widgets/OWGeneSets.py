@@ -7,7 +7,15 @@ from AnyQt.QtWidgets import QTableView, QHBoxLayout
 
 from Orange.data import Table, Domain
 from Orange.data import filter as table_filter
-from Orange.widgets.gui import LinkRole, spin, vBox, lineEdit, widgetBox, auto_commit
+from Orange.widgets.gui import (
+    LinkRole,
+    spin,
+    vBox,
+    deferred,
+    lineEdit,
+    widgetBox,
+    auto_commit,
+)
 from Orange.widgets.widget import Msg, OWWidget
 from Orange.widgets.settings import Setting, SettingProvider
 from Orange.widgets.utils.signals import Input, Output
@@ -125,7 +133,7 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
     use_min_count = Setting(False)
 
     auto_commit: bool
-    auto_commit = Setting(False)
+    auto_commit = Setting(True)
 
     search_pattern: str
     search_pattern = Setting('')
@@ -259,7 +267,7 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
         self.view.resizeColumnsToContents()
         # this is slow
         # self.view.resizeRowsToContents()
-        self.view.selectionModel().selectionChanged.connect(self.commit)
+        self.view.selectionModel().selectionChanged.connect(self.commit.deferred)
         self.filter_view()
 
     def on_exception(self, ex):
@@ -301,6 +309,7 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
         else:
             self.gs_selection_component.initialize_custom_gene_sets(None)
 
+    @deferred
     def commit(self):
         selection_model = self.view.selectionModel()
         gene_sets = None
@@ -350,8 +359,8 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
                     # apply filter to the data
                     reduced_data = table_filter.Values([only_known])(self.input_data)
 
-            self.Outputs.gene_sets.send(gene_sets)
-            self.Outputs.reduced_data.send(reduced_data)
+        self.Outputs.gene_sets.send(gene_sets)
+        self.Outputs.reduced_data.send(reduced_data)
 
     def create_filters(self):
         search_term: List[str] = self.search_pattern.lower().strip().split()
