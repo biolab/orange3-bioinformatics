@@ -1,5 +1,4 @@
 """ GUI utils for widgets """
-from typing import Sequence
 from numbers import Real, Integral
 from collections import namedtuple
 
@@ -74,8 +73,6 @@ class FilterProxyModel(QSortFilterProxyModel):
         self.invalidateFilter()
 
     def set_filters(self, filters):
-        # type: (Sequence[FilterProxyModel.Filter]) -> None
-
         filters = [
             FilterProxyModel.Filter(f.column, f.role, f.predicate) for f in filters
         ]
