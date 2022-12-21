@@ -5,7 +5,13 @@ from collections import namedtuple
 
 from AnyQt.QtGui import QTextDocument, QAbstractTextDocumentLayout
 from AnyQt.QtCore import Qt, QSize, QSortFilterProxyModel
-from AnyQt.QtWidgets import QFrame, QStyle, QApplication, QStyledItemDelegate, QStyleOptionViewItem
+from AnyQt.QtWidgets import (
+    QFrame,
+    QStyle,
+    QApplication,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+)
 
 from .gene_sets import GeneSetsSelection
 from .gene_scoring import GeneScoringWidget, gene_scoring_method
@@ -60,6 +66,9 @@ class FilterProxyModel(QSortFilterProxyModel):
         super().__init__(*args, **kwargs)
         self.__filters = []
 
+    def sort(self, *args, **kwargs):
+        return self.sourceModel().sort(*args, **kwargs)
+
     def reset_filters(self):
         self.__filters = []
         self.invalidateFilter()
@@ -67,7 +76,9 @@ class FilterProxyModel(QSortFilterProxyModel):
     def set_filters(self, filters):
         # type: (Sequence[FilterProxyModel.Filter]) -> None
 
-        filters = [FilterProxyModel.Filter(f.column, f.role, f.predicate) for f in filters]
+        filters = [
+            FilterProxyModel.Filter(f.column, f.role, f.predicate) for f in filters
+        ]
         self.__filters = filters
         self.invalidateFilter()
 
@@ -134,7 +145,9 @@ class HTMLDelegate(QStyledItemDelegate):
         row_obj = index.data(Qt.DisplayRole)
         self.initStyleOption(options, index)
         # print(option.rect.width())
-        style = QApplication.style() if options.widget is None else options.widget.style()
+        style = (
+            QApplication.style() if options.widget is None else options.widget.style()
+        )
 
         doc = QTextDocument()
         doc.setHtml(row_obj.to_html())
