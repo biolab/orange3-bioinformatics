@@ -6,14 +6,13 @@ from collections import defaultdict
 
 import requests
 
-from AnyQt.QtCore import Qt, QModelIndex
+from AnyQt.QtCore import Qt
 from AnyQt.QtWidgets import (
     QSplitter,
     QTreeWidget,
     QTreeWidgetItem,
     QAbstractItemView,
     QAbstractScrollArea,
-    QStyleOptionViewItem,
 )
 
 from orangewidget.utils.itemdelegates import DataDelegate
@@ -22,7 +21,6 @@ from Orange.data import Table
 from Orange.widgets.gui import (
     LinkRole,
     IndicatorItemDelegate,
-    LinkStyledItemDelegate,
     rubber,
     lineEdit,
     separator,
@@ -41,6 +39,7 @@ from orangecontrib.bioinformatics.geo import is_cached, pubmed_url, local_files
 from orangecontrib.bioinformatics.geo.dataset import GDSInfo, get_samples, dataset_download
 from orangecontrib.bioinformatics.widgets.utils.gui import FilterProxyModel
 from orangecontrib.bioinformatics.widgets.utils.itemmodels import TableModel
+from orangecontrib.bioinformatics.widgets.utils.itemdelegates import LinkStyledItemDelegate
 
 
 class Result(SimpleNamespace):
@@ -175,17 +174,6 @@ class GEODatasetsModel(TableModel):
 
     def update_cache_indicator(self):
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 0))
-
-
-class LinkStyledItemDelegate(LinkStyledItemDelegate):
-    def initStyleOption(self, option: QStyleOptionViewItem, index: QModelIndex) -> None:
-        super().initStyleOption(option, index)
-        if index.data(LinkRole) is not None:
-            option.font.setUnderline(True)
-
-    def paint(self, painter, option, index):
-        self.initStyleOption(option, index)
-        super().paint(painter, option, index)
 
 
 class FilterProxyModel(FilterProxyModel):
