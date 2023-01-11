@@ -6,14 +6,13 @@ from collections import defaultdict
 
 import requests
 
-from AnyQt.QtCore import Qt, QModelIndex
+from AnyQt.QtCore import Qt
 from AnyQt.QtWidgets import (
     QSplitter,
     QTreeWidget,
     QTreeWidgetItem,
     QAbstractItemView,
     QAbstractScrollArea,
-    QStyleOptionViewItem,
 )
 
 from orangewidget.utils.itemdelegates import DataDelegate
@@ -22,7 +21,6 @@ from Orange.data import Table
 from Orange.widgets.gui import (
     LinkRole,
     IndicatorItemDelegate,
-    LinkStyledItemDelegate,
     rubber,
     lineEdit,
     separator,
@@ -38,16 +36,25 @@ from Orange.widgets.utils.tableview import TableView
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 
 from orangecontrib.bioinformatics.geo import is_cached, pubmed_url, local_files
-from orangecontrib.bioinformatics.geo.dataset import GDSInfo, get_samples, dataset_download
+from orangecontrib.bioinformatics.geo.dataset import (
+    GDSInfo,
+    get_samples,
+    dataset_download,
+)
 from orangecontrib.bioinformatics.widgets.utils.gui import FilterProxyModel
 from orangecontrib.bioinformatics.widgets.utils.itemmodels import TableModel
+from orangecontrib.bioinformatics.widgets.utils.itemdelegates import (
+    LinkStyledItemDelegate,
+)
 
 
 class Result(SimpleNamespace):
     gds_dataset: Optional[Table] = None
 
 
-def run_download_task(gds_id: str, samples: DefaultDict[str, list], transpose: bool, state: TaskState):
+def run_download_task(
+    gds_id: str, samples: DefaultDict[str, list], transpose: bool, state: TaskState
+):
     res = Result()
     current_iter = 0
     max_iter = 102
@@ -58,7 +65,9 @@ def run_download_task(gds_id: str, samples: DefaultDict[str, list], transpose: b
         state.set_progress_value(100 * (current_iter / max_iter))
 
     state.set_status("Downloading...")
-    res.gds_dataset = dataset_download(gds_id, samples, transpose=transpose, callback=callback)
+    res.gds_dataset = dataset_download(
+        gds_id, samples, transpose=transpose, callback=callback
+    )
     return res
 
 
@@ -99,7 +108,9 @@ class GEODatasetsModel(TableModel):
             TableModel.Column(
                 title(""),
                 {
-                    Qt.DisplayRole: lambda row: " " if is_cached(items[row]["name"]) else "",
+                    Qt.DisplayRole: lambda row: " "
+                    if is_cached(items[row]["name"])
+                    else "",
                     Qt.UserRole: lambda row: items[row],
                 },
             ),
@@ -177,17 +188,6 @@ class GEODatasetsModel(TableModel):
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 0))
 
 
-class LinkStyledItemDelegate(LinkStyledItemDelegate):
-    def initStyleOption(self, option: QStyleOptionViewItem, index: QModelIndex) -> None:
-        super().initStyleOption(option, index)
-        if index.data(LinkRole) is not None:
-            option.font.setUnderline(True)
-
-    def paint(self, painter, option, index):
-        self.initStyleOption(option, index)
-        super().paint(painter, option, index)
-
-
 class FilterProxyModel(FilterProxyModel):
     def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder) -> None:
         """
@@ -248,7 +248,13 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.infoBox = widgetLabel(box, 'Initializing\n\n')
 
         box = widgetBox(self.controlArea, 'Output', addSpace=True)
-        radioButtonsInBox(box, self, 'genes_as_rows', ['Samples in rows', 'Genes in rows'], callback=self._run)
+        radioButtonsInBox(
+            box,
+            self,
+            'genes_as_rows',
+            ['Samples in rows', 'Genes in rows'],
+            callback=self._run,
+        )
         separator(box)
 
         rubber(self.controlArea)
@@ -258,7 +264,12 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
         # Filter widget
         self.filter = lineEdit(
-            self.mainArea, self, 'search_pattern', 'Filter:', callbackOnType=True, callback=self._apply_filter
+            self.mainArea,
+            self,
+            'search_pattern',
+            'Filter:',
+            callbackOnType=True,
+            callback=self._apply_filter,
         )
         self.mainArea.layout().addWidget(self.filter)
 
@@ -293,9 +304,12 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.table_view.setItemDelegateForColumn(
             self.table_model.pubmed_id_col, LinkStyledItemDelegate(self.table_view)
         )
-        self.table_view.setItemDelegateForColumn(self.table_model.gds_id_col, LinkStyledItemDelegate(self.table_view))
         self.table_view.setItemDelegateForColumn(
-            self.table_model.indicator_col, IndicatorItemDelegate(self.table_view, role=Qt.DisplayRole)
+            self.table_model.gds_id_col, LinkStyledItemDelegate(self.table_view)
+        )
+        self.table_view.setItemDelegateForColumn(
+            self.table_model.indicator_col,
+            IndicatorItemDelegate(self.table_view, role=Qt.DisplayRole),
         )
 
         splitter_horizontal = QSplitter(Qt.Horizontal, splitter_vertical)
@@ -309,18 +323,24 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         # Sample Annotations Widget
         box = widgetBox(splitter_horizontal, 'Sample Annotations')
         self.annotations_widget = QTreeWidget(box)
-        self.annotations_widget.setHeaderLabels(['Type (Sample annotations)', 'Sample count'])
+        self.annotations_widget.setHeaderLabels(
+            ['Type (Sample annotations)', 'Sample count']
+        )
         self.annotations_widget.setRootIsDecorated(True)
         box.layout().addWidget(self.annotations_widget)
         self._annotations_updating = False
-        self.annotations_widget.itemChanged.connect(self.on_annotation_selection_changed)
+        self.annotations_widget.itemChanged.connect(
+            self.on_annotation_selection_changed
+        )
         self.splitters = splitter_vertical, splitter_horizontal
 
         for sp, setting in zip(self.splitters, self.splitter_settings):
             sp.splitterMoved.connect(self._splitter_moved)
             sp.restoreState(setting)
 
-        self.table_view.selectionModel().selectionChanged.connect(self.__on_selection_changed)
+        self.table_view.selectionModel().selectionChanged.connect(
+            self.__on_selection_changed
+        )
         self._apply_filter()
 
         self.commit()
@@ -329,7 +349,9 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.splitter_settings = [bytes(sp.saveState()) for sp in self.splitters]
 
     def _set_description_widget(self):
-        self.description_widget.setText(self.selected_gds.get('description', 'Description not available.'))
+        self.description_widget.setText(
+            self.selected_gds.get('description', 'Description not available.')
+        )
 
     def _set_annotations_widget(self, gds):
         self._annotations_updating = True
@@ -379,7 +401,9 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
     def _handle_selection_changed(self):
         if self.table_model is not None:
-            selection = self.table_view.selectionModel().selectedRows(self.table_model.gds_id_col)
+            selection = self.table_view.selectionModel().selectedRows(
+                self.table_model.gds_id_col
+            )
             selected_gds_name = selection[0].data() if len(selection) > 0 else None
 
             if selected_gds_name:
@@ -410,7 +434,13 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         selmodel.selectionChanged.connect(current_changed)
         try:
             self.__updating_filter = True
-            self.proxy_model.set_filters([FilterProxyModel.Filter(self.table_model.gds_id_col, Qt.UserRole, filter)])
+            self.proxy_model.set_filters(
+                [
+                    FilterProxyModel.Filter(
+                        self.table_model.gds_id_col, Qt.UserRole, filter
+                    )
+                ]
+            )
             if changed:
                 self.table_view.clearSelection()
                 self._handle_selection_changed()
@@ -425,7 +455,10 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         if self.selected_gds is not None:
             self.gds_data = None
             self.start(
-                run_download_task, self.selected_gds.get('name'), self.get_selected_samples(), self.genes_as_rows
+                run_download_task,
+                self.selected_gds.get('name'),
+                self.get_selected_samples(),
+                self.genes_as_rows,
             )
 
     def __on_selection_changed(self):
@@ -452,7 +485,9 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
     def update_info(self):
         all_gds = len(self.table_model.info)
-        text = "{} datasets\n{} datasets cached\n".format(all_gds, len(local_files.listfiles()))
+        text = "{} datasets\n{} datasets cached\n".format(
+            all_gds, len(local_files.listfiles())
+        )
         filtered = self.table_view.model().rowCount()
         if all_gds != filtered:
             text += "{} after filtering".format(filtered)
@@ -544,12 +579,16 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.report_name("Sample annotations")
         subsets = defaultdict(list)
         for subset in self.selected_gds['subsets']:
-            subsets[subset['type']].append((subset['description'], len(subset['sample_id'])))
+            subsets[subset['type']].append(
+                (subset['description'], len(subset['sample_id']))
+            )
         self.report_html += "<ul>"
         for _type in subsets:
             self.report_html += "<b>" + _type + ":</b></br>"
             for desc, count in subsets[_type]:
-                self.report_html += 9 * "&nbsp" + "<b>{}:</b> {}</br>".format(desc, count)
+                self.report_html += 9 * "&nbsp" + "<b>{}:</b> {}</br>".format(
+                    desc, count
+                )
         self.report_html += "</ul>"
 
 

@@ -1,11 +1,16 @@
 import os
-from unittest.mock import Mock
+
+from AnyQt.QtCore import (  # , QItemSelectionRange, QItemSelection
+    Qt,
+    QItemSelectionModel,
+)
 
 from orangewidget.tests.base import WidgetTest
 
 from Orange.data import Table, Domain, StringVariable
 
-from orangecontrib.bioinformatics.widgets.OWGeneSets import OWGeneSets
+# from orangecontrib.bioinformatics.geneset import GeneSets
+from orangecontrib.bioinformatics.widgets.OWGeneSets import OWGeneSets, GeneSetsModel
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
 
@@ -15,33 +20,55 @@ class TestOWGeneSets(WidgetTest):
         self.widget = self.create_widget(OWGeneSets)
 
         domain = Domain([], metas=[StringVariable('name'), StringVariable('Entrez ID')])
-        self.data = Table.from_list(domain, [['CA1', '759'], ['CA2', '760'], ['CA3', '761']])
+        self.data = Table.from_list(
+            domain, [['CA1', '759'], ['CA2', '760'], ['CA3', '761']]
+        )
         self.data.attributes[TableAnnotation.tax_id] = '9606'
         self.data.attributes[TableAnnotation.gene_as_attr_name] = False
         self.data.attributes[TableAnnotation.gene_id_column] = 'Entrez ID'
 
-    def test_input_info(self):
-        input_sum = self.widget.info.set_input_summary = Mock()
+    def test_gene_sets_loaded(self):
+        self.wait_until_finished()
+        self.assertTrue(self.widget.filter_proxy_model.sourceModel().rowCount())
+        self.assertTrue(self.widget.filter_proxy_model.sourceModel().columnCount())
 
+    # TODO: return to this test later.
+    # on CI this test fails consistently on linux and sometimes for macOS platform,
+    # while on windows runs without issues.
+    # When running tests locally there is no problem (macOS)
+    # def test_gene_set_selection(self):
+    #     selection = QItemSelection()
+    #
+    #     selection.append(
+    #         QItemSelectionRange(
+    #             self.widget.view.model().index(0, 0),
+    #             self.widget.view.model().index(1, 0),
+    #         )
+    #     )
+    #
+    #     selection_model = self.widget.view.selectionModel()
+    #     selection_flags = QItemSelectionModel.Select | QItemSelectionModel.Rows
+    #     selection_model.select(selection, selection_flags)
+    #
+    #     output = self.get_output(self.widget.Outputs.gene_sets)
+    #     self.assertIsInstance(output, GeneSets)
+    #     self.assertTrue(len(output) == 2)
+
+    def test_input_data(self):
         self.send_signal(self.widget.Inputs.data, self.data)
         self.wait_until_finished()
-        input_sum.assert_called_with("3", "3 unique gene names on input.\n")
 
-        self.send_signal(self.widget.Inputs.custom_gene_sets, self.data)
-        self.wait_until_finished()
-        input_sum.assert_called_with("3|3", "3 unique gene names on input.\n3 marker genes in 3 sets\n")
+        first_row = self.widget.view.model().index(0, 0)
+        tenth_row = self.widget.view.model().index(10, 0)
 
-        self.send_signal(self.widget.Inputs.data, None)
-        self.send_signal(self.widget.Inputs.custom_gene_sets, None)
-        self.wait_until_finished()
-        input_sum.assert_called_with(self.widget.info.NoInput)
+        selection_model = self.widget.view.selectionModel()
+        selection_flags = QItemSelectionModel.Select | QItemSelectionModel.Rows
+        selection_model.select(first_row, selection_flags)
+        selection_model.select(tenth_row, selection_flags)
 
-    def test_output_info(self):
-        output_sum = self.widget.info.set_output_summary = Mock()
+        selection = selection_model.selectedRows(column=GeneSetsModel.mapped_genes)
 
-        self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_finished()
-        output_sum.assert_called_with("0", "0 genes on output.\n")
-
-        self.send_signal(self.widget.Inputs.data, None)
-        output_sum.assert_called_with(self.widget.info.NoOutput)
+        # all genes from the data are found in first gene set
+        self.assertTrue(selection[0].data(Qt.DisplayRole))
+        # non genes map to 10th gene set
+        self.assertFalse(selection[1].data(Qt.DisplayRole))
