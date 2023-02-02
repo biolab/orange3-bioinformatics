@@ -56,7 +56,7 @@ def worker(data: Table, gene_sets, selected_method: int, state: TaskState):
 class OWSingleSampleScoring(OWWidget, ConcurrentWidgetMixin):
     name = 'Single sample scoring'
     description = 'Scoring gene sets by single sample.'
-    icon = ''
+    icon = 'icons/OWSingleSampleScoring.svg'
     priority = 150
     keywords = ['single sample scoring', 'gene sets', 'ssGSEA']
     want_main_area = False
