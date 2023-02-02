@@ -1,17 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generator: Adobe Illustrator 23.0.4, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+<!-- Generator: Adobe Illustrator 26.4.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 viewBox="0 0 48 48" style="enable-background:new 0 0 48 48;" xml:space="preserve">
 <style type="text/css">
 	.st0{fill:#333333;}
+	.st1{fill:#666666;}
+	.st2{fill:#B2B2B2;}
 </style>
-<g>
-	<rect x="4.4" y="19.1" class="st0" width="20.8" height="9.7"/>
-	<rect x="4.4" y="31.7" class="st0" width="12.1" height="9.7"/>
+<g id="Layer_1_copy">
+</g>
+<g id="Layer_1">
+	
+		<rect x="12.3" y="1.1" transform="matrix(5.992344e-11 1 -1 5.992344e-11 26.1664 -5.0995)" class="st0" width="6.6" height="18.9"/>
+	<rect x="33" y="5.1" transform="matrix(5.992344e-11 1 -1 5.992344e-11 46.8495 -25.7808)" class="st0" width="6.6" height="11"/>
+	
+		<rect x="27.1" y="6.1" transform="matrix(7.075567e-11 1 -1 7.075567e-11 38.3745 -17.3076)" class="st0" width="1.5" height="8.8"/>
+	
+		<rect x="41.1" y="6.1" transform="matrix(7.075567e-11 1 -1 7.075567e-11 52.3944 -31.2764)" class="st0" width="1.5" height="8.8"/>
+	<rect x="5.4" y="6.1" transform="matrix(7.193517e-11 1 -1 7.193517e-11 16.6582 4.295)" class="st0" width="1.5" height="8.8"/>
 	<g>
-		<rect x="4.4" y="6.6" class="st0" width="20.8" height="9.7"/>
-		<rect x="31.6" y="6.6" class="st0" width="12.1" height="9.7"/>
-		<rect x="22.8" y="10.1" class="st0" width="9.7" height="2.7"/>
+		
+			<rect x="29.1" y="16.5" transform="matrix(-1.049349e-10 1 -1 -1.049349e-10 58.3524 -6.4035)" class="st1" width="6.6" height="18.9"/>
+		
+			<rect x="8.4" y="20.5" transform="matrix(-1.049349e-10 1 -1 -1.049349e-10 37.6282 14.3207)" class="st1" width="6.6" height="11"/>
+	</g>
+	
+		<rect x="19.4" y="21.6" transform="matrix(-1.179263e-10 1 -1 -1.179263e-10 46.1504 5.7985)" class="st1" width="1.5" height="8.8"/>
+	<g>
+		
+			<rect x="12.3" y="28" transform="matrix(6.019878e-11 1 -1 6.019878e-11 53.0484 21.7825)" class="st2" width="6.6" height="18.9"/>
+		
+			<rect x="33.1" y="31.9" transform="matrix(5.992344e-11 1 -1 5.992344e-11 73.7726 1.0584)" class="st2" width="6.6" height="11"/>
+		<rect x="27.1" y="33" transform="matrix(7.075567e-11 1 -1 7.075567e-11 65.2565 9.5744)" class="st2" width="1.5" height="8.8"/>
 	</g>
 </g>
 </svg>
