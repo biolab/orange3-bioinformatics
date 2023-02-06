@@ -66,7 +66,7 @@ class OWSingleSampleScoring(OWWidget, ConcurrentWidgetMixin):
 
     class Inputs:
         data = Input('Data', Table)
-        gene_sets = Input('Gene Set', (Table, GeneSets))
+        gene_sets = Input('Gene Sets', (Table, GeneSets))
 
     class Outputs:
         data = Output('Data', Table)
