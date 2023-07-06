@@ -35,8 +35,8 @@ def etc_to_table(etc_json, transpose=False):
     variables = []
     time_point = 1
     for time in etc_json['etc']['timePoints']:
-        var = ContinuousVariable('TP ' + str(time_point))
-        var.attributes['Time'] = str(time)
+        var = ContinuousVariable(str(time))
+        var.attributes['Time point'] = str(time_point)
         variables.append(var)
         time_point += 1
 
@@ -54,7 +54,7 @@ def etc_to_table(etc_json, transpose=False):
         orange_table = Table.transpose(
             orange_table,
             feature_names_column=meta_attr.name,
-            meta_attr_name='Time Points',
+            meta_attr_name='Time',
             remove_redundant_inst=True,
         )
 
