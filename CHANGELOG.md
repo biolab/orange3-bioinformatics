@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.2] - 2023-07-06
+### Changed
+- [#335](https://github.com/biolab/orange3-bioinformatics/pull/335):  Time is now column name for Dicty express data
+- 
 ## [4.7.1] - 2023-02-06
 
 ## [4.7.0] - 2023-02-06
