@@ -16,8 +16,9 @@ databases.
 ![](images/dicty_express/dictyExpress-stamped.png)
 
 1. Log into the database to access personal files.
-2. Define the output. Genes from experiments can be either in rows or in columns. Press *Commit* to output the data and *Refresh* to update the list of experiments.
-3. List of available experiments. Use *Filter* to find a particular experiment.
+2. Define the output. Genes from experiments can be either in rows or in columns. To clear all locally cached dictyExpress data, press *Clear cache*.
+3. If *Commit Automatically* is ticked, results will be automatically sent to the output. Alternatively, press *Commit*.
+4. List of available experiments. Use *Filter* to find a particular experiment.
 
 Example
 -------
