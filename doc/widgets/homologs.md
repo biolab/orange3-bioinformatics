@@ -22,7 +22,7 @@ The **Homologs** widget finds homologs to genes in the input data set for the se
 Example
 -------
 
-From the **GEO Data Sets** widget we select the [GDS10](https://pubmed.ncbi.nlm.nih.gov/11827943/) data set for type 1 diabetes gene expression profiling in mice (*Mus musculus*). Next, we annotate the genes using the **Genes** widget. We then connect the **Genes** and **Homologs** widgets and select the organism of interest. The output of the **Homologs** widget is a list of homologs to the genes in the input data set. Next, we connect the **Homologs** widget to the **Data Table** widget. This allows us to efficiently inspect and work with information specifically related to homologous genes.
+From the **GEO Data Sets** widget we select the [GDS3132](https://pubmed.ncbi.nlm.nih.gov/17975176/) data set for neonatal lung response to cigarette smoke expression profiling in mice (*Mus musculus*). Next, we annotate the genes using the **Genes** widget. We then connect the **Genes** and **Differential Expression** widgets to inspect the differentially expressed genes. We select the top 100 genes and feed the data to **Homologs** widget and select the organism of interest, in our case *Homo Sapiens*. The output is a list of homologs to the genes in the input data set. Next, we connect the **Homologs** widget to the **Data Table** widget. This allows us to efficiently inspect and work with information specifically related to homologous genes.
 
 
 ![](images/homologs/Homologs-Example.png)
