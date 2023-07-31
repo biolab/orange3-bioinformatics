@@ -15,6 +15,7 @@ from serverfiles import LocalFiles, ServerFiles
 from Orange.data import Table, Domain, StringVariable, DiscreteVariable
 from Orange.data import filter as table_filter
 from Orange.misc.environ import data_dir
+from Orange.preprocess.transformation import MappingTransform
 
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
 
@@ -26,6 +27,7 @@ pubmed_url = 'http://www.ncbi.nlm.nih.gov/pubmed/{}'
 
 server_files = ServerFiles(server=_server_url)
 local_files = LocalFiles(_local_cache_path, serverfiles=server_files)
+LookupMappingTransform = MappingTransform
 
 
 def is_cached(gds_id):
@@ -73,19 +75,29 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
 
         column_values = []
         for meta_var in samples.keys():
-            column_values.append(table.get_column_view(table.domain[meta_var])[0])
+            column_values.append(table.get_column(table.domain[meta_var]))
 
         class_values = list(map('|'.join, zip(*column_values)))
 
         _class_values = list(set(class_values))
+        new_meta_tuple = (table.domain.metas[0],)
         map_class_values = {value: key for (key, value) in enumerate(_class_values)}
         class_var = DiscreteVariable(name='class', values=_class_values)
-        _domain = Domain(table.domain.attributes, table.domain.class_vars + (class_var,), table.domain.metas)
+        for i in range(len(column_values)):
+            data = column_values[i]
+            values = tuple(set(data))
+            mapping = {v: float(i) for i, v in enumerate(values)}
+            var = table.domain.metas[i+1]
+            tr = LookupMappingTransform(var, mapping)
+            rvar = DiscreteVariable(
+                name=var.name, values=values, compute_value=tr
+            )
+            new_meta_tuple += (rvar,)
+        _domain = Domain(table.domain.attributes, table.domain.class_vars + (class_var,), new_meta_tuple)
 
         table = table.transform(_domain)
         with table.unlocked(table.Y):
-            col, _ = table.get_column_view(class_var)
-            col[:] = [map_class_values[class_val] for class_val in class_values]
+            table.set_column(class_var, [map_class_values[class_val] for class_val in class_values])
 
     if transpose:
         table = Table.transpose(table, feature_names_column='sample_id', meta_attr_name='genes')
@@ -94,7 +106,7 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
         # We need to convert from Continuous to StringVariable
         _genes = [
             [str(int(gene)) if not np.isnan(gene) else '?']
-            for gene in table.get_column_view('Entrez ID')[0].astype(np.float64)
+            for gene in table.get_column('Entrez ID').astype(np.float64)
         ]
         new_var = StringVariable('Entrez ID')
         metas = [var for var in table.domain.metas if var.name != 'Entrez ID'] + [new_var]
