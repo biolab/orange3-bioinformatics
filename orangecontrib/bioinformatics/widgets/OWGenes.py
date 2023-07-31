@@ -7,7 +7,13 @@ import numpy as np
 
 from AnyQt.QtGui import QFont, QColor
 from AnyQt.QtCore import Qt, QSize, QTimer, QVariant, QModelIndex, QAbstractTableModel
-from AnyQt.QtWidgets import QStyle, QSplitter, QTableView, QHeaderView, QAbstractItemView
+from AnyQt.QtWidgets import (
+    QStyle,
+    QSplitter,
+    QTableView,
+    QHeaderView,
+    QAbstractItemView,
+)
 
 from Orange.data import Table, Domain, StringVariable, DiscreteVariable
 from Orange.data import filter as table_filter
@@ -38,7 +44,10 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
     GENE_AS_ATTRIBUTE_NAME,
 )
 
-NCBI_DETAIL_LINK = 'http://www.ncbi.nlm.nih.gov/sites/entrez?Db=gene&Cmd=ShowDetailView&TermToSearch={}'
+NCBI_DETAIL_LINK = (
+    'http://www.ncbi.nlm.nih.gov/'
+    'sites/entrez?Db=gene&Cmd=ShowDetailView&TermToSearch={}'
+)
 HEADER = [
     ['Input ID', 'Entrez ID', 'Name', 'Description', 'Synonyms', 'Other IDs'],
     ['input_identifier', 'gene_id', 'symbol', 'description', 'synonyms', 'db_refs'],
@@ -90,11 +99,13 @@ class GeneInfoModel(itemmodels.PyTableModel):
         self.__table_from_genes([gene for gene in list_of_genes if gene.gene_id])
         self.update_model()
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=QModelIndex()):  # noqa: B008
         return 0 if parent.isValid() else len(self._table)
 
-    def columnCount(self, parent=QModelIndex()):
-        return 0 if (parent.isValid() or self._table.size == 0) else self._table.shape[1]
+    def columnCount(self, parent=QModelIndex()):  # noqa: B008
+        return (
+            0 if (parent.isValid() or self._table.size == 0) else self._table.shape[1]
+        )
 
     def clear(self):
         self.beginResetModel()
@@ -113,9 +124,10 @@ class GeneInfoModel(itemmodels.PyTableModel):
         _Qt_FontRole=Qt.FontRole,
         _Qt_ForegroundRole=Qt.ForegroundRole,
         _LinkRolee=LinkRole,
-        _recognizedRoles=frozenset([Qt.DisplayRole, Qt.EditRole, Qt.FontRole, Qt.ForegroundRole, LinkRole]),
+        _recognizedRoles=frozenset(
+            [Qt.DisplayRole, Qt.EditRole, Qt.FontRole, Qt.ForegroundRole, LinkRole]
+        ),
     ):
-
         if role not in _recognizedRoles:
             return None
 
@@ -153,7 +165,12 @@ class GeneInfoModel(itemmodels.PyTableModel):
                 if isinstance(gene_attr, dict):
                     # note: db_refs are stored as dicts
                     gene_attr = (
-                        ', '.join('{}: {}'.format(key, val) for (key, val) in gene_attr.items()) if gene_attr else ' '
+                        ', '.join(
+                            '{}: {}'.format(key, val)
+                            for (key, val) in gene_attr.items()
+                        )
+                        if gene_attr
+                        else ' '
                     )
                 elif isinstance(gene_attr, list):
                     # note: synonyms are stored as lists
@@ -166,12 +183,19 @@ class GeneInfoModel(itemmodels.PyTableModel):
         self.table = np.asarray([to_list(gene) for gene in list_of_genes])
 
     def get_filtered_genes(self):
-        return list(self._table[:, self.entrez_column_index]) if self._table.size else []
+        return (
+            list(self._table[:, self.entrez_column_index]) if self._table.size else []
+        )
 
     def filter_table(self, filter_pattern: str):
         selection = np.full(self.table.shape, True)
         for search_word in filter_pattern.split():
-            match_result = np.core.defchararray.find(np.char.lower(self.table), search_word.lower()) >= 0
+            match_result = (
+                np.core.defchararray.find(
+                    np.char.lower(self.table), search_word.lower()
+                )
+                >= 0
+            )
             selection = selection & match_result
         return selection
 
@@ -191,7 +215,17 @@ class UnknownGeneInfoModel(itemmodels.PyListModel):
 
     def initialize(self, list_of_genes):
         self.genes = list_of_genes
-        self.wrap([', '.join([gene.input_identifier for gene in list_of_genes if not gene.gene_id])])
+        self.wrap(
+            [
+                ', '.join(
+                    [
+                        gene.input_identifier
+                        for gene in list_of_genes
+                        if not gene.gene_id
+                    ]
+                )
+            ]
+        )
 
     def data(self, index, role=Qt.DisplayRole):
         row = index.row()
@@ -203,7 +237,6 @@ class UnknownGeneInfoModel(itemmodels.PyListModel):
             return self._other_data[row].get(role, None)
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
-
         if role == Qt.DisplayRole and orientation == Qt.Horizontal:
             return self.header_labels[section]
         return QAbstractTableModel.headerData(self, section, orientation, role)
@@ -226,7 +259,9 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
     selected_gene_col = ContextSetting(None)
     use_attr_names = ContextSetting(True)
 
-    replaces = ['orangecontrib.bioinformatics.widgets.OWGeneNameMatcher.OWGeneNameMatcher']
+    replaces = [
+        'orangecontrib.bioinformatics.widgets.OWGeneNameMatcher.OWGeneNameMatcher'
+    ]
 
     class Inputs:
         data_table = Input("Data", Table)
@@ -270,18 +305,25 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
         # GUI SECTION #
 
         # Control area
-        self.info_box = widgetLabel(widgetBox(self.controlArea, "Info", addSpace=True), 'No data on input.\n')
+        self.info_box = widgetLabel(
+            widgetBox(self.controlArea, "Info", addSpace=True), 'No data on input.\n'
+        )
 
         organism_box = vBox(self.controlArea, 'Organism')
         self.organism_select_combobox = comboBox(
-            organism_box, self, 'selected_organism', callback=self.on_input_option_change
+            organism_box,
+            self,
+            'selected_organism',
+            callback=self.on_input_option_change,
         )
 
         self.get_available_organisms()
         self.organism_select_combobox.setCurrentIndex(self.selected_organism)
 
         box = widgetBox(self.controlArea, 'Gene IDs in the input data')
-        self.gene_columns_model = itemmodels.DomainModel(valid_types=(StringVariable, DiscreteVariable))
+        self.gene_columns_model = itemmodels.DomainModel(
+            valid_types=(StringVariable, DiscreteVariable)
+        )
         self.gene_column_combobox = comboBox(
             box,
             self,
@@ -309,11 +351,19 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
         # output_box.layout().addWidget(horizontal_line())
         # separator(output_box)
         self.exclude_radio = checkBox(
-            output_box, self, 'exclude_unmatched', 'Exclude unmatched genes', callback=self.commit
+            output_box,
+            self,
+            'exclude_unmatched',
+            'Exclude unmatched genes',
+            callback=self.commit,
         )
 
         self.replace_radio = checkBox(
-            output_box, self, 'replace_id_with_symbol', 'Replace feature IDs with gene names', callback=self.commit
+            output_box,
+            self,
+            'replace_id_with_symbol',
+            'Replace feature IDs with gene names',
+            callback=self.commit,
         )
 
         auto_commit(self.controlArea, self, "auto_commit", "&Commit", box=False)
@@ -322,7 +372,12 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
 
         # Main area
         self.filter = lineEdit(
-            self.mainArea, self, 'search_pattern', 'Filter:', callbackOnType=True, callback=self.handle_filter_callback
+            self.mainArea,
+            self,
+            'search_pattern',
+            'Filter:',
+            callbackOnType=True,
+            callback=self.handle_filter_callback,
         )
         # rubber(self.radio_group)
         self.mainArea.layout().addWidget(self.filter)
@@ -375,7 +430,6 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
         self._update_info_box()
 
     def _update_info_box(self):
-
         if self.input_genes and self.gene_matcher:
             num_genes = len(self.gene_matcher.genes)
             known_genes = len(self.gene_matcher.get_known_genes())
@@ -383,7 +437,9 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
             info_text = (
                 '{} genes in input data\n'
                 '{} genes match Entrez database\n'
-                '{} genes with match conflicts\n'.format(num_genes, known_genes, num_genes - known_genes)
+                '{} genes with match conflicts\n'.format(
+                    num_genes, known_genes, num_genes - known_genes
+                )
             )
 
         else:
@@ -405,11 +461,14 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
 
         self.table_view.setItemDelegateForColumn(
-            self.table_model.entrez_column_index, LinkStyledItemDelegate(self.table_view)
+            self.table_model.entrez_column_index,
+            LinkStyledItemDelegate(self.table_view),
         )
         v_header = self.table_view.verticalHeader()
         option = self.table_view.viewOptions()
-        size = self.table_view.style().sizeFromContents(QStyle.CT_ItemViewItem, option, QSize(20, 20), self.table_view)
+        size = self.table_view.style().sizeFromContents(
+            QStyle.CT_ItemViewItem, option, QSize(20, 20), self.table_view
+        )
 
         v_header.setDefaultSectionSize(size.height() + 2)
         v_header.setMinimumSectionSize(5)
@@ -423,24 +482,31 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
 
     def get_available_organisms(self):
         available_organism = sorted(
-            ((tax_id, taxonomy.name(tax_id)) for tax_id in taxonomy.common_taxids()), key=lambda x: x[1]
+            ((tax_id, taxonomy.name(tax_id)) for tax_id in taxonomy.common_taxids()),
+            key=lambda x: x[1],
         )
 
         self.organisms = [tax_id[0] for tax_id in available_organism]
-        self.organism_select_combobox.addItems([tax_id[1] for tax_id in available_organism])
+        self.organism_select_combobox.addItems(
+            [tax_id[1] for tax_id in available_organism]
+        )
 
     def gene_names_from_table(self):
         """Extract and return gene names from `Orange.data.Table`."""
         self.input_genes = []
         if self.input_data:
             if self.use_attr_names:
-                self.input_genes = [str(attr.name).strip() for attr in self.input_data.domain.attributes]
+                self.input_genes = [
+                    str(attr.name).strip() for attr in self.input_data.domain.attributes
+                ]
             else:
                 if self.selected_gene_col is None:
                     self.selected_gene_col = self.gene_column_identifier()
 
                 self.input_genes = [
-                    str(e[self.selected_gene_col]) for e in self.input_data if not np.isnan(e[self.selected_gene_col])
+                    str(e[self.selected_gene_col])
+                    for e in self.input_data
+                    if not np.isnan(e[self.selected_gene_col])
                 ]
 
     def _update_gene_matcher(self):
@@ -471,7 +537,7 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
 
         # candidates -> (variable, num of unique values)
         candidates = (
-            (col, np.unique(self.input_data.get_column_view(col)[0]).size)
+            (col, np.unique(self.input_data.get_column(col)).size)
             for col in self.gene_columns_model
             if isinstance(col, DiscreteVariable) or isinstance(col, StringVariable)
         )
@@ -508,8 +574,11 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
 
             # check if input table has tax_id, human is used if tax_id is not found
             self.tax_id = str(self.input_data.attributes.get(TAX_ID, '9606'))
-            # check for gene location. Default is that genes are attributes in the input table.
-            self.use_attr_names = self.input_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, self.use_attr_names)
+            # check for gene location. Default is that genes are
+            # attributes in the input table.
+            self.use_attr_names = self.input_data.attributes.get(
+                GENE_AS_ATTRIBUTE_NAME, self.use_attr_names
+            )
 
             if self.tax_id in self.organisms and not self.selected_organism:
                 self.selected_organism = self.organisms.index(self.tax_id)
@@ -519,7 +588,9 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
             self.on_input_option_change()
 
     def commit(self):
-        selection = self.table_view.selectionModel().selectedRows(self.table_model.entrez_column_index)
+        selection = self.table_view.selectionModel().selectedRows(
+            self.table_model.entrez_column_index
+        )
 
         selected_genes = [row.data() for row in selection]
         if not len(selected_genes):
@@ -537,7 +608,9 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                 if self.target_database in self.input_data.domain:
                     gene_var = t.domain[self.target_database]
                     # new data inserted in current meta column - copy only meta part
-                    table = Table.from_numpy(t.domain, t.X, t.Y, t.metas.copy(), t.W, t.attributes, t.ids)
+                    table = Table.from_numpy(
+                        t.domain, t.X, t.Y, t.metas.copy(), t.W, t.attributes, t.ids
+                    )
                 else:
                     gene_var = StringVariable(self.target_database)
                     metas = t.domain.metas + (gene_var,)
@@ -545,13 +618,15 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                     table = t.transform(domain)
 
                 with table.unlocked(table.metas):
-                    col, _ = table.get_column_view(gene_var)
+                    col = table.get_column(gene_var)
                     col[:] = gene_ids
 
                 # filter selected rows
                 selected_genes_set = set(selected_genes)
                 selected_rows = [
-                    row_index for row_index, row in enumerate(table) if str(row[gene_var]) in selected_genes_set
+                    row_index
+                    for row_index, row in enumerate(table)
+                    if str(row[gene_var]) in selected_genes_set
                 ]
 
                 # handle table attributes
@@ -572,7 +647,9 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
             else:
                 domain = self.input_data.domain.copy()
                 table = self.input_data.transform(domain)
-                table = self.gene_matcher.match_table_attributes(table, run=False, rename=self.replace_id_with_symbol)
+                table = self.gene_matcher.match_table_attributes(
+                    table, run=False, rename=self.replace_id_with_symbol
+                )
 
                 # filter selected columns
                 selected_genes_set = set(selected_genes)
@@ -580,7 +657,8 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                     column
                     for column in table.domain.attributes
                     if self.target_database in column.attributes
-                    and str(column.attributes[self.target_database]) in selected_genes_set
+                    and str(column.attributes[self.target_database])
+                    in selected_genes_set
                 ]
 
                 output_attrs = table.domain.attributes
@@ -591,10 +669,14 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                 if self.exclude_unmatched:
                     known_genes_set = set(known_genes)
                     output_attrs = [
-                        col for col in output_attrs if col.attributes[self.target_database] in known_genes_set
+                        col
+                        for col in output_attrs
+                        if col.attributes[self.target_database] in known_genes_set
                     ]
 
-                domain = Domain(output_attrs, table.domain.class_vars, table.domain.metas)
+                domain = Domain(
+                    output_attrs, table.domain.class_vars, table.domain.metas
+                )
 
                 table = table.from_table(domain, table)
 
@@ -603,7 +685,9 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
                 table.attributes[GENE_AS_ATTRIBUTE_NAME] = True
                 table.attributes[GENE_ID_ATTRIBUTE] = self.target_database
 
-            gm_table = self.gene_matcher.to_data_table(selected_genes=selected_genes if selected_genes else None)
+            gm_table = self.gene_matcher.to_data_table(
+                selected_genes=selected_genes if selected_genes else None
+            )
 
         self.Outputs.data_table.send(table)
         self.Outputs.gene_matcher_results.send(gm_table)
@@ -613,11 +697,18 @@ class OWGenes(OWWidget, ConcurrentWidgetMixin):
 
         if self.gene_matcher.genes:
             # enable checkbox if unknown genes are detected
-            self.exclude_radio.setEnabled(len(self.gene_matcher.genes) != len(self.gene_matcher.get_known_genes()))
-            self.exclude_unmatched = len(self.gene_matcher.genes) != len(self.gene_matcher.get_known_genes())
+            self.exclude_radio.setEnabled(
+                len(self.gene_matcher.genes) != len(self.gene_matcher.get_known_genes())
+            )
+            self.exclude_unmatched = len(self.gene_matcher.genes) != len(
+                self.gene_matcher.get_known_genes()
+            )
 
     def get_target_ids(self):
-        return [str(gene.gene_id) if gene.gene_id else '?' for gene in self.gene_matcher.genes]
+        return [
+            str(gene.gene_id) if gene.gene_id else '?'
+            for gene in self.gene_matcher.genes
+        ]
 
 
 if __name__ == "__main__":

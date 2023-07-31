@@ -235,7 +235,7 @@ class GeneMatcher:
         """
 
         if column_name in data_table.domain:
-            self.genes = data_table.get_column_view(column_name)[0]
+            self.genes = data_table.get_column(column_name)
 
             if target_column is None:
                 target_column = StringVariable(ENTREZ_ID)
@@ -323,7 +323,6 @@ class GeneMatcher:
         with contextlib.closing(sqlite3.connect(self.gene_db_path)) as con:
             with con as cursor:
                 for gene in self.genes:
-
                     if self._progress_callback:
                         self._progress_callback()
 
@@ -411,7 +410,6 @@ def load_gene_summary(tax_d: str, genes: List[Optional[str]]) -> List[Optional[G
 
     with contextlib.closing(sqlite3.connect(gene_db_path)) as con:
         with con as cur:
-
             gene_map: Dict[str, Gene] = {}
             for gene_info in cur.execute(
                 f'SELECT * FROM gene_info WHERE gene_id in ({",".join(_genes)})'

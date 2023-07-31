@@ -378,9 +378,7 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
                 for variable in self.input_data.domain.attributes
             }
         else:
-            return {
-                str(g) for g in self.input_data.get_column_view(self.gene_location)[0]
-            }
+            return {str(g) for g in self.input_data.get_column(self.gene_location)}
 
     def get_data_from_source_model(self, proxy_row_index, column):
         proxy_index = self.filter_proxy_model.index(proxy_row_index, column)
@@ -510,7 +508,7 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
                         )
                     )
             else:
-                genes, _ = self.reference_data.get_column_view(
+                genes = self.reference_data.get_column(
                     attrs[TableAnnotation.gene_id_column]
                 )
                 self.reference_genes = [str(g) for g in genes]
@@ -595,7 +593,6 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
         model: QStandardItemModel = filter_proxy.sourceModel()
 
         if isinstance(model, QStandardItemModel):
-
             # apply filtering rules
             filter_proxy.set_filters(self.create_filters())
 

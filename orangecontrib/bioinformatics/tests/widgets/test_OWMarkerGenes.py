@@ -9,7 +9,12 @@ from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
 
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics.widgets.OWMarkerGenes import SERVER_FILES_DOMAIN, TreeItem, TreeView, OWMarkerGenes
+from orangecontrib.bioinformatics.widgets.OWMarkerGenes import (
+    SERVER_FILES_DOMAIN,
+    TreeItem,
+    TreeView,
+    OWMarkerGenes,
+)
 
 
 class TestTreeItem(unittest.TestCase):
@@ -43,7 +48,9 @@ class TestTreeItem(unittest.TestCase):
         TreeItem.change_parents([self.item1, self.item2], self.item3)
         self.assertListEqual([self.item1, self.item2], self.item3.childItems)
 
-        s = self.item3.remove_children(-1, 1)  # should return False (it is not possible)
+        s = self.item3.remove_children(
+            -1, 1
+        )  # should return False (it is not possible)
         self.assertFalse(s)
         self.assertListEqual([self.item1, self.item2], self.item3.childItems)
 
@@ -108,19 +115,35 @@ class TestTreeItem(unittest.TestCase):
         self.assertTupleEqual((None, None), self.item3.child_from_name_index("item 1"))
         TreeItem.change_parents([self.item1, self.item2], self.item3)
 
-        self.assertTupleEqual((0, self.item1), self.item3.child_from_name_index("item 1"))
-        self.assertTupleEqual((1, self.item2), self.item3.child_from_name_index("item 2"))
+        self.assertTupleEqual(
+            (0, self.item1), self.item3.child_from_name_index("item 1")
+        )
+        self.assertTupleEqual(
+            (1, self.item2), self.item3.child_from_name_index("item 2")
+        )
 
         self.item3.remove_children(0, 2)
         TreeItem.change_parents([self.item2, self.item1], self.item3)
 
-        self.assertTupleEqual((1, self.item1), self.item3.child_from_name_index("item 1"))
-        self.assertTupleEqual((0, self.item2), self.item3.child_from_name_index("item 2"))
+        self.assertTupleEqual(
+            (1, self.item1), self.item3.child_from_name_index("item 1")
+        )
+        self.assertTupleEqual(
+            (0, self.item2), self.item3.child_from_name_index("item 2")
+        )
 
     def test_contains_text(self):
         # simulate RowItem with dictionary
-        self.item1.data_row = {"Name": "item1", "Cell Type": "type1", "Function": "function1"}
-        self.item2.data_row = {"Name": "item2", "Cell Type": "type2", "Function": "function2"}
+        self.item1.data_row = {
+            "Name": "item1",
+            "Cell Type": "type1",
+            "Function": "function1",
+        }
+        self.item2.data_row = {
+            "Name": "item2",
+            "Cell Type": "type2",
+            "Function": "function2",
+        }
         filter_columns = ["Name", "Cell Type", "Function"]
         TreeItem.change_parents([self.item2, self.item1], self.item3)
 
@@ -168,7 +191,9 @@ class TestTreeItem(unittest.TestCase):
         self.item2.data_row = "dr2"
         self.item3.data_row = "dr3"
 
-        self.assertListEqual(sorted(["dr1", "dr2", "dr3"]), sorted(self.item3.get_data_rows()))
+        self.assertListEqual(
+            sorted(["dr1", "dr2", "dr3"]), sorted(self.item3.get_data_rows())
+        )
         self.assertListEqual(["dr1"], self.item1.get_data_rows())
         self.assertListEqual(["dr2"], self.item2.get_data_rows())
 
@@ -247,7 +272,9 @@ class TestOWMarkerGenes(WidgetTest):
             The view from which we move top element.
         """
         parent_index = source_view.model().index(0, 0)
-        source_view.selectionModel().select(parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        source_view.selectionModel().select(
+            parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.widget.move_button.click()
 
     def move_first_child(self, source_view: TreeView) -> None:
@@ -261,7 +288,9 @@ class TestOWMarkerGenes(WidgetTest):
         """
         parent_index = source_view.model().index(0, 0)
         gene_index = source_view.model().index(0, 0, parent_index)
-        source_view.selectionModel().select(gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        source_view.selectionModel().select(
+            gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.widget.move_button.click()
 
     def test_data_not_empty(self):
@@ -273,10 +302,12 @@ class TestOWMarkerGenes(WidgetTest):
 
     def test_available_sources(self):
         """
-        Test if all sources retrieved. Currently there are two sources available. When more available unittest will be
-        changed.
+        Test if all sources retrieved. Currently there are two sources available.
+        When more available unittest will be changed.
         """
-        self.assertListEqual(["CellMarker", "Panglao"], list(self.widget.available_sources.keys()))
+        self.assertListEqual(
+            ["CellMarker", "Panglao"], list(self.widget.available_sources.keys())
+        )
 
     def test_source_changed(self):
         """
@@ -308,12 +339,16 @@ class TestOWMarkerGenes(WidgetTest):
         self.assertEqual("Panglao", self.widget.db_source_cb.currentText())
         self.assertEqual("Human", self.widget.group_cb.currentText())
 
-        human_rows = self.widget.data.get_column_view("Organism")[0] == "Human"
-        cell_types = self.widget.data.get_column_view("Cell Type")[0]
+        human_rows = self.widget.data.get_column("Organism") == "Human"
+        cell_types = self.widget.data.get_column("Cell Type")
 
         model = self.widget.available_markers_view.model().sourceModel()
-        self.assertEqual(sum(self.panglao.get_column_view("Organism")[0] == "Human"), len(model))
-        self.assertEqual(len(np.unique(cell_types[human_rows])), len(model.rootItem.childItems))
+        self.assertEqual(
+            sum(self.panglao.get_column("Organism") == "Human"), len(model)
+        )
+        self.assertEqual(
+            len(np.unique(cell_types[human_rows])), len(model.rootItem.childItems)
+        )
 
         simulate.combobox_activate_index(self.widget.controls.source_index, 0)
         simulate.combobox_activate_index(self.widget.controls.organism_index, 1)
@@ -321,20 +356,28 @@ class TestOWMarkerGenes(WidgetTest):
         self.assertEqual("Mouse", self.widget.group_cb.currentText())
 
         model = self.widget.available_markers_view.model().sourceModel()
-        self.assertEqual(sum(self.panglao.get_column_view("Organism")[0] == "Mouse"), len(model))
-        self.assertEqual(len(np.unique(cell_types[~human_rows])), len(model.rootItem.childItems))
+        self.assertEqual(
+            sum(self.panglao.get_column("Organism") == "Mouse"), len(model)
+        )
+        self.assertEqual(
+            len(np.unique(cell_types[~human_rows])), len(model.rootItem.childItems)
+        )
 
         simulate.combobox_activate_index(self.widget.controls.source_index, 1)
         simulate.combobox_activate_index(self.widget.controls.organism_index, 0)
         self.assertEqual("CellMarker", self.widget.db_source_cb.currentText())
         self.assertEqual("Human", self.widget.group_cb.currentText())
 
-        human_rows = self.widget.data.get_column_view("Organism")[0] == "Human"
-        cell_types = self.widget.data.get_column_view("Cell Type")[0]
+        human_rows = self.widget.data.get_column("Organism") == "Human"
+        cell_types = self.widget.data.get_column("Cell Type")
 
         model = self.widget.available_markers_view.model().sourceModel()
-        self.assertEqual(sum(self.cell_markers.get_column_view("Organism")[0] == "Human"), len(model))
-        self.assertEqual(len(np.unique(cell_types[human_rows])), len(model.rootItem.childItems))
+        self.assertEqual(
+            sum(self.cell_markers.get_column("Organism") == "Human"), len(model)
+        )
+        self.assertEqual(
+            len(np.unique(cell_types[human_rows])), len(model.rootItem.childItems)
+        )
 
         simulate.combobox_activate_index(self.widget.controls.source_index, 1)
         simulate.combobox_activate_index(self.widget.controls.organism_index, 1)
@@ -342,25 +385,33 @@ class TestOWMarkerGenes(WidgetTest):
         self.assertEqual("Mouse", self.widget.group_cb.currentText())
 
         model = self.widget.available_markers_view.model().sourceModel()
-        self.assertEqual(sum(self.cell_markers.get_column_view("Organism")[0] == "Mouse"), len(model))
-        self.assertEqual(len(np.unique(cell_types[~human_rows])), len(model.rootItem.childItems))
+        self.assertEqual(
+            sum(self.cell_markers.get_column("Organism") == "Mouse"), len(model)
+        )
+        self.assertEqual(
+            len(np.unique(cell_types[~human_rows])), len(model.rootItem.childItems)
+        )
 
     def test_group_by_changed(self):
         """
         Test changing the group by parameter (Cell Type, Function)
         """
         # group by cell type
-        simulate.combobox_activate_index(self.widget.controls.selected_root_attribute, 0)
+        simulate.combobox_activate_index(
+            self.widget.controls.selected_root_attribute, 0
+        )
 
-        human_rows = self.widget.data.get_column_view("Organism")[0] == "Human"
-        cell_types = np.unique(self.widget.data.get_column_view("Cell Type")[0][human_rows])
+        human_rows = self.widget.data.get_column("Organism") == "Human"
+        cell_types = np.unique(self.widget.data.get_column("Cell Type")[human_rows])
         model = self.widget.available_markers_view.model().sourceModel()
         self.assertEqual(len(cell_types), len(model.rootItem.childItems))
 
         # group by function
-        simulate.combobox_activate_index(self.widget.controls.selected_root_attribute, 1)
+        simulate.combobox_activate_index(
+            self.widget.controls.selected_root_attribute, 1
+        )
 
-        functions = np.unique(self.widget.data.get_column_view("Function")[0][human_rows])
+        functions = np.unique(self.widget.data.get_column("Function")[human_rows])
         model = self.widget.available_markers_view.model().sourceModel()
         self.assertEqual(len(functions), len(model.rootItem.childItems))
 
@@ -377,22 +428,32 @@ class TestOWMarkerGenes(WidgetTest):
 
         # select first element
         index = src_view.model().index(0, 0)
-        src_view.selectionModel().select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        num_items = src_view.model().rowCount(index)  # number of items under selected item
+        src_view.selectionModel().select(
+            index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
+        num_items = src_view.model().rowCount(
+            index
+        )  # number of items under selected item
 
         # move element to the TreeView with selected genes
         self.widget.move_button.click()
         self.assertEqual(len(dest_view.model().sourceModel()), num_items)
         output = self.get_output(self.widget.Outputs.genes)
         self.assertEqual(num_items, len(output))
-        self.assertEqual(dest_view.model().rowCount(QModelIndex()), 1)  # one root element added
+        self.assertEqual(
+            dest_view.model().rowCount(QModelIndex()), 1
+        )  # one root element added
         index = dest_view.model().index(0, 0)
         self.assertEqual(dest_view.model().rowCount(index), num_items)
 
-        self.assertEqual(src_view.model().rowCount(QModelIndex()), num_root_items - 1)  # one item is remove from view
+        self.assertEqual(
+            src_view.model().rowCount(QModelIndex()), num_root_items - 1
+        )  # one item is remove from view
 
         # move everything back
-        dest_view.selectionModel().select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        dest_view.selectionModel().select(
+            index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.widget.move_button.click()
 
         self.assertEqual(num_items_source_view, len(src_view.model().sourceModel()))
@@ -412,8 +473,12 @@ class TestOWMarkerGenes(WidgetTest):
         # select first element
         index = src_view.model().index(0, 0)
         index1 = src_view.model().index(1, 0)
-        src_view.selectionModel().select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        src_view.selectionModel().select(index1, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        src_view.selectionModel().select(
+            index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
+        src_view.selectionModel().select(
+            index1, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         num_items = src_view.model().rowCount(index)
         num_items1 = src_view.model().rowCount(index1)
 
@@ -422,17 +487,22 @@ class TestOWMarkerGenes(WidgetTest):
         self.assertEqual(len(dest_view.model().sourceModel()), num_items + num_items1)
         output = self.get_output(self.widget.Outputs.genes)
         self.assertEqual(num_items + num_items1, len(output))
-        self.assertEqual(dest_view.model().rowCount(QModelIndex()), 2)  # two root element added
+        self.assertEqual(
+            dest_view.model().rowCount(QModelIndex()), 2
+        )  # two root element added
         index = dest_view.model().index(0, 0)
         index1 = dest_view.model().index(1, 0)
         self.assertEqual(
-            dest_view.model().rowCount(index) + dest_view.model().rowCount(index1), num_items + num_items1
+            dest_view.model().rowCount(index) + dest_view.model().rowCount(index1),
+            num_items + num_items1,
         )
 
         self.assertEqual(src_view.model().rowCount(QModelIndex()), num_root_items - 2)
 
         # move everything back one by one
-        dest_view.selectionModel().select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        dest_view.selectionModel().select(
+            index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.widget.move_button.click()
         index1 = dest_view.model().index(0, 0)
         self.assertEqual(dest_view.model().rowCount(index1), num_items1)
@@ -442,7 +512,9 @@ class TestOWMarkerGenes(WidgetTest):
         self.assertEqual(src_view.model().rowCount(QModelIndex()), num_root_items - 1)
 
         # move the other one back
-        dest_view.selectionModel().select(index1, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        dest_view.selectionModel().select(
+            index1, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.widget.move_button.click()
         self.assertEqual(num_items_source_view, len(src_view.model().sourceModel()))
         self.assertEqual(0, len(dest_view.model().sourceModel()))
@@ -452,7 +524,8 @@ class TestOWMarkerGenes(WidgetTest):
     def test_move_genes(self):
         """
         Move elements between booth views and observe if numbers matches.
-        In previous test we were moving just root elements. In this test we will move children elements.
+        In previous test we were moving just root elements.
+        In this test we will move children elements.
         """
         src_view = self.widget.available_markers_view
         dest_view = self.widget.selected_markers_view
@@ -464,22 +537,30 @@ class TestOWMarkerGenes(WidgetTest):
         index = src_view.model().index(0, 0, parent_index)
         index1 = src_view.model().index(1, 0, parent_index)
 
-        src_view.selectionModel().select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        src_view.selectionModel().select(index1, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        src_view.selectionModel().select(
+            index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
+        src_view.selectionModel().select(
+            index1, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
 
         # move elements to the TreeView with selected genes
         self.widget.move_button.click()
         self.assertEqual(len(dest_view.model().sourceModel()), 2)
         output = self.get_output(self.widget.Outputs.genes)
         self.assertEqual(2, len(output))
-        self.assertEqual(dest_view.model().rowCount(QModelIndex()), 1)  # one parent element added
+        self.assertEqual(
+            dest_view.model().rowCount(QModelIndex()), 1
+        )  # one parent element added
         parent_index = dest_view.model().index(0, 0)
         self.assertEqual(dest_view.model().rowCount(parent_index), 2)
         self.assertEqual(src_view.model().rowCount(QModelIndex()), num_root_items)
 
         # move everything back one by one
         index = dest_view.model().index(0, 0, parent_index)
-        dest_view.selectionModel().select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        dest_view.selectionModel().select(
+            index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.widget.move_button.click()
 
         self.assertEqual(dest_view.model().rowCount(parent_index), 1)
@@ -490,7 +571,9 @@ class TestOWMarkerGenes(WidgetTest):
 
         # move the other one back
         index1 = dest_view.model().index(0, 0, parent_index)
-        dest_view.selectionModel().select(index1, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        dest_view.selectionModel().select(
+            index1, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.widget.move_button.click()
         self.assertEqual(num_items_source_view, len(src_view.model().sourceModel()))
         self.assertEqual(src_view.model().rowCount(QModelIndex()), num_root_items)
@@ -511,21 +594,33 @@ class TestOWMarkerGenes(WidgetTest):
         gene_index1 = src_view.model().index(1, 0, parent_index)
 
         # no description for parent
-        src_view.selectionModel().select(parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        src_view.selectionModel().select(
+            parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.assertEqual(not_gene, self.widget.descriptionlabel.toPlainText())
 
         # no description for multiple genes
-        src_view.selectionModel().select(gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        src_view.selectionModel().select(gene_index1, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        src_view.selectionModel().select(
+            gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
+        src_view.selectionModel().select(
+            gene_index1, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.assertEqual(not_gene, self.widget.descriptionlabel.toPlainText())
 
         # description for first gene
-        src_view.selectionModel().select(gene_index, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+        src_view.selectionModel().select(
+            gene_index, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows
+        )
         self.assertIn(first_gene_info, self.widget.descriptionlabel.toPlainText())
 
         # move elements
-        src_view.selectionModel().select(gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        src_view.selectionModel().select(gene_index1, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        src_view.selectionModel().select(
+            gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
+        src_view.selectionModel().select(
+            gene_index1, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.widget.move_button.click()
 
         # test in the dest view
@@ -534,16 +629,24 @@ class TestOWMarkerGenes(WidgetTest):
         gene_index1 = dest_view.model().index(1, 0, parent_index)
 
         # no description for parent
-        dest_view.selectionModel().select(parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        dest_view.selectionModel().select(
+            parent_index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.assertEqual(not_gene, self.widget.descriptionlabel.toPlainText())
 
         # no description for multiple genes
-        dest_view.selectionModel().select(gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        dest_view.selectionModel().select(gene_index1, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        dest_view.selectionModel().select(
+            gene_index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
+        dest_view.selectionModel().select(
+            gene_index1, QItemSelectionModel.Select | QItemSelectionModel.Rows
+        )
         self.assertEqual(not_gene, self.widget.descriptionlabel.toPlainText())
 
         # description for first gene
-        dest_view.selectionModel().select(gene_index, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+        dest_view.selectionModel().select(
+            gene_index, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows
+        )
         self.assertIn(first_gene_info, self.widget.descriptionlabel.toPlainText())
 
     def test_extend_collapse_both_views(self):
@@ -553,18 +656,31 @@ class TestOWMarkerGenes(WidgetTest):
         src_view = self.widget.available_markers_view
         dest_view = self.widget.selected_markers_view
 
-        # I do not know how to simulate click so I just call the function that is called on click
+        # I do not know how to simulate click, so I just call the
+        # function that is called on click
         index = src_view.model().index(0, 0)
         src_view.expand_in_other_view(index, is_expanded=True)
-        tree_node = src_view.model().sourceModel().node_from_index(src_view.model().mapToSource(index))
+        tree_node = (
+            src_view.model()
+            .sourceModel()
+            .node_from_index(src_view.model().mapToSource(index))
+        )
         self.assertTrue(tree_node.expanded)
 
         # move one child left to check simultaneous expand
         self.move_first_child(src_view)
         index_left = src_view.model().index(0, 0)
         index_right = dest_view.model().index(0, 0)
-        tree_node_left = src_view.model().sourceModel().node_from_index(src_view.model().mapToSource(index_left))
-        tree_node_right = dest_view.model().sourceModel().node_from_index(dest_view.model().mapToSource(index_right))
+        tree_node_left = (
+            src_view.model()
+            .sourceModel()
+            .node_from_index(src_view.model().mapToSource(index_left))
+        )
+        tree_node_right = (
+            dest_view.model()
+            .sourceModel()
+            .node_from_index(dest_view.model().mapToSource(index_right))
+        )
 
         src_view.expand_in_other_view(index_left, is_expanded=True)
         self.assertTrue(tree_node_left.expanded)

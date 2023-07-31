@@ -223,14 +223,12 @@ class GeneSetSelection(OWComponent, QObject):
             labels = self.custom_gene_set_indicator.values
             gene_sets_names = [
                 labels[int(idx)]
-                for idx in self.data.get_column_view(self.custom_gene_set_indicator)[0]
+                for idx in self.data.get_column(self.custom_gene_set_indicator)
             ]
         else:
-            gene_sets_names, _ = self.data.get_column_view(
-                self.custom_gene_set_indicator
-            )
+            gene_sets_names = self.data.get_column(self.custom_gene_set_indicator)
 
-        gene_names, _ = self.data.get_column_view(self.gene_ids_location)
+        gene_names = self.data.get_column(self.gene_ids_location)
         domain = (self.data.name if self.data.name else 'Custom sets',)
         self.custom_gene_set_hierarchy = domain
 

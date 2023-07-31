@@ -406,14 +406,12 @@ class OWClusterAnalysis(OWWidget):
         }
         for var in self.cluster_indicators:
             if row_profile is None:
-                row_profile = np.asarray(
-                    self.input_data.get_column_view(var)[0], dtype=int
-                )
+                row_profile = np.asarray(self.input_data.get_column(var), dtype=int)
             else:
                 row_profile = np.vstack(
                     (
                         row_profile,
-                        np.asarray(self.input_data.get_column_view(var)[0], dtype=int),
+                        np.asarray(self.input_data.get_column(var), dtype=int),
                     )
                 )
 
@@ -445,7 +443,6 @@ class OWClusterAnalysis(OWWidget):
         self.cluster_var = None
 
         if self.cluster_indicators and self.input_data:
-
             if (
                 isinstance(self.cluster_indicators, list)
                 and len(self.cluster_indicators) > 1
@@ -455,7 +452,7 @@ class OWClusterAnalysis(OWWidget):
                 self.cluster_var = self.cluster_indicators[0]
 
             self.rows_by_cluster = np.asarray(
-                self.input_data.get_column_view(self.cluster_var)[0], dtype=int
+                self.input_data.get_column(self.cluster_var), dtype=int
             )
             for index, name in enumerate(self.cluster_var.values):
                 cluster = Cluster(name, index)
@@ -471,7 +468,7 @@ class OWClusterAnalysis(OWWidget):
             return
         if self.batch_indicator and self.input_data:
             self.rows_by_batch = np.asarray(
-                self.input_data.get_column_view(self.batch_indicator)[0], dtype=int
+                self.input_data.get_column(self.batch_indicator), dtype=int
             )
 
     def __set_genes(self):
@@ -721,7 +718,6 @@ class OWClusterAnalysis(OWWidget):
     def handle_custom_gene_sets(self, select_customs_flag=False):
         if self.custom_gene_set_indicator:
             if self.custom_data is not None and self.custom_gene_id_column is not None:
-
                 if self.__check_organism_mismatch():
                     self.gs_label_combobox.setDisabled(True)
                     self.Error.organism_mismatch()
@@ -733,19 +729,17 @@ class OWClusterAnalysis(OWWidget):
                     labels = self.custom_gene_set_indicator.values
                     gene_sets_names = [
                         labels[int(idx)]
-                        for idx in self.custom_data.get_column_view(
+                        for idx in self.custom_data.get_column(
                             self.custom_gene_set_indicator
-                        )[0]
+                        )
                     ]
                 else:
-                    gene_sets_names, _ = self.custom_data.get_column_view(
+                    gene_sets_names = self.custom_data.get_column(
                         self.custom_gene_set_indicator
                     )
 
                 self.num_of_custom_sets = len(set(gene_sets_names))
-                gene_names, _ = self.custom_data.get_column_view(
-                    self.custom_gene_id_column
-                )
+                gene_names = self.custom_data.get_column(self.custom_gene_id_column)
                 hierarchy_title = (
                     self.custom_data.name if self.custom_data.name else 'Custom sets',
                 )
@@ -770,7 +764,6 @@ class OWClusterAnalysis(OWWidget):
         # self.gs_widget.update_gs_hierarchy()
 
     def gene_scores_output(self, selected_clusters):
-
         metas = [
             StringVariable('Gene'),
             StringVariable(ENTREZ_ID),
@@ -818,7 +811,6 @@ class OWClusterAnalysis(OWWidget):
         self.Outputs.gene_scores.send(out_data)
 
     def gene_set_scores_output(self, selected_clusters):
-
         metas = [
             StringVariable('Term'),
             StringVariable('Term ID'),

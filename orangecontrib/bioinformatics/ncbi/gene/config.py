@@ -27,7 +27,7 @@ _select_gene_info_columns = """
     gene_info.symbol_from_nomenclature_authority, gene_info.full_name_from_nomenclature_authority,
     gene_info.nomenclature_status, gene_info.other_designations, gene_info.modification_date,
     gene_info.homology_group_id, gene_info.homologs
-    """
+    """  # noqa: B950
 
 query_exact = f"""
     SELECT  {_select_gene_info_columns}

@@ -45,7 +45,6 @@ class TestOWMHomologs(WidgetTest):
         self.genes_columns.attributes = attributes_columns
 
     def test_homologs_by_rows(self):
-
         self.widget.auto_commit = False
         self.widget.target_organism_change(self.widget.taxonomy_ids.index("10090"))
 
@@ -55,7 +54,7 @@ class TestOWMHomologs(WidgetTest):
 
         out_data = self.get_output("Genes", self.widget)
         self.assertEqual(len(self.genes_rows), len(out_data))
-        mouse_ids = list(out_data.get_column_view(HOMOLOG_ID)[0])
+        mouse_ids = list(out_data.get_column(HOMOLOG_ID))
         self.assertListEqual(mouse_ids, self.expected_results)
 
     def test_auto_commit(self):

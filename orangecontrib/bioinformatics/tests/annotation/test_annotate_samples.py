@@ -9,7 +9,13 @@ from pointannotator.annotate_samples import (
     SCORING_MARKERS_SUM,
 )
 
-from Orange.data import Table, Domain, StringVariable, DiscreteVariable, ContinuousVariable
+from Orange.data import (
+    Table,
+    Domain,
+    StringVariable,
+    DiscreteVariable,
+    ContinuousVariable,
+)
 from Orange.tests.test_statistics import dense_sparse
 
 from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID
@@ -22,7 +28,9 @@ from orangecontrib.bioinformatics.annotation.annotate_samples import (
 
 class TestAnnotateSamples(unittest.TestCase):
     def setUp(self):
-        m_domain = Domain([], None, [StringVariable("Cell Type"), StringVariable("Entrez ID")])
+        m_domain = Domain(
+            [], None, [StringVariable("Cell Type"), StringVariable("Entrez ID")]
+        )
         m_data = [
             ["Type 1", "111"],
             ["Type 1", "112"],
@@ -67,7 +75,12 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertTupleEqual(self.data.X.shape, d.X.shape)
 
     def annotate_samples(
-        self, data, markers, return_nonzero_annotations=True, scoring=SCORING_EXP_RATIO, p_value_fun=PFUN_BINOMIAL
+        self,
+        data,
+        markers,
+        return_nonzero_annotations=True,
+        scoring=SCORING_EXP_RATIO,
+        p_value_fun=PFUN_BINOMIAL,
     ):
         """
         Helper method that performs all operations and returns final results.
@@ -76,7 +89,9 @@ class TestAnnotateSamples(unittest.TestCase):
         scores, fdrs = self.annotator.assign_annotations(
             z_values, markers, data, scoring=scoring, p_value_fun=p_value_fun
         )
-        return self.annotator.filter_annotations(scores, fdrs, return_nonzero_annotations)
+        return self.annotator.filter_annotations(
+            scores, fdrs, return_nonzero_annotations
+        )
 
     @dense_sparse
     def test_artificial_data(self, array):
@@ -96,7 +111,9 @@ class TestAnnotateSamples(unittest.TestCase):
         """
         Type 3 column must be removed here
         """
-        m_domain = Domain([], None, [StringVariable("Cell Type"), StringVariable("Entrez ID")])
+        m_domain = Domain(
+            [], None, [StringVariable("Cell Type"), StringVariable("Entrez ID")]
+        )
         m_data = [
             ["Type 1", "111"],
             ["Type 1", "112"],
@@ -122,7 +139,9 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertLessEqual(np.nanmax(annotations.X), 1)
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
-        annotations = self.annotate_samples(self.data, markers, return_nonzero_annotations=False)
+        annotations = self.annotate_samples(
+            self.data, markers, return_nonzero_annotations=False
+        )
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 3)  # two types in the data
         self.assertGreater(np.nansum(annotations.X), 0)
@@ -136,7 +155,9 @@ class TestAnnotateSamples(unittest.TestCase):
         """
         with self.data.unlocked(self.data.X):
             self.data.X = array(self.data.X)
-        annotations = self.annotate_samples(self.data, self.markers, p_value_fun=PFUN_HYPERGEOMETRIC)
+        annotations = self.annotate_samples(
+            self.data, self.markers, p_value_fun=PFUN_HYPERGEOMETRIC
+        )
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -162,7 +183,9 @@ class TestAnnotateSamples(unittest.TestCase):
             self.markers[1, "Entrez ID"] = "?"
         with self.data.unlocked(self.data.X):
             self.data.X = array(self.data.X)
-        annotations = self.annotate_samples(self.data, self.markers, return_nonzero_annotations=False)
+        annotations = self.annotate_samples(
+            self.data, self.markers, return_nonzero_annotations=False
+        )
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -202,7 +225,9 @@ class TestAnnotateSamples(unittest.TestCase):
         exp_ann = np.array([[1, 0], [1 / 2, 1 / 4], [1 / 4, 1 / 2], [0, 1]])
         with self.data.unlocked(self.data.X):
             self.data.X = array(self.data.X)
-        annotations, fdrs = self.annotator.assign_annotations(z_table, self.markers, self.data[:4])
+        annotations, fdrs = self.annotator.assign_annotations(
+            z_table, self.markers, self.data[:4]
+        )
 
         self.assertEqual(len(attrs), len(annotations))
         self.assertEqual(len(attrs), len(fdrs))
@@ -223,7 +248,9 @@ class TestAnnotateSamples(unittest.TestCase):
             return
         with self.data.unlocked(self.data.X):
             self.data.X = array(self.data.X)
-        annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_EXP_RATIO)
+        annotations = self.annotate_samples(
+            self.data, self.markers, scoring=SCORING_EXP_RATIO
+        )
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -233,7 +260,9 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertGreaterEqual(np.nanmin(annotations.X), 0)
 
         # scoring SCORING_MARKERS_SUM
-        annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_MARKERS_SUM)
+        annotations = self.annotate_samples(
+            self.data, self.markers, scoring=SCORING_MARKERS_SUM
+        )
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -245,14 +274,18 @@ class TestAnnotateSamples(unittest.TestCase):
         self.assertEqual(annotations[5, 1].value, self.data.X[5].sum())
 
         # scoring SCORING_LOG_FDR
-        annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_LOG_FDR)
+        annotations = self.annotate_samples(
+            self.data, self.markers, scoring=SCORING_LOG_FDR
+        )
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
         self.assertEqual(len(annotations[0]), 2)  # two types in the data
 
         # scoring SCORING_LOG_PVALUE
-        annotations = self.annotate_samples(self.data, self.markers, scoring=SCORING_LOG_PVALUE)
+        annotations = self.annotate_samples(
+            self.data, self.markers, scoring=SCORING_LOG_PVALUE
+        )
 
         self.assertEqual(type(annotations), Table)
         self.assertEqual(len(annotations), len(self.data))
@@ -265,7 +298,7 @@ class TestAnnotateSamples(unittest.TestCase):
         although they should be strings. Here we add the test for those cases.
         """
         # change Entrez IDs to int
-        for i, att in enumerate(self.data.domain.attributes):
+        for _, att in enumerate(self.data.domain.attributes):
             att.attributes["Entrez ID"] = int(att.attributes["Entrez ID"])
 
         with self.data.unlocked(self.data.X):
@@ -284,8 +317,8 @@ class TestAnnotateSamples(unittest.TestCase):
         """
         Test case when cell type or genes appears as a feature
         """
-        ct_values = self.markers.get_column_view("Cell Type")[0].tolist()
-        entrezid = self.markers.get_column_view("Entrez ID")[0].tolist()
+        ct_values = self.markers.get_column("Cell Type").tolist()
+        entrezid = self.markers.get_column("Entrez ID").tolist()
         ct_variable = DiscreteVariable("Cell Type", values=list(set(ct_values)))
         entrez_variable = DiscreteVariable("Entrez ID", values=list(set(entrezid)))
 
@@ -314,8 +347,8 @@ class TestAnnotateSamples(unittest.TestCase):
         """
         Test case when cell type is a feature and Entrez id is in metas
         """
-        ct_values = self.markers.get_column_view("Cell Type")[0].tolist()
-        entrezid = self.markers.get_column_view("Entrez ID")[0].tolist()
+        ct_values = self.markers.get_column("Cell Type").tolist()
+        entrezid = self.markers.get_column("Entrez ID").tolist()
         ct_variable = DiscreteVariable("Cell Type", values=list(set(ct_values)))
         entrez_variable = DiscreteVariable("Entrez ID", values=list(set(entrezid)))
 

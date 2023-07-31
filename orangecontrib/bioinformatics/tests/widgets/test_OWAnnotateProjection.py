@@ -78,7 +78,7 @@ class TestOWAnnotateProjection(
             return table
 
         def assign_annotations(data, cell_types, *args, **kwargs):
-            columns = set(cell_types.get_column_view(cell_types.domain["Cell Type"])[0])
+            columns = set(cell_types.get_column(cell_types.domain["Cell Type"]))
             domain = Domain([ContinuousVariable(c) for c in columns])
             table = Table.from_list(domain, np.random.random((len(data), len(domain))))
             return table, table

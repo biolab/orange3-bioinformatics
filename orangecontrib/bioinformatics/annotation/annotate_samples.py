@@ -133,21 +133,21 @@ class AnnotateSamplesMeta:
             list(
                 map(
                     ann.domain["Cell Type"].repr_val,
-                    ann.get_column_view("Cell Type")[0],
+                    ann.get_column("Cell Type"),
                 )
             )
             if ann.domain["Cell Type"].is_discrete
-            else ann.get_column_view("Cell Type")[0]
+            else ann.get_column("Cell Type")
         )
         entrez_values = (
             list(
                 map(
                     ann.domain["Entrez ID"].repr_val,
-                    ann.get_column_view("Entrez ID")[0],
+                    ann.get_column("Entrez ID"),
                 )
             )
             if ann.domain["Entrez ID"].is_discrete
-            else ann.get_column_view("Entrez ID")[0]
+            else ann.get_column("Entrez ID")
         )
 
         # the framework recognizes Gene instead of Entrez ID

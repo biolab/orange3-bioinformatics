@@ -4,18 +4,41 @@ from functools import partial
 
 import numpy as np
 import requests
-from orangewidget.settings import Setting, ContextHandler
 
 from AnyQt import QtGui, QtCore
-from AnyQt.QtCore import Qt, QSize, QMimeData, QModelIndex, QAbstractItemModel, QSortFilterProxyModel, pyqtSignal
-from AnyQt.QtWidgets import QLayout, QWidget, QLineEdit, QTreeView, QGridLayout, QTextBrowser, QAbstractItemView
+from AnyQt.QtCore import (
+    Qt,
+    QSize,
+    QMimeData,
+    QModelIndex,
+    QAbstractItemModel,
+    QSortFilterProxyModel,
+    pyqtSignal,
+)
+from AnyQt.QtWidgets import (
+    QLayout,
+    QWidget,
+    QLineEdit,
+    QTreeView,
+    QGridLayout,
+    QTextBrowser,
+    QAbstractItemView,
+)
+
+from orangewidget.settings import Setting
 
 from Orange.data import Table, RowInstance
 from Orange.widgets import gui, widget, settings
 
 from orangecontrib.bioinformatics.utils import serverfiles
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
-from orangecontrib.bioinformatics.widgets.utils.settings import MarkerGroupContextHandler
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID,
+    GENE_ID_COLUMN,
+    GENE_AS_ATTRIBUTE_NAME,
+)
+from orangecontrib.bioinformatics.widgets.utils.settings import (
+    MarkerGroupContextHandler,
+)
 
 SERVER_FILES_DOMAIN = 'marker_genes'
 GROUP_BY_ITEMS = ["Cell Type", "Function"]
@@ -26,7 +49,11 @@ MAP_GROUP_TO_TAX_ID = {'Human': '9606', 'Mouse': '10090'}
 
 class TreeItem(object):
     def __init__(
-        self, name: str, is_type_item: bool, data_row: Optional[RowInstance], parent: Optional["TreeItem"] = None
+        self,
+        name: str,
+        is_type_item: bool,
+        data_row: Optional[RowInstance],
+        parent: Optional["TreeItem"] = None,
     ):
         self.name: str = name
         self.parentItem: Optional["TreeItem"] = None
@@ -69,7 +96,8 @@ class TreeItem(object):
     def append_child(self, item: "TreeItem") -> None:
         """
         This function appends child to self. This function just append a child
-        and do not set parent of child item (it is set by function calling this function.
+        and do not set parent of child item (it is set by function calling this
+        function.
 
         Parameters
         ----------
@@ -107,11 +135,13 @@ class TreeItem(object):
         -------
         Success of removing
         """
-        # we could check for every index separately but in case when all items cannot be removed there is something
+        # we could check for every index separately but in case
+        # when all items cannot be removed there is something
         # wrong with the cal - just refuse to do the removal
         if position < 0 or position + count > len(self.childItems):
             return False
-        # remove from the back otherwise you get index out of range when removing more than one
+        # remove from the back otherwise you get index out of range
+        # when removing more than one
         for i in range(position + count - 1, position - 1, -1):
             self.childItems.pop(i)
         return True
@@ -128,7 +158,8 @@ class TreeItem(object):
 
     def row(self) -> int:
         """
-        Function returns the index of the item in a parents list. If it does not have parent returns 0.
+        Function returns the index of the item in a parents list.
+        If it does not have parent returns 0.
 
         Returns
         -------
@@ -138,9 +169,12 @@ class TreeItem(object):
             return self.parentItem.childItems.index(self)
         return 0
 
-    def child_from_name_index(self, name: str) -> Tuple[Optional[int], Optional["TreeItem"]]:
+    def child_from_name_index(
+        self, name: str
+    ) -> Tuple[Optional[int], Optional["TreeItem"]]:
         """
-        This function returns the index (in the array of children) and item with the name specified.
+        This function returns the index (in the array
+        of children) and item with the name specified.
 
         Parameters
         ----------
@@ -158,7 +192,8 @@ class TreeItem(object):
 
     def contains_text(self, text: str, filter_columns: List[str]) -> bool:
         """
-        Function indicates whether the text is present in any of columns in FILTER_COLUMNS.
+        Function indicates whether the text is present in any of columns
+        in FILTER_COLUMNS.
 
         Parameters
         ----------
@@ -172,7 +207,10 @@ class TreeItem(object):
         Boolean that indicates that text is present in the item.
         """
         if self.data_row is not None:
-            return any(text.lower() in str(self.data_row[col]).lower() for col in filter_columns)
+            return any(
+                text.lower() in str(self.data_row[col]).lower()
+                for col in filter_columns
+            )
         else:
             return False
 
@@ -198,19 +236,23 @@ class TreeItem(object):
         int
             Number of marker genes in the tree including itself.
         """
-        return sum(c.count_marker_genes() for c in self.childItems) + (0 if self.data_row is None else 1)
+        return sum(c.count_marker_genes() for c in self.childItems) + (
+            0 if self.data_row is None else 1
+        )
 
 
 class TreeModel(QAbstractItemModel):
-
     MIME_TYPE = "application/x-Orange-TreeModelData"
-    # it was slow to relay on the qt model signals since they are emitted every time endInsertRows is called
-    # this one will be emitted just a the end
+    # it was slow to relay on the qt model signals since they are
+    # emitted every time endInsertRows is called
+    # this one will be emitted just at the end
     data_added = pyqtSignal()
     data_removed = pyqtSignal()
     expand_item = pyqtSignal(QModelIndex, bool)
 
-    def __init__(self, data: Table, parent_column: str, parent: QModelIndex = None) -> None:
+    def __init__(
+        self, data: Table, parent_column: str, parent: QModelIndex = None
+    ) -> None:
         super().__init__(parent)
 
         self.rootItem = TreeItem("Genes", False, None)
@@ -220,7 +262,12 @@ class TreeModel(QAbstractItemModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         if not index.isValid():
             return Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDropEnabled
-        return Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled | Qt.ItemIsDragEnabled
+        return (
+            Qt.ItemIsEnabled
+            | Qt.ItemIsSelectable
+            | Qt.ItemIsDragEnabled
+            | Qt.ItemIsDragEnabled
+        )
 
     def supportedDropActions(self) -> Qt.DropAction:  # noqa: N802
         return Qt.MoveAction
@@ -311,32 +358,43 @@ class TreeModel(QAbstractItemModel):
         return self.createIndex(parent_item.row(), 0, parent_item)
 
     def removeRows(  # noqa: N802
-        self, position: int, rows: int, parent: QModelIndex = QModelIndex(), emit_data_removed: bool = True
+        self,
+        position: int,
+        rows: int,
+        parent: QModelIndex = QModelIndex(),  # noqa: B008
+        emit_data_removed: bool = True,
     ) -> bool:
         """
-        This function implements removing rows form position to position + rows form the model. It also removes
-        a parent when it becomes empty. If remove is called over the parent it remove children together with the
+        This function implements removing rows form position to position + rows
+        form the model. It also removes a parent when it becomes empty.
+        If remove is called over the parent it remove children together with the
         parent.
 
         Parameters
         ----------
         emit_data_removed
-            It indicates whether we emit dataRemoved signal. It makes possible that it is emitted when function called
-            by Qt and not when called by removeNodeList. When qt call this function indices are optimized to be in
-            range and this function is called just once for consecutive data. It is not true for data from
-            removeNodeList. In this case we call removeRows for each removed item and it can become slow when many
-            items are removed.
+            It indicates whether we emit dataRemoved signal. It makes possible
+            that it is emitted when function called by Qt and not when called by
+            removeNodeList. When qt call this function indices are optimized to be in
+            range and this function is called just once for consecutive data. It is
+            not true for data from removeNodeList. In this case we call removeRows
+            for each removed item, and it can become slow when many  items are removed.
         """
         node = self.node_from_index(parent)
         if not node:
             return False
         if not (position == 0 and node.children_count() == rows) or not node.isTypeItem:
-            # when not all children are removed or when type item is removed - when removed node is a type item its
-            # parent is not
-            self.beginRemoveRows(QModelIndex() if node is self.rootItem else parent, position, position + rows - 1)
+            # when not all children are removed or when type item is removed -
+            # when removed node is a type item its parent is not
+            self.beginRemoveRows(
+                QModelIndex() if node is self.rootItem else parent,
+                position,
+                position + rows - 1,
+            )
             success = node.remove_children(position, rows)
         else:
-            # when node is a children of a type item and all children of node needs to be removed, remove node itself
+            # when node is a children of a type item and all children of node
+            # needs to be removed, remove node itself
             self.beginRemoveRows(QModelIndex(), node.row(), node.row())
             success = self.rootItem.remove_children(node.row(), 1)
         self.endRemoveRows()
@@ -349,7 +407,8 @@ class TreeModel(QAbstractItemModel):
 
     def mimeData(self, index_list: List[QModelIndex]) -> QMimeData:  # noqa: N802
         """
-        This function packs data in QMimeData in order to move them to other view with drag and drop functionality.
+        This function packs data in QMimeData in order to move them to other view
+        with drag and drop functionality.
         """
         items = [self.node_from_index(index) for index in index_list]
         mime = QMimeData()
@@ -360,15 +419,22 @@ class TreeModel(QAbstractItemModel):
         return mime
 
     def dropMimeData(  # noqa: N802
-        self, mime: QMimeData, action: Qt.DropAction, row: int, column: int, parent: QModelIndex = QModelIndex
+        self,
+        mime: QMimeData,
+        action: Qt.DropAction,
+        row: int,
+        column: int,
+        parent: QModelIndex = QModelIndex,
     ) -> bool:
         """
-        This function unpacks QMimeData and insert them to the view where they are dropped.
-        Inserting is a bit complicated since sometimes we need to create a parent when it is not in the view yet:
-        - when child (marker gene) is dropped we insert it under the current parent (group) if it exist othervise
-          we crate a new parent.
-        - when group item is inserted it merge it with current same parent item if exist or insert it if it does
-          not exists
+        This function unpacks QMimeData and insert them to the
+        view where they are dropped.
+        Inserting is a bit complicated since sometimes we need to create a
+        parent when it is not in the view yet:
+        - when child (marker gene) is dropped we insert it under the
+            current parent (group) if it exists othervise we crate a new parent.
+        - when group item is inserted it merge it with current same
+            parent item if exist or insert it if it does not exist
         """
         if action == Qt.IgnoreAction:
             return True
@@ -401,7 +467,8 @@ class TreeModel(QAbstractItemModel):
 
     def insert_group(self, item: TreeItem) -> None:
         """
-        This function makes insert of the item in the model in case that it is a group item.
+        This function makes insert of the item in the model in case that it is
+        a group item.
 
         Parameters
         ----------
@@ -413,13 +480,21 @@ class TreeModel(QAbstractItemModel):
         item_curr_idx, curr_item = self.rootItem.child_from_name_index(item.name)
         if item_curr_idx is None:
             # it is not in the view yet - just insert it
-            self.beginInsertRows(QModelIndex(), self.rootItem.children_count(), self.rootItem.children_count())
+            self.beginInsertRows(
+                QModelIndex(),
+                self.rootItem.children_count(),
+                self.rootItem.children_count(),
+            )
             item.change_parent(self.rootItem)
             expand = item.expanded
         else:
             # it is in the view already - insert only children
             tr_idx = self.createIndex(item_curr_idx, 0, curr_item)
-            self.beginInsertRows(tr_idx, self.rowCount(tr_idx), self.rowCount(tr_idx) + len(item.childItems) - 1)
+            self.beginInsertRows(
+                tr_idx,
+                self.rowCount(tr_idx),
+                self.rowCount(tr_idx) + len(item.childItems) - 1,
+            )
             TreeItem.change_parents(item.childItems, curr_item)
         self.endInsertRows()
 
@@ -429,7 +504,8 @@ class TreeModel(QAbstractItemModel):
 
     def insert_child_item(self, item: TreeItem) -> None:
         """
-        This function makes insert of the item in the model in case that it is a child (gene) item.
+        This function makes insert of the item in the model in case that
+        it is a child (gene) item.
 
         Parameters
         ----------
@@ -437,12 +513,19 @@ class TreeModel(QAbstractItemModel):
             Item that is inserted - child item (gene).
         """
         expand_parent = None
-        parent_curr_idx, curr_parent = self.rootItem.child_from_name_index(item.parentItem.name)
+        parent_curr_idx, curr_parent = self.rootItem.child_from_name_index(
+            item.parentItem.name
+        )
         if parent_curr_idx is None:
             # parent (group) do not exists yet - crate it
-            self.beginInsertRows(QModelIndex(), self.rootItem.children_count(), self.rootItem.children_count())
+            self.beginInsertRows(
+                QModelIndex(),
+                self.rootItem.children_count(),
+                self.rootItem.children_count(),
+            )
             curr_parent = TreeItem(item.parentItem.name, True, None, self.rootItem)
-            # when creating new parent because child is inserted always expend since it is expanded in the other view
+            # when creating new parent because child is inserted always expend since
+            # it is expanded in the other view
             expand_parent = True
         else:
             # parent (group) exists - insert into it
@@ -456,10 +539,16 @@ class TreeModel(QAbstractItemModel):
             self.expand_item.emit(self.index_from_node(curr_parent), expand_parent)
 
     def canDropMimeData(  # noqa: N802
-        self, data: QMimeData, action: Qt.DropAction, row: int, column: int, parent: QModelIndex
+        self,
+        data: QMimeData,
+        action: Qt.DropAction,
+        row: int,
+        column: int,
+        parent: QModelIndex,
     ) -> bool:
         """
-        This function enable or disable drop action to the view. With current implementation we disable drop action to
+        This function enable or disable drop action to the view. With current
+        implementation we disable drop action to
         the same view.
         """
         if data.property("_source_id") == id(self):
@@ -469,8 +558,9 @@ class TreeModel(QAbstractItemModel):
 
     def remove_node_list(self, indices: List[QModelIndex]) -> None:
         """
-        Sometimes we need to remove items provided as a list of QModelIndex. Since it is not possible directly with
-        removeRows it is implemented with this function.
+        Sometimes we need to remove items provided as a list of QModelIndex.
+        Since it is not possible directly with removeRows it is implemented
+        with this function.
 
         Parameters
         ----------
@@ -479,7 +569,9 @@ class TreeModel(QAbstractItemModel):
         """
         for idx in indices:
             node = self.node_from_index(idx)
-            if node in node.parentItem.childItems:  # it is possible that item already removed since no children left
+            if (
+                node in node.parentItem.childItems
+            ):  # it is possible that item already removed since no children left
                 parent_idx = self.index_from_node(node.parentItem)
                 self.removeRows(node.row(), 1, parent_idx, emit_data_removed=False)
         self.data_removed.emit()
@@ -504,8 +596,9 @@ class TreeModel(QAbstractItemModel):
 
     def index_from_node(self, node: TreeItem) -> QModelIndex:  # noqa: N802
         """
-        This function is similar to the index function. We use it in case when we create index but not base on the
-        parent index. We could call index but it is faster to create it directly.
+        This function is similar to the index function. We use it in case when we
+        create index but not base on the parent index. We could call index but it is
+        faster to create it directly.
 
         Parameters
         ----------
@@ -518,7 +611,9 @@ class TreeModel(QAbstractItemModel):
         """
         return self.createIndex(node.row(), 0, node)
 
-    def index_from_name(self, name: str, parent: TreeItem) -> Optional[QModelIndex]:  # noqa: N802
+    def index_from_name(
+        self, name: str, parent: TreeItem
+    ) -> Optional[QModelIndex]:  # noqa: N802
         """
         Function create index from tree item name.
 
@@ -538,10 +633,13 @@ class TreeModel(QAbstractItemModel):
             return None
         return self.createIndex(i, 0, node)
 
-    def setup_model_data(self, data_table: Table, parent: TreeItem, parent_column: str) -> None:  # noqa: N802
+    def setup_model_data(
+        self, data_table: Table, parent: TreeItem, parent_column: str
+    ) -> None:  # noqa: N802
         """
-        Function populates the view with the items from the data table. Items are inserted as a tree with the depth 2
-        each row (gene from the table) get inserted under the parent item (group) which is defined with the
+        Function populates the view with the items from the data table. Items are
+        inserted as a tree with the depth 2 each row (gene from the table) get inserted
+        under the parent item (group) which is defined with the
         paren_column parameter (e.g. marker gene).
 
         Parameters
@@ -554,8 +652,8 @@ class TreeModel(QAbstractItemModel):
             Column which is the group for items in the tree.
         """
         parents_dict = {}
-        names = data_table.get_column_view("Name")[0]
-        types = data_table.get_column_view(parent_column)[0]
+        names = data_table.get_column("Name")
+        types = data_table.get_column(parent_column)
         for n, pt, row in zip(names, types, data_table):
             if pt not in parents_dict:
                 parents_dict[pt] = TreeItem(pt, True, None, parent)
@@ -564,7 +662,8 @@ class TreeModel(QAbstractItemModel):
 
     def set_expanded(self, index: QModelIndex, expanded: bool) -> None:
         """
-        Sets the expanded flag of the item. This flag tell whether the item in the view is expanded.
+        Sets the expanded flag of the item. This flag tell whether the item in the view
+        is expanded.
 
         Parameters
         ----------
@@ -590,7 +689,8 @@ class TreeModel(QAbstractItemModel):
 
 class FilterProxyModel(QSortFilterProxyModel):
     """
-    FilterProxyModel is used to sort items in alphabetical order, and to make filter on the view of available genes.
+    FilterProxyModel is used to sort items in alphabetical order, and to make
+    filter on the view of available genes.
 
     Parameters
     ----------
@@ -615,7 +715,9 @@ class FilterProxyModel(QSortFilterProxyModel):
             return True
         model = self.sourceModel()
         idx = model.index(p_int, 0, index)
-        res = model.node_from_index(idx).contains_text(self.filter_line_edit.text(), self.sourceModel().filter_columns)
+        res = model.node_from_index(idx).contains_text(
+            self.filter_line_edit.text(), self.sourceModel().filter_columns
+        )
 
         if model.hasChildren(idx):
             num_items = model.rowCount(idx)
@@ -653,7 +755,8 @@ class TreeView(QTreeView):
 
     def handle_expand(self, e: QtGui.QMouseEvent) -> None:
         """
-        Check if click happened on the part with cause expanding the item in the view. If so also expand/collapse
+        Check if click happened on the part with cause expanding the item in the view.
+        If so also expand/collapse
         the same item in the other view.
         """
         clicked_index = self.indexAt(e.pos())
@@ -662,12 +765,16 @@ class TreeView(QTreeView):
             vrect = self.visualRect(clicked_index)
             item_identation = vrect.x() - self.visualRect(self.rootIndex()).x()
             if e.pos().x() < item_identation:
-                self.expand_in_other_view(clicked_index, not self.isExpanded(clicked_index))
+                self.expand_in_other_view(
+                    clicked_index, not self.isExpanded(clicked_index)
+                )
 
-    def expand_in_other_view(self, clicked_index: QModelIndex, is_expanded: bool) -> None:
+    def expand_in_other_view(
+        self, clicked_index: QModelIndex, is_expanded: bool
+    ) -> None:
         """
-        Expand/collapse item which is same to the clicked_index in the other view. The other view is one of the left
-        if click happened on the right and vice versa.
+        Expand/collapse item which is same to the clicked_index in the other view.
+        The other view is one of the left if click happened on the right and vice versa.
 
         Parameters
         ----------
@@ -685,15 +792,17 @@ class TreeView(QTreeView):
 
         clicked_name = source_model_this.node_from_index(clicked_model_index).name
 
-        index_other = source_model_other.index_from_name(clicked_name, source_model_other.rootItem)
+        index_other = source_model_other.index_from_name(
+            clicked_name, source_model_other.rootItem
+        )
         if index_other is not None:
             # if same item (item with the same name) exists in the other view
             self.otherView.setExpanded(index_other, is_expanded)
 
     def setModel(self, model: QtCore.QAbstractItemModel) -> None:  # noqa: N802
         """
-        Override setModel that we can connect expandItem signal. This signal is emitted when model
-        expand the item.
+        Override setModel that we can connect expandItem signal.
+        This signal is emitted when model expand the item.
         """
         super().setModel(model)
         self.model().sourceModel().expand_item.connect(self.setExpanded)
@@ -725,7 +834,9 @@ class OWMarkerGenes(widget.OWWidget):
     replaces = ['orangecontrib.single_cell.widgets.owmarkergenes.OWMarkerGenes']
 
     class Warning(widget.OWWidget.Warning):
-        using_local_files = widget.Msg("Can't connect to serverfiles. Using cached files.")
+        using_local_files = widget.Msg(
+            "Can't connect to serverfiles. Using cached files."
+        )
 
     class Outputs:
         genes = widget.Output("Genes", Table)
@@ -787,13 +898,17 @@ class OWMarkerGenes(widget.OWWidget):
 
     def _init_description_area(self, layout: QLayout) -> None:
         """
-        Function define an info area with description of the genes and add it to the layout.
+        Function define an info area with description of the genes and add it to the
+        layout.
         """
         box = gui.widgetBox(self.mainArea, "Description", addToLayout=False)
         self.descriptionlabel = QTextBrowser(
-            openExternalLinks=True, textInteractionFlags=(Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse)
+            openExternalLinks=True,
+            textInteractionFlags=(Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse),
         )
-        box.setMaximumHeight(self.descriptionlabel.fontMetrics().height() * (NUM_LINES_TEXT + 3))
+        box.setMaximumHeight(
+            self.descriptionlabel.fontMetrics().height() * (NUM_LINES_TEXT + 3)
+        )
 
         # description filed
         self.descriptionlabel.setText("Select a gene to see information.")
@@ -819,7 +934,11 @@ class OWMarkerGenes(widget.OWWidget):
 
         box = gui.widgetBox(self.controlArea, 'Group by', margin=0)
         self.group_by_cb = gui.comboBox(
-            box, self, 'selected_root_attribute', items=GROUP_BY_ITEMS, callback=self._setup
+            box,
+            self,
+            'selected_root_attribute',
+            items=GROUP_BY_ITEMS,
+            callback=self._setup,
         )
 
         gui.rubber(self.controlArea)
@@ -835,7 +954,8 @@ class OWMarkerGenes(widget.OWWidget):
     @available_sources.setter
     def available_sources(self, value: dict) -> None:
         """
-        Set _available_sources variable, add them to dropdown, and select the source that was previously.
+        Set _available_sources variable, add them to dropdown, and select the source
+        that was previously.
         """
         self._available_sources = value
 
@@ -864,14 +984,15 @@ class OWMarkerGenes(widget.OWWidget):
     def data(self, value: Table):
         """
         Set the source data. The data is then filtered on the first meta column (group).
-        Select set dropdown with the groups and select the one that was selected previously.
+        Select set dropdown with the groups and select the one that was selected
+        previously.
         """
         self._data = value
         domain = value.domain
 
         if domain.metas:
             group = domain.metas[0]
-            groupcol, _ = value.get_column_view(group)
+            groupcol = value.get_column(group)
 
             if group.is_string:
                 group_values = list(set(groupcol))
@@ -893,7 +1014,9 @@ class OWMarkerGenes(widget.OWWidget):
                 self.organism_index = idx
                 self.selected_organism = group_values[idx]
             elif group_values:
-                self.organism_index = min(max(self.organism_index, 0), len(group_values) - 1)
+                self.organism_index = min(
+                    max(self.organism_index, 0), len(group_values) - 1
+                )
 
             self._set_group_index(self.organism_index)
 
@@ -910,7 +1033,9 @@ class OWMarkerGenes(widget.OWWidget):
             found_sources.update(serverfiles.allinfo(SERVER_FILES_DOMAIN))
             self.Warning.using_local_files()
 
-        self.available_sources = {item.get('title').split(': ')[-1]: item for item in found_sources.values()}
+        self.available_sources = {
+            item.get('title').split(': ')[-1]: item for item in found_sources.values()
+        }
 
     def _source_changed(self) -> None:
         """
@@ -926,7 +1051,9 @@ class OWMarkerGenes(widget.OWWidget):
                 pass
 
             try:
-                file_path = serverfiles.localpath_download(SERVER_FILES_DOMAIN, file_name)
+                file_path = serverfiles.localpath_download(
+                    SERVER_FILES_DOMAIN, file_name
+                )
             except requests.exceptions.ConnectionError as err:
                 # Unexpected error.
                 raise err
@@ -960,16 +1087,20 @@ class OWMarkerGenes(widget.OWWidget):
         self.selected_markers_view.selectionModel().selectionChanged.connect(
             partial(self._on_selection_changed, self.selected_markers_view)
         )
-        self.selected_markers_view.model().sourceModel().data_added.connect(self._selected_markers_changed)
-        self.selected_markers_view.model().sourceModel().data_removed.connect(self._selected_markers_changed)
+        self.selected_markers_view.model().sourceModel().data_added.connect(
+            self._selected_markers_changed
+        )
+        self.selected_markers_view.model().sourceModel().data_removed.connect(
+            self._selected_markers_changed
+        )
 
         # update output and messages
         self._selected_markers_changed()
 
     def _filter_data_group(self, data: Table) -> Tuple[Table, Tuple]:
         """
-        Function filter the table based on the selected group (Mouse, Human) and divide them in two groups based on
-        selected_data variable.
+        Function filter the table based on the selected group (Mouse, Human) and divide
+        them in two groups based on selected_data variable.
 
         Parameters
         ----------
@@ -984,7 +1115,7 @@ class OWMarkerGenes(widget.OWWidget):
             Data that will initially be in selected markers view.
         """
         group = data.domain.metas[0]
-        gvec = data.get_column_view(group)[0]
+        gvec = data.get_column(group)
 
         if group.is_string:
             mask = gvec == self.selected_organism
@@ -994,7 +1125,8 @@ class OWMarkerGenes(widget.OWWidget):
 
         # divide data based on selected_genes variable (context)
         unique_gene_names = np.core.defchararray.add(
-            data.get_column_view("Entrez ID")[0].astype(str), data.get_column_view("Cell Type")[0].astype(str)
+            data.get_column("Entrez ID").astype(str),
+            data.get_column("Cell Type").astype(str),
         )
         mask = np.isin(unique_gene_names, self.selected_genes)
         data_not_selected = data[~mask]
@@ -1005,11 +1137,15 @@ class OWMarkerGenes(widget.OWWidget):
         rows = self.selected_markers_view.model().sourceModel().rootItem.get_data_rows()
         if len(rows) > 0:
             metas = [r.metas for r in rows]
-            data = Table.from_numpy(self.data.domain, np.empty((len(metas), 0)), metas=np.array(metas))
+            data = Table.from_numpy(
+                self.data.domain, np.empty((len(metas), 0)), metas=np.array(metas)
+            )
             # always false for marker genes data tables in single cell
             data.attributes[GENE_AS_ATTRIBUTE_NAME] = False
             # set taxonomy id in data.attributes
-            data.attributes[TAX_ID] = MAP_GROUP_TO_TAX_ID.get(self.selected_organism, '')
+            data.attributes[TAX_ID] = MAP_GROUP_TO_TAX_ID.get(
+                self.selected_organism, ''
+            )
             # set column id flag
             data.attributes[GENE_ID_COLUMN] = "Entrez ID"
             data.name = 'Marker Genes'
@@ -1024,7 +1160,11 @@ class OWMarkerGenes(widget.OWWidget):
         selection = self._selected_rows(view)
         qmodel = view.model().sourceModel()
 
-        if len(selection) > 1 or len(selection) == 0 or qmodel.node_from_index(selection[0]).data_row is None:
+        if (
+            len(selection) > 1
+            or len(selection) == 0
+            or qmodel.node_from_index(selection[0]).data_row is None
+        ):
             self.descriptionlabel.setText("Select a gene to see information.")
         else:
             data_row = qmodel.node_from_index(selection[0]).data_row
@@ -1043,13 +1183,16 @@ class OWMarkerGenes(widget.OWWidget):
         This function is called when markers in the selected view are added or removed.
         """
         rows = self.selected_markers_view.model().sourceModel().rootItem.get_data_rows()
-        self.selected_genes = [row["Entrez ID"].value + row["Cell Type"].value for row in rows]
+        self.selected_genes = [
+            row["Entrez ID"].value + row["Cell Type"].value for row in rows
+        ]
         self.commit()
 
     def _on_selection_changed(self, view: TreeView) -> None:
         """
-        When selection in one of the view changes in a view button should change a sign in the correct direction and
-        other view should reset the selection. Also gene description is updated.
+        When selection in one of the view changes in a view button should change a sign
+        in the correct direction and other view should reset the selection.
+        Also gene description is updated.
         """
         self.move_button.setText(">" if view is self.available_markers_view else "<")
         if view is self.available_markers_view:
@@ -1079,9 +1222,13 @@ class OWMarkerGenes(widget.OWWidget):
         Move selected genes when button clicked.
         """
         if self._selected_rows(self.selected_markers_view):
-            self._move_selected_from_to(self.selected_markers_view, self.available_markers_view)
+            self._move_selected_from_to(
+                self.selected_markers_view, self.available_markers_view
+            )
         elif self._selected_rows(self.available_markers_view):
-            self._move_selected_from_to(self.available_markers_view, self.selected_markers_view)
+            self._move_selected_from_to(
+                self.available_markers_view, self.selected_markers_view
+            )
 
     # support functions for callbacks
 
@@ -1115,7 +1262,9 @@ class OWMarkerGenes(widget.OWWidget):
             settings["selected_organism"] = settings.pop("selected_group", "")
             if "context_settings" in settings:
                 for co in settings["context_settings"]:
-                    co.values["selected_genes"] = [g[0] + g[1] for g in co.values["selected_genes"]]
+                    co.values["selected_genes"] = [
+                        g[0] + g[1] for g in co.values["selected_genes"]
+                    ]
 
         if version < 2:
             migrate_to_version_2()

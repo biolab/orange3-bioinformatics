@@ -6,7 +6,11 @@ from orangewidget.tests.base import WidgetTest
 from Orange.data import Table
 
 from orangecontrib.bioinformatics.widgets.OWGenes import OWGenes
-from orangecontrib.bioinformatics.widgets.utils.data import TAX_ID, GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TAX_ID,
+    GENE_ID_COLUMN,
+    GENE_AS_ATTRIBUTE_NAME,
+)
 
 
 class TestOWGenes(WidgetTest):
@@ -32,7 +36,7 @@ class TestOWGenes(WidgetTest):
 
         # check if genes were extracted from the table
         self.assertIsNotNone(self.widget.input_genes)
-        genes, _ = self.widget.input_data.get_column_view(self.widget.selected_gene_col)
+        genes = self.widget.input_data.get_column(self.widget.selected_gene_col)
         self.assertEqual(len(self.widget.input_genes), len(genes))
 
         self.wait_until_finished()
@@ -52,7 +56,7 @@ class TestOWGenes(WidgetTest):
         self.assertTrue(self.target_db in out_data.domain)
 
         # test if genes in the output data is the same as known genes from gene matcher.
-        ids, _ = out_data.get_column_view(self.target_db)
+        ids = out_data.get_column(self.target_db)
         self.assertTrue((ids == [str(g.gene_id) for g in self.gene_match_result]).all())
 
         # test if table on the output is properly annotated
@@ -76,7 +80,7 @@ class TestOWGenes(WidgetTest):
         self.assertTrue(self.target_db in out_data.domain)
 
         # we expect filtered data table on the output
-        ids, _ = out_data.get_column_view(self.target_db)
+        ids = out_data.get_column(self.target_db)
         self.assertTrue(len(ids) == 2)
 
         # test if table on the output is properly annotated

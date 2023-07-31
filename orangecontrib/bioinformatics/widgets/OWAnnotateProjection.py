@@ -33,14 +33,17 @@ from orangecontrib.bioinformatics.annotation.annotate_samples import (
     SCORING_MARKERS_SUM,
     AnnotateSamplesMeta,
 )
-from orangecontrib.bioinformatics.annotation.annotate_projection import annotate_projection, cluster_additional_points
+from orangecontrib.bioinformatics.annotation.annotate_projection import (
+    annotate_projection,
+    cluster_additional_points,
+)
 
 CELL_TYPE = "Cell Type"
 ENTREZ_ID = "Entrez ID"
 
 
 class Result(SimpleNamespace):
-    scores = None  # type: Optional[Table]
+    scores: Optional[Table] = None
     clusters = None  # type: OWAnnotateProjection.Clusters
 
 
@@ -75,7 +78,11 @@ class Runner:
 
             if not result.scores.annotations or not result.scores.p_vals:
                 annot, p_vals = AnnotateSamplesMeta.assign_annotations(
-                    result.scores.z_vals, genes, data, p_value_fun=p_value_fun, scoring=scoring
+                    result.scores.z_vals,
+                    genes,
+                    data,
+                    p_value_fun=p_value_fun,
+                    scoring=scoring,
                 )
                 result.scores.annotations = annot
                 result.scores.p_vals = p_vals
@@ -133,7 +140,6 @@ class Runner:
         result: Result,
         state: TaskState,
     ):
-
         start, step, weights = 0, 0, np.array([80, 15, 5])
 
         def set_progress():
@@ -146,7 +152,17 @@ class Runner:
 
         if not result.scores.table:
             end = start + weights[step]
-            cls.compute_scores(data, genes, p_threshold, p_value_fun, scoring, start, end, result, state)
+            cls.compute_scores(
+                data,
+                genes,
+                p_threshold,
+                p_value_fun,
+                scoring,
+                start,
+                end,
+                result,
+                state,
+            )
         if not set_progress():
             return result
 
@@ -276,7 +292,9 @@ class OWAnnotateProjectionGraph(OWScatterPlotBase):
             color = pg.mkColor(200, 200, 200)
             pen, brush = pg.mkPen(color=color), pg.mkBrush(color=color)
             size = OWScatterPlotBase.MinShapeSize + 3
-            self.ref_scatterplot_item = pg.ScatterPlotItem(x=points[0], y=points[1], pen=pen, brush=brush, size=size)
+            self.ref_scatterplot_item = pg.ScatterPlotItem(
+                x=points[0], y=points[1], pen=pen, brush=brush, size=size
+            )
             self.plot_widget.addItem(self.ref_scatterplot_item)
         else:
             self.ref_scatterplot_item.setData(x=points[0], y=points[1])
@@ -332,16 +350,16 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     color_by_cluster = Setting(False)
 
     class Scores(SimpleNamespace):
-        z_vals = None  # type: Optional[Table]
-        annotations = None  # type: Optional[Table]
-        p_vals = None  # type: Optional[Table]
-        table = None  # type: Optional[Table]
+        z_vals: Optional[Table] = None
+        annotations: Optional[Table] = None
+        p_vals: Optional[Table] = None
+        table: Optional[Table] = None
 
     class Clusters(SimpleNamespace):
-        table = None  # type: Optional[Table]
-        groups = None  # type: Optional[Dict[str, Tuple]]
-        epsilon = None  # type: Optional[float]
-        secondary_table = None  # type: Optional[Table]
+        table: Optional[Table] = None
+        groups: Optional[Dict[str, Tuple]] = None
+        epsilon: Optional[float] = None
+        secondary_table: Optional[Table] = None
 
     class Inputs:
         data = Input("Reference Data", Table, default=True)
@@ -349,37 +367,53 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         genes = Input("Genes", Table)
 
     class Information(OWDataProjectionWidget.Information):
-        modified = Msg("The parameter settings have been changed. Press " "\"Start\" to rerun with the new settings.")
+        modified = Msg(
+            "The parameter settings have been changed. Press "
+            "\"Start\" to rerun with the new settings."
+        )
 
     class Warning(OWDataProjectionWidget.Warning):
         no_genes = Msg("Missing Genes table on input.")
         missing_compute_value = Msg(
-            "{} or {} is missing in Secondary data and" " cannot be computed from Reference data."
+            "{} or {} is missing in Secondary data and"
+            " cannot be computed from Reference data."
         )
-        missing_tax_id = Msg(f"'{TAX_ID}' is missing in Reference data. " f"Try using 'Genes' widget.")
+        missing_tax_id = Msg(
+            f"'{TAX_ID}' is missing in Reference data. " f"Try using 'Genes' widget."
+        )
         missing_entrez_id = Msg("'Entred ID' is missing in Genes table.")
         missing_cell_type = Msg("'Cell Type' is missing in Genes table.")
-        missing_tax_id_genes = Msg(f"'{TAX_ID}' is missing in Genes table. " f"Try using 'Marker Genes' widget.")
-        different_tax_id = Msg(f"Data and Genes appear to describe different " f"organisms (mismatching {TAX_ID}).")
-        same_axis_features = Msg("Selected features for Axis x and " "Axis y should differ.")
+        missing_tax_id_genes = Msg(
+            f"'{TAX_ID}' is missing in Genes table. "
+            f"Try using 'Marker Genes' widget."
+        )
+        different_tax_id = Msg(
+            f"Data and Genes appear to describe different "
+            f"organisms (mismatching {TAX_ID})."
+        )
+        same_axis_features = Msg(
+            "Selected features for Axis x and " "Axis y should differ."
+        )
 
     class Error(OWDataProjectionWidget.Error):
         no_reference_data = Msg("Missing Reference data on input.")
         no_continuous_vars = Msg("Data has no continuous variables.")
         not_enough_inst = Msg("Not enough instances in Reference data.")
         proj_error = Msg("An error occurred while annotating data.\n{}")
-        sec_proj_error = Msg("An error occurred while projecting " "Secondary data.\n{}")
+        sec_proj_error = Msg(
+            "An error occurred while projecting " "Secondary data.\n{}"
+        )
 
     def __init__(self):
         OWDataProjectionWidget.__init__(self)
         ConcurrentWidgetMixin.__init__(self)
         # inputs
-        self.reference_data = None  # type: Optional[Table]
-        self.secondary_data = None  # type: Optional[Table]
-        self.genes = None  # type: Optional[Table]
+        self.reference_data: Optional[Table] = None
+        self.secondary_data: Optional[Table] = None
+        self.genes: Optional[Table] = None
         # annotations
-        self.scores = None  # type: OWAnnotateProjection.Scores
-        self.clusters = None  # type: OWAnnotateProjection.Clusters
+        self.scores: OWAnnotateProjection.Scores = None
+        self.clusters: OWAnnotateProjection.Clusters = None
         self.__invalidate_scores()
         self.__invalidate_clusters()
 
@@ -401,7 +435,11 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         )
         self._plot_box.children()[1].hide()  # Hide 'Show color regions'
         gui.checkBox(
-            self._plot_box, self.graph, "show_cluster_hull", "Show cluster hull", callback=self.graph.update_clusters
+            self._plot_box,
+            self.graph,
+            "show_cluster_hull",
+            "Show cluster hull",
+            callback=self.graph.update_clusters,
         )
         gui.checkBox(
             self._plot_box,
@@ -411,7 +449,11 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             callback=self.__color_by_cluster_changed,
         )
         gui.checkBox(
-            self._plot_box, self.graph, "show_ref_data", "Show reference data", callback=self.__show_ref_data_changed
+            self._plot_box,
+            self.graph,
+            "show_ref_data",
+            "Show reference data",
+            callback=self.__show_ref_data_changed,
         )
 
     def __add_annotation_controls(self):
@@ -425,10 +467,22 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         ord = (DomainModel.METAS, DomainModel.ATTRIBUTES, DomainModel.CLASSES)
         mod = DomainModel(ord, valid_types=ContinuousVariable)
         gui.comboBox(
-            box, self, "attr_x", label="Axis x:", model=mod, callback=self.__axis_attr_changed, **common_options
+            box,
+            self,
+            "attr_x",
+            label="Axis x:",
+            model=mod,
+            callback=self.__axis_attr_changed,
+            **common_options,
         )
         gui.comboBox(
-            box, self, "attr_y", label="Axis y:", model=mod, callback=self.__axis_attr_changed, **common_options
+            box,
+            self,
+            "attr_y",
+            label="Axis y:",
+            model=mod,
+            callback=self.__axis_attr_changed,
+            **common_options,
         )
 
         box = gui.vBox(self.controlArea, box='Annotation')
@@ -454,11 +508,26 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             callback=self.__scoring_combo_changed,
         )
         gui.doubleSpin(
-            box, self, "p_threshold", 0, 1, 0.01, label="FDR threshold:", callback=self.__p_threshold_changed
+            box,
+            self,
+            "p_threshold",
+            0,
+            1,
+            0.01,
+            label="FDR threshold:",
+            callback=self.__p_threshold_changed,
         )
         hbox = gui.hBox(box)
-        gui.checkBox(hbox, self, "use_user_epsilon", "ε for DBSCAN:", callback=self.__epsilon_check_changed)
-        self.epsilon_spin = gui.doubleSpin(hbox, self, "epsilon", 0, 10, 0.1, callback=self.__epsilon_changed)
+        gui.checkBox(
+            hbox,
+            self,
+            "use_user_epsilon",
+            "ε for DBSCAN:",
+            callback=self.__epsilon_check_changed,
+        )
+        self.epsilon_spin = gui.doubleSpin(
+            hbox, self, "epsilon", 0, 10, 0.1, callback=self.__epsilon_changed
+        )
         self.run_button = gui.button(box, self, "Start", self._toggle_run)
 
     @property
@@ -522,7 +591,9 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             self.__epsilon_changed()
 
     def __invalidate_scores(self):
-        self.scores = self.Scores(z_vals=None, annotations=None, p_vals=None, scores=None)
+        self.scores = self.Scores(
+            z_vals=None, annotations=None, p_vals=None, scores=None
+        )
 
     def __invalidate_scores_table(self):
         self.scores.table = None
@@ -534,7 +605,9 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
 
     def __invalidate_clusters(self):
         epsilon = self.epsilon if self.use_user_epsilon else None
-        self.clusters = self.Clusters(table=None, groups=None, epsilon=epsilon, secondary_table=None)
+        self.clusters = self.Clusters(
+            table=None, groups=None, epsilon=epsilon, secondary_table=None
+        )
 
     def __invalidate_clusters_secondary_table(self):
         self.clusters.secondary_table = None
@@ -604,7 +677,9 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         super().set_data(data)
         self.reference_data = self.data
         if not (
-            data_existed and self.reference_data is not None and array_equal(effective_data.X, self.effective_data.X)
+            data_existed
+            and self.reference_data is not None
+            and array_equal(effective_data.X, self.effective_data.X)
         ):
             self.clear()
             self.__invalidate_scores()
@@ -687,7 +762,9 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
             and self.genes
             and TAX_ID in self.reference_data.attributes
             and TAX_ID in self.genes.attributes
-            and (self.genes.attributes[TAX_ID] != self.reference_data.attributes[TAX_ID])
+            and (
+                self.genes.attributes[TAX_ID] != self.reference_data.attributes[TAX_ID]
+            )
         ):
             self.Warning.different_tax_id()
         elif self.secondary_data and not self.reference_data:
@@ -715,8 +792,8 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     def get_coordinates_reference_data(self):
         if not self.secondary_data or not self.reference_data:
             return None
-        x_data = self.reference_data.get_column_view(self.attr_x)[0]
-        y_data = self.reference_data.get_column_view(self.attr_y)[0]
+        x_data = self.reference_data.get_column(self.attr_x)
+        y_data = self.reference_data.get_column(self.attr_y)
         return np.vstack((x_data, y_data))
 
     def get_embedding(self):
@@ -758,12 +835,16 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         return np.vstack((x_data, y_data)).T
 
     def get_color_data(self):
-        table = self.clusters.secondary_table if self.secondary_data else self.clusters.table
+        table = (
+            self.clusters.secondary_table
+            if self.secondary_data
+            else self.clusters.table
+        )
         if not self.color_by_cluster or not table:
             return super().get_color_data()
 
         attr = table.domain["Clusters"]
-        all_data = table.get_column_view(attr)[0]
+        all_data = table.get_column(attr)
         if all_data.dtype == object and attr.is_primitive():
             all_data = all_data.astype(float)
         if self.valid_data is not None:
@@ -796,13 +877,19 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         if not self.clusters.groups:
             return None
         var = self.clusters.table.domain["Clusters"]
-        return [(hull, var.colors[var.values.index(key)]) for key, (_, _, hull) in self.clusters.groups.items()]
+        return [
+            (hull, var.colors[var.values.index(key)])
+            for key, (_, _, hull) in self.clusters.groups.items()
+        ]
 
     def get_cluster_labels(self):
         if not self.clusters.groups:
             return None
         var = self.clusters.table.domain["Clusters"]
-        return [(ann, lab, var.colors[var.values.index(key)]) for key, (ann, lab, _) in self.clusters.groups.items()]
+        return [
+            (ann, lab, var.colors[var.values.index(key)])
+            for key, (ann, lab, _) in self.clusters.groups.items()
+        ]
 
     def send_data(self):
         if self.clusters.secondary_table:
@@ -818,13 +905,21 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
                 group_sel = np.hstack([ref_group_sel, sec_group_sel])
 
             selection = graph.get_selection() + len(ref_proj_data)
-            self.Outputs.selected_data.send(self._get_selected_data(data, selection, group_sel))
+            self.Outputs.selected_data.send(
+                self._get_selected_data(data, selection, group_sel)
+            )
 
             # keeping backward compatible - versions of Orange < 3.25 fails on first call
             try:
-                self.Outputs.annotated_data.send(self._get_annotated_data(data, group_sel, graph.selection))
+                self.Outputs.annotated_data.send(
+                    self._get_annotated_data(data, group_sel, graph.selection)
+                )
             except TypeError:
-                self.Outputs.annotated_data.send(self._get_annotated_data(data, selection, group_sel, graph.selection))
+                self.Outputs.annotated_data.send(
+                    self._get_annotated_data(
+                        data, selection, group_sel, graph.selection
+                    )
+                )
         else:
             super().send_data()
 
@@ -843,14 +938,22 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         n_sco = self.scores.table.X.shape[1]
         n_clu = n_sco + self.clusters.table.X.shape[1]
         domain = self.reference_data.domain
-        metas = chain(self.scores.table.domain.attributes, self.clusters.table.domain.attributes, domain.metas)
+        metas = chain(
+            self.scores.table.domain.attributes,
+            self.clusters.table.domain.attributes,
+            domain.metas,
+        )
         domain = Domain(domain.attributes, domain.class_vars, metas)
         if self.clusters.secondary_table:
             domain = self.__concatenate_domains(domain, self.secondary_data.domain)
 
-        augmented_data = get_augmented_data(self.reference_data, self.scores.table.X, self.clusters.table.X)
+        augmented_data = get_augmented_data(
+            self.reference_data, self.scores.table.X, self.clusters.table.X
+        )
         if self.clusters.secondary_table:
-            sec_aug_data = get_augmented_data(self.secondary_data, None, self.clusters.secondary_table.X)
+            sec_aug_data = get_augmented_data(
+                self.secondary_data, None, self.clusters.secondary_table.X
+            )
             return augmented_data, sec_aug_data
         return augmented_data
 
@@ -871,7 +974,9 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         return Domain(attributes, class_vars, metas)
 
     def __add_data_source_column(self, data):
-        source_attr = DiscreteVariable("Data Source", values=[self.reference_data.name, self.secondary_data.name])
+        source_attr = DiscreteVariable(
+            "Data Source", values=[self.reference_data.name, self.secondary_data.name]
+        )
         domain = data.domain
         metas = chain(domain.metas, [source_attr])
         domain = Domain(domain.attributes, domain.class_vars, metas)
@@ -882,14 +987,22 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         return data
 
     def _get_send_report_caption(self):
-        color_vr_name = "Clusters" if self.color_by_cluster else self._get_caption_var_name(self.attr_color)
+        color_vr_name = (
+            "Clusters"
+            if self.color_by_cluster
+            else self._get_caption_var_name(self.attr_color)
+        )
         return report.render_items_vert(
             (
                 ("Color", color_vr_name),
                 ("Label", self._get_caption_var_name(self.attr_label)),
                 ("Shape", self._get_caption_var_name(self.attr_shape)),
                 ("Size", self._get_caption_var_name(self.attr_size)),
-                ("Jittering", self.graph.jitter_size != 0 and "{} %".format(self.graph.jitter_size)),
+                (
+                    "Jittering",
+                    self.graph.jitter_size != 0
+                    and "{} %".format(self.graph.jitter_size),
+                ),
             )
         )
 
@@ -917,11 +1030,15 @@ if __name__ == "__main__":
     pca_model = pca(ref_data)
     proj = pca_model(ref_data)
     new_dom = Domain(
-        ref_data.domain.attributes, ref_data.domain.class_vars, chain(ref_data.domain.metas, proj.domain.attributes)
+        ref_data.domain.attributes,
+        ref_data.domain.class_vars,
+        chain(ref_data.domain.metas, proj.domain.attributes),
     )
     ref_data = ref_data.transform(new_dom)
 
-    genes_path = serverfiles.localpath_download("marker_genes", "panglao_gene_markers.tab")
+    genes_path = serverfiles.localpath_download(
+        "marker_genes", "panglao_gene_markers.tab"
+    )
     filter_ = FilterString("Organism", FilterString.Equal, "Human")
     table_genes = Values([filter_])(Table(genes_path))
     table_genes.attributes[TAX_ID] = "9606"

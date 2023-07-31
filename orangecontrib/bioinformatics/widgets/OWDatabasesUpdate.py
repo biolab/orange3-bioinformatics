@@ -39,7 +39,11 @@ from orangecontrib.bioinformatics.geneset import DOMAIN as gene_sets_domain
 from orangecontrib.bioinformatics.geneset import filename
 from orangecontrib.bioinformatics.go.config import DOMAIN as gene_ontology_domain
 from orangecontrib.bioinformatics.go.config import FILENAME_ANNOTATION
-from orangecontrib.bioinformatics.ncbi.taxonomy import common_taxids, common_taxid_to_name, species_name_to_taxid
+from orangecontrib.bioinformatics.ncbi.taxonomy import (
+    common_taxids,
+    common_taxid_to_name,
+    species_name_to_taxid,
+)
 from orangecontrib.bioinformatics.widgets.utils.gui import TokenListCompleter
 from orangecontrib.bioinformatics.widgets.utils.concurrent import Worker
 
@@ -63,7 +67,7 @@ INFO_FILE_SCHEMA = {
 
 
 def file_size_bytes(file_path):
-    """ returns file size in bytes """
+    """returns file size in bytes"""
     return os.stat(file_path).st_size
 
 
@@ -90,7 +94,7 @@ def create_folder(path):
 
 
 class UpdateOptionsItemDelegate(QStyledItemDelegate):
-    """ An item delegate for the updates tree widget.
+    """An item delegate for the updates tree widget.
 
     note:
         Must be a child of a QTreeWidget.
@@ -125,7 +129,7 @@ def UpdateItem_match(item, string):
 
 
 def evaluate_all_info(local, server):
-    """ Return FileState
+    """Return FileState
 
     Args:
         local: info files from LocalFiles
@@ -135,7 +139,12 @@ def evaluate_all_info(local, server):
     files = set(local.keys()).union(server.keys())
 
     for domain, file_name in sorted(files):
-        yield FileState(domain, file_name, server.get((domain, file_name), None), local.get((domain, file_name), None))
+        yield FileState(
+            domain,
+            file_name,
+            server.get((domain, file_name), None),
+            local.get((domain, file_name), None),
+        )
 
 
 def evaluate_files_state(progress_callback):
@@ -178,7 +187,6 @@ def download_server_file(fs, index, progress_callback):
 
 
 class OWDatabasesUpdate(OWWidget):
-
     name = "Databases Update"
     description = "Update local systems biology databases."
     icon = "../widgets/icons/OWDatabasesUpdate.svg"
@@ -209,7 +217,9 @@ class OWDatabasesUpdate(OWWidget):
         self.filesView.setSelectionMode(QAbstractItemView.NoSelection)
         self.filesView.setSortingEnabled(True)
         self.filesView.sortItems(header.Title, Qt.AscendingOrder)
-        self.filesView.setItemDelegateForColumn(0, UpdateOptionsItemDelegate(self.filesView))
+        self.filesView.setItemDelegateForColumn(
+            0, UpdateOptionsItemDelegate(self.filesView)
+        )
 
         self.filesView.model().layoutChanged.connect(self.search_update)
 
@@ -219,19 +229,35 @@ class OWDatabasesUpdate(OWWidget):
         gui.widgetBox(self.controlArea, margin=0, orientation=layout)
 
         self.updateButton = gui.button(
-            box, self, "Update all", callback=self.update_all, tooltip="Update all updatable files"
+            box,
+            self,
+            "Update all",
+            callback=self.update_all,
+            tooltip="Update all updatable files",
         )
 
         self.downloadButton = gui.button(
-            box, self, "Download all", callback=self.download_filtered, tooltip="Download all filtered files shown"
+            box,
+            self,
+            "Download all",
+            callback=self.download_filtered,
+            tooltip="Download all filtered files shown",
         )
 
         self.cancelButton = gui.button(
-            box, self, "Cancel", callback=self.cancel_active_threads, tooltip="Cancel scheduled downloads/updates."
+            box,
+            self,
+            "Cancel",
+            callback=self.cancel_active_threads,
+            tooltip="Cancel scheduled downloads/updates.",
         )
 
         self.addButton = gui.button(
-            box, self, "Add ...", callback=self.__handle_dialog, tooltip="Add files for personal use."
+            box,
+            self,
+            "Add ...",
+            callback=self.__handle_dialog,
+            tooltip="Add files for personal use.",
         )
 
         layout.addWidget(self.updateButton)
@@ -306,17 +332,25 @@ class OWDatabasesUpdate(OWWidget):
         if not retry:
             if fs.state == OUTDATED:
                 button.setText('Update')
-                button.clicked.connect(partial(self.submit_download_task, fs.domain, fs.filename, True))
+                button.clicked.connect(
+                    partial(self.submit_download_task, fs.domain, fs.filename, True)
+                )
             elif fs.state == USER_FILE:
                 if not fs.info_server:
                     button.setText('Remove')
-                    button.clicked.connect(partial(self.submit_remove_task, fs.domain, fs.filename))
+                    button.clicked.connect(
+                        partial(self.submit_remove_task, fs.domain, fs.filename)
+                    )
                 else:
                     button.setText('Use server version')
-                    button.clicked.connect(partial(self.submit_download_task, fs.domain, fs.filename, True))
+                    button.clicked.connect(
+                        partial(self.submit_download_task, fs.domain, fs.filename, True)
+                    )
         else:
             button.setText('Retry')
-            button.clicked.connect(partial(self.submit_download_task, fs.domain, fs.filename, True))
+            button.clicked.connect(
+                partial(self.submit_download_task, fs.domain, fs.filename, True)
+            )
 
         button.setMaximumWidth(120)
         button.setMaximumHeight(20)
@@ -328,8 +362,7 @@ class OWDatabasesUpdate(OWWidget):
         self.filesView.setItemWidget(fs.tree_item, header.Update, button)
 
     def set_files_list(self, result):
-        """ Set the files to show.
-        """
+        """Set the files to show."""
         assert threading.current_thread() == threading.main_thread()
         self.progress_bar.finish()
         self.setStatusMessage('')
@@ -342,21 +375,29 @@ class OWDatabasesUpdate(OWWidget):
             fs.tree_item = FileStateItem(fs)
             fs.download_option = DownloadOption(state=fs.state)
 
-            fs.download_option.download_clicked.connect(partial(self.submit_download_task, fs.domain, fs.filename))
-            fs.download_option.remove_clicked.connect(partial(self.submit_remove_task, fs.domain, fs.filename))
+            fs.download_option.download_clicked.connect(
+                partial(self.submit_download_task, fs.domain, fs.filename)
+            )
+            fs.download_option.remove_clicked.connect(
+                partial(self.submit_remove_task, fs.domain, fs.filename)
+            )
 
         # add widget items to the QTreeWidget
         self.filesView.addTopLevelItems([fs.tree_item for fs in self.update_items])
 
         # add action widgets to tree items
         for fs in self.update_items:
-            self.filesView.setItemWidget(fs.tree_item, header.Download, fs.download_option)
+            self.filesView.setItemWidget(
+                fs.tree_item, header.Download, fs.download_option
+            )
             if fs.state in [USER_FILE, OUTDATED]:
                 self.__create_action_button(fs)
 
             all_tags.update(fs.tags)
 
-        self.filesView.setColumnWidth(header.Download, self.filesView.sizeHintForColumn(header.Download))
+        self.filesView.setColumnWidth(
+            header.Download, self.filesView.sizeHintForColumn(header.Download)
+        )
 
         for column in range(1, len(header_labels)):
             self.filesView.resizeColumnToContents(column)
@@ -401,8 +442,7 @@ class OWDatabasesUpdate(OWWidget):
         self.run_download_tasks()
 
     def submit_download_task(self, domain, filename, start=True):
-        """ Submit the (domain, filename) to be downloaded/updated.
-        """
+        """Submit the (domain, filename) to be downloaded/updated."""
         # get selected tree item
         index = self.tree_item_index(domain, filename)
         fs = self.update_items[index]
@@ -476,7 +516,9 @@ class OWDatabasesUpdate(OWWidget):
         fs = self.update_items[index]
 
         if fs.state == USER_FILE:
-            self.filesView.takeTopLevelItem(self.filesView.indexOfTopLevelItem(fs.tree_item))
+            self.filesView.takeTopLevelItem(
+                self.filesView.indexOfTopLevelItem(fs.tree_item)
+            )
             self.update_items.remove(fs)
             # self.filesView.removeItemWidget(index)
         else:
@@ -491,8 +533,7 @@ class OWDatabasesUpdate(OWWidget):
         self.toggle_action_buttons()
 
     def cancel_active_threads(self):
-        """ Cancel all pending update/download tasks (that have not yet started).
-        """
+        """Cancel all pending update/download tasks (that have not yet started)."""
         if self.threadpool:
             self.threadpool.clear()
 
@@ -508,8 +549,7 @@ class OWDatabasesUpdate(OWWidget):
 
 
 class DownloadOption(QWidget):
-    """ A Widget with download/update/remove options.
-    """
+    """A Widget with download/update/remove options."""
 
     download_clicked = Signal()
     remove_clicked = Signal()
@@ -562,7 +602,9 @@ class DownloadOption(QWidget):
         except Exception:
             pass
 
-        if not self.checkButton.isChecked():  # Switch signals if the file is present or not
+        if (
+            not self.checkButton.isChecked()
+        ):  # Switch signals if the file is present or not
             self.checkButton.clicked.connect(self.download_clicked)
         else:
             self.checkButton.clicked.connect(self.remove_clicked)
@@ -632,7 +674,7 @@ class FileState:
             return self.info_server.source.capitalize().replace('_', ' ')
 
     def __item_state(self):
-        """ Return item state
+        """Return item state
 
         Note:
             available  -> available for download
@@ -658,7 +700,6 @@ class FileState:
 
         if self.info_server and self.info_local:
             if not self.info_local.source == SOURCE_USER:
-
                 if self.info_local.datetime < self.info_server.datetime:
                     return OUTDATED
                 else:
@@ -669,16 +710,16 @@ class FileState:
 
     @staticmethod
     def parse_info_file(info):
-        """ Parse .info file from JSON like format to namedtuple
-        """
+        """Parse .info file from JSON like format to namedtuple"""
         if info is not None:
             if not isinstance(info['datetime'], d_time):
-                info['datetime'] = d_time.strptime(info['datetime'], "%Y-%m-%d %H:%M:%S.%f")
+                info['datetime'] = d_time.strptime(
+                    info['datetime'], "%Y-%m-%d %H:%M:%S.%f"
+                )
             return namedtuple('file_info', info.keys())(**info)
 
 
 class FileStateItem(QTreeWidgetItem):
-
     STATE_STRINGS = {
         0: 'not downloaded',
         1: 'downloaded, current',
@@ -699,8 +740,7 @@ class FileStateItem(QTreeWidgetItem):
     EditRole2 = next(gui.OrangeUserRole)
 
     def __init__(self, fs):
-        """ A QTreeWidgetItem for displaying a FileState.
-        """
+        """A QTreeWidgetItem for displaying a FileState."""
         QTreeWidgetItem.__init__(self, type=QTreeWidgetItem.UserType)
         self.update_data(fs)
         self._update_tool_tip(fs)
@@ -731,13 +771,19 @@ class FileStateItem(QTreeWidgetItem):
         else:
             diff_date = None
 
-        tooltip = "State: {}\nTags: {}".format(state_str, ', '.join(tag for tag in fs.tags if not tag.startswith("#")))
+        tooltip = "State: {}\nTags: {}".format(
+            state_str, ', '.join(tag for tag in fs.tags if not tag.startswith("#"))
+        )
 
         if fs.state in [CURRENT, OUTDATED, DEPRECATED]:
-            tooltip += "\nFile: {}".format(serverfiles.localpath(fs.domain, fs.filename))
+            tooltip += "\nFile: {}".format(
+                serverfiles.localpath(fs.domain, fs.filename)
+            )
 
         if fs.state == OUTDATED and diff_date:
-            tooltip += "\nServer version: {}\nStatus: old {} days".format(fs.datetime, diff_date.days)
+            tooltip += "\nServer version: {}\nStatus: old {} days".format(
+                fs.datetime, diff_date.days
+            )
         else:
             tooltip += "\nServer version: {}".format(fs.datetime)
 
@@ -766,11 +812,12 @@ class FileStateItem(QTreeWidgetItem):
 
 
 class FileUploadHelper(QDialog):
-
     # settings
     kegg_domain = 'KEGG'
 
-    supported_domains = OrderedDict({'Gene Ontology': gene_ontology_domain, 'Gene Sets': gene_sets_domain})
+    supported_domains = OrderedDict(
+        {'Gene Ontology': gene_ontology_domain, 'Gene Sets': gene_sets_domain}
+    )
 
     supported_organisms = [common_taxid_to_name(tax_id) for tax_id in common_taxids()]
 
@@ -834,7 +881,9 @@ class FileUploadHelper(QDialog):
         self.layout.addStretch(1)
 
         # Ok and Cancel buttons
-        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self
+        )
         self.layout.addWidget(self.buttons, alignment=Qt.AlignJustify)
 
         self.buttons.accepted.connect(self.__accept)
@@ -848,11 +897,15 @@ class FileUploadHelper(QDialog):
         self.hierarchy_selection.setVisible(selected)
 
     def __get_selected_domain(self):
-        domain_label = list(self.supported_domains.keys())[self.domain_selection.currentIndex()]
+        domain_label = list(self.supported_domains.keys())[
+            self.domain_selection.currentIndex()
+        ]
         return self.supported_domains[domain_label]
 
     def __get_selected_hier(self):
-        hier_label = list(self.hierarchies.keys())[self.hierarchy_selection.currentIndex()]
+        hier_label = list(self.hierarchies.keys())[
+            self.hierarchy_selection.currentIndex()
+        ]
         return self.hierarchies[hier_label]
 
     def __create_selection_row(self, label, widget):
@@ -875,19 +928,28 @@ class FileUploadHelper(QDialog):
         self.parent()._dialog = None
 
     def __filename(self, domain, organism):
-        """ Create filename based od domain name and organism.
-        """
+        """Create filename based od domain name and organism."""
 
-        if domain in self.supported_domains.values() and domain == gene_ontology_domain and organism:
+        if (
+            domain in self.supported_domains.values()
+            and domain == gene_ontology_domain
+            and organism
+        ):
             return FILENAME_ANNOTATION.format(organism)
 
-        elif domain in self.supported_domains.values() and domain == gene_sets_domain and organism:
+        elif (
+            domain in self.supported_domains.values()
+            and domain == gene_sets_domain
+            and organism
+        ):
             return filename((self.__get_selected_hier()), organism)
 
     def __parse_selection(self):
         try:
             domain = self.__get_selected_domain()
-            organism = species_name_to_taxid(self.supported_organisms[self.organism_selection.currentIndex()])
+            organism = species_name_to_taxid(
+                self.supported_organisms[self.organism_selection.currentIndex()]
+            )
         except KeyError as e:
             raise e
 
@@ -916,7 +978,9 @@ class FileUploadHelper(QDialog):
 
     def __handle_file_selector(self):
         self.file_path = QFileDialog.getOpenFileName(self, 'Open File')[0]
-        self.file_info.setText('Selected File: {}'.format(os.path.basename(self.file_path)))
+        self.file_info.setText(
+            'Selected File: {}'.format(os.path.basename(self.file_path))
+        )
 
 
 if __name__ == "__main__":
