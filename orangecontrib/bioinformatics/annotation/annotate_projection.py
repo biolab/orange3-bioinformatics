@@ -416,7 +416,7 @@ def compute_concave_hulls(coordinates, clusters, epsilon):
         edges = set()
         # loop over triangles:
         # ia, ib, ic = indices of corner points of the triangle
-        for ia, ib, ic in tri.vertices:
+        for ia, ib, ic in tri.simplices:
             pa = pts[ia]
             pb = pts[ib]
             pc = pts[ic]

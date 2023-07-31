@@ -8,7 +8,7 @@ if __name__ == '__main__':
         install_requires=[
             'Orange3>=3.31.0',
             'orange-widget-base>=4.14.1',
-            'scipy>=1.5.0',
+            'scipy>=1.11.0',
             'pyclipper>=1.2.0',
             'point-annotator~=2.0',
             'requests',
