@@ -17,6 +17,7 @@ from Orange.data import filter as table_filter
 from Orange.misc.environ import data_dir
 
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
+from Orange.preprocess.transformation import MappingTransform
 
 domain = 'geo'
 _local_cache_path = os.path.join(data_dir(), domain)
@@ -26,6 +27,7 @@ pubmed_url = 'http://www.ncbi.nlm.nih.gov/pubmed/{}'
 
 server_files = ServerFiles(server=_server_url)
 local_files = LocalFiles(_local_cache_path, serverfiles=server_files)
+LookupMappingTransform = MappingTransform
 
 
 def is_cached(gds_id):
@@ -83,14 +85,24 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
         class_values = list(map('|'.join, zip(*column_values)))
 
         _class_values = list(set(class_values))
+        new_meta_tuple = (table.domain.metas[0],)
         map_class_values = {value: key for (key, value) in enumerate(_class_values)}
         class_var = DiscreteVariable(name='class', values=_class_values)
+        for i in range(len(column_values)):
+            data = column_values[i]
+            values = tuple(set(data))
+            mapping = {v: float(i) for i, v in enumerate(values)}
+            var = table.domain.metas[i+1]
+            tr = LookupMappingTransform(var, mapping)
+            rvar = DiscreteVariable(
+                name=var.name, values=values, compute_value=tr
+            )
+            new_meta_tuple += (rvar,)
         _domain = Domain(
             table.domain.attributes,
             table.domain.class_vars + (class_var,),
-            table.domain.metas,
+            new_meta_tuple,
         )
-
         table = table.transform(_domain)
         with table.unlocked(table.Y):
             col = table.get_column(class_var)
