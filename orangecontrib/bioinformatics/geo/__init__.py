@@ -15,9 +15,9 @@ from serverfiles import LocalFiles, ServerFiles
 from Orange.data import Table, Domain, StringVariable, DiscreteVariable
 from Orange.data import filter as table_filter
 from Orange.misc.environ import data_dir
+from Orange.preprocess.transformation import MappingTransform
 
 from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation
-from Orange.preprocess.transformation import MappingTransform
 
 domain = 'geo'
 _local_cache_path = os.path.join(data_dir(), domain)
@@ -92,11 +92,9 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
             data = column_values[i]
             values = tuple(set(data))
             mapping = {v: float(i) for i, v in enumerate(values)}
-            var = table.domain.metas[i+1]
+            var = table.domain.metas[i + 1]
             tr = LookupMappingTransform(var, mapping)
-            rvar = DiscreteVariable(
-                name=var.name, values=values, compute_value=tr
-            )
+            rvar = DiscreteVariable(name=var.name, values=values, compute_value=tr)
             new_meta_tuple += (rvar,)
         _domain = Domain(
             table.domain.attributes,
