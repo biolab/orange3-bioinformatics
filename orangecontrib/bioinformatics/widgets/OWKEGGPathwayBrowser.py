@@ -8,7 +8,16 @@ from itertools import chain
 from contextlib import contextmanager
 from collections import defaultdict
 
-from AnyQt.QtGui import QPen, QBrush, QColor, QPixmap, QPainter, QTransform, QKeySequence, QPainterPath
+from AnyQt.QtGui import (
+    QPen,
+    QBrush,
+    QColor,
+    QPixmap,
+    QPainter,
+    QTransform,
+    QKeySequence,
+    QPainterPath,
+)
 from AnyQt.QtCore import Qt, Slot, QSize, QRectF, QItemSelectionModel
 from AnyQt.QtWidgets import (
     QMenu,
@@ -68,7 +77,9 @@ def relation_list_to_multimap(rellist: Sequence[Tuple[A, B]]) -> Dict[A, Sequenc
     return dict(mmap)
 
 
-def relation_join(rela: Sequence[Tuple[A, B]], relb: Sequence[Tuple[C, D]]) -> Sequence[Tuple[A, D]]:
+def relation_join(
+    rela: Sequence[Tuple[A, B]], relb: Sequence[Tuple[C, D]]
+) -> Sequence[Tuple[A, D]]:
     res = []
     relb_mmap = relation_list_to_multimap(relb)
     for a, b in rela:
@@ -76,7 +87,9 @@ def relation_join(rela: Sequence[Tuple[A, B]], relb: Sequence[Tuple[C, D]]) -> S
     return res
 
 
-def relation_map(relation: Sequence[Tuple[A, B]], values: Sequence[A]) -> Sequence[Tuple[A, Sequence[B]]]:
+def relation_map(
+    relation: Sequence[Tuple[A, B]], values: Sequence[A]
+) -> Sequence[Tuple[A, Sequence[B]]]:
     rel_mmap = relation_list_to_multimap(relation)
     return [rel_mmap.get(v, []) for v in values]
 
@@ -186,7 +199,9 @@ class GraphicsPathwayItem(QGraphicsPixmapItem):
             action = QAction("View genes on kegg website", None)
             org = {s.split(":")[0] for s in marked_objects}.pop()
             genes = [s.split(":")[-1] for s in marked_objects]
-            address = "http://www.genome.jp/dbget-bin/www_bget?" + "+".join([org] + genes)
+            address = "http://www.genome.jp/dbget-bin/www_bget?" + "+".join(
+                [org] + genes
+            )
 
             action.triggered.connect(partial(webbrowser.open, address))
             actions.append(action)
@@ -207,7 +222,10 @@ class GraphicsPathwayItem(QGraphicsPixmapItem):
     def contextMenuEvent(self, event):
         self._menu = menu = QMenu()
         action = menu.addAction("View this pathway on KEGG website")
-        address = "http://www.kegg.jp/kegg-bin/show_pathway?%s%s" % (self.pathway.org, self.pathway.number)
+        address = "http://www.kegg.jp/kegg-bin/show_pathway?%s%s" % (
+            self.pathway.org,
+            self.pathway.number,
+        )
 
         action.triggered.connect(partial(webbrowser.open, address))
         menu.popup(event.screenPos())
@@ -248,7 +266,9 @@ class PathwayView(QGraphicsView):
 
     def updateTransform(self):
         if self.master.autoResize:
-            self.fitInView(self.scene().sceneRect().adjusted(-1, -1, 1, 1), Qt.KeepAspectRatio)
+            self.fitInView(
+                self.scene().sceneRect().adjusted(-1, -1, 1, 1), Qt.KeepAspectRatio
+            )
         else:
             self.setTransform(QTransform())
 
@@ -259,8 +279,14 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
     icon = "../widgets/icons/OWKEGGPathwayBrowser.svg"
     priority = 70
 
-    inputs = [("Data", Orange.data.Table, "SetData", widget.Default), ("Reference", Orange.data.Table, "SetRefData")]
-    outputs = [("Selected Data", Orange.data.Table, widget.Default), ("Unselected Data", Orange.data.Table)]
+    inputs = [
+        ("Data", Orange.data.Table, "SetData", widget.Default),
+        ("Reference", Orange.data.Table, "SetRefData"),
+    ]
+    outputs = [
+        ("Selected Data", Orange.data.Table, widget.Default),
+        ("Unselected Data", Orange.data.Table),
+    ]
 
     autoCommit = settings.Setting(False)
     autoResize = settings.Setting(True)
@@ -288,7 +314,14 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
         gui.separator(self.controlArea)
 
-        gui.checkBox(self.controlArea, self, "useReference", "From signal", box="Reference", callback=self.Update)
+        gui.checkBox(
+            self.controlArea,
+            self,
+            "useReference",
+            "From signal",
+            box="Reference",
+            callback=self.Update,
+        )
 
         gui.separator(self.controlArea)
 
@@ -334,7 +367,10 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         self.mainArea.layout().addWidget(spliter)
 
         self.listView = QTreeWidget(
-            allColumnsShowFocus=True, selectionMode=QTreeWidget.SingleSelection, sortingEnabled=True, maximumHeight=200
+            allColumnsShowFocus=True,
+            selectionMode=QTreeWidget.SingleSelection,
+            sortingEnabled=True,
+            maximumHeight=200,
         )
 
         spliter.addWidget(self.listView)
@@ -440,9 +476,9 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
             self.gene_id_column = self.data.attributes.get(GENE_ID_COLUMN, None)
 
             if not (
-                self.use_attr_names is not None and ((self.gene_id_attribute is None) ^ (self.gene_id_column is None))
+                self.use_attr_names is not None
+                and ((self.gene_id_attribute is None) ^ (self.gene_id_column is None))
             ):
-
                 if self.tax_id is None:
                     self.Error.missing_annotation()
                     return
@@ -468,15 +504,21 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         if data is not None and self.useReference:
             self.ref_data = data
             self.ref_tax_id = str(self.ref_data.attributes.get(TAX_ID, None))
-            self.ref_use_attr_names = self.ref_data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
-            self.ref_gene_id_attribute = self.ref_data.attributes.get(GENE_ID_ATTRIBUTE, None)
+            self.ref_use_attr_names = self.ref_data.attributes.get(
+                GENE_AS_ATTRIBUTE_NAME, None
+            )
+            self.ref_gene_id_attribute = self.ref_data.attributes.get(
+                GENE_ID_ATTRIBUTE, None
+            )
             self.ref_gene_id_column = self.ref_data.attributes.get(GENE_ID_COLUMN, None)
 
             if not (
                 self.ref_use_attr_names is not None
-                and ((self.ref_gene_id_attribute is None) ^ (self.ref_gene_id_column is None))
+                and (
+                    (self.ref_gene_id_attribute is None)
+                    ^ (self.ref_gene_id_column is None)
+                )
             ):
-
                 if self.ref_tax_id is None:
                     self.Error.missing_annotation()
                     return
@@ -518,13 +560,23 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
                 num = koEntry.title[:5] if koEntry.title else None
                 if num in path_ids:
                     return [koEntry] + reduce(
-                        lambda li, c: li + _walkCollect(c), [child for child in koEntry.entries], []
+                        lambda li, c: li + _walkCollect(c),
+                        [child for child in koEntry.entries],
+                        [],
                     )
                 else:
-                    c = reduce(lambda li, c: li + _walkCollect(c), [child for child in koEntry.entries], [])
+                    c = reduce(
+                        lambda li, c: li + _walkCollect(c),
+                        [child for child in koEntry.entries],
+                        [],
+                    )
                     return c + (c and [koEntry] or [])
 
-            allClasses = reduce(lambda li1, li2: li1 + li2, [_walkCollect(c) for c in self.koOrthology], [])
+            allClasses = reduce(
+                lambda li1, li2: li1 + li2,
+                [_walkCollect(c) for c in self.koOrthology],
+                [],
+            )
 
             def _walkCreate(koEntry, lvItem):
                 item = QTreeWidgetItem(lvItem)
@@ -587,7 +639,9 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
         if self.bestPValueItem:
             index = self.listView.indexFromItem(self.bestPValueItem)
-            self.listView.selectionModel().select(index, QItemSelectionModel.ClearAndSelect)
+            self.listView.selectionModel().select(
+                index, QItemSelectionModel.ClearAndSelect
+            )
 
     def UpdatePathwayView(self):
         items = self.listView.selectedItems()
@@ -611,7 +665,9 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
             return (pathway_id, p)
 
         self.setEnabled(False)
-        self._pathwayTask = concurrent.Task(function=lambda: get_kgml_and_image(item.pathway_id))
+        self._pathwayTask = concurrent.Task(
+            function=lambda: get_kgml_and_image(item.pathway_id)
+        )
         self._pathwayTask.finished.connect(self._onPathwayTaskFinshed)
         self._executor.submit(self._pathwayTask)
 
@@ -659,16 +715,29 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
             # the enrichment calculation.
 
             kegg_api = kegg.api.CachedKeggApi()
-            link_map = kegg_api.link(org_code, "pathway")  # [(pathway_id, kegg_gene_id)]
-            ncbi_gene_map = kegg_api.conv(org_code, 'ncbi-geneid')  # [(ncbi_gene_id, kegg_gene_id)]
+            link_map = kegg_api.link(
+                org_code, "pathway"
+            )  # [(pathway_id, kegg_gene_id)]
+            ncbi_gene_map = kegg_api.conv(
+                org_code, 'ncbi-geneid'
+            )  # [(ncbi_gene_id, kegg_gene_id)]
             ncbi_gene_map = [(_1.split(":", 1)[1], _2) for _1, _2 in ncbi_gene_map]
-            link_map = relation_join(link_map, [(_2, _1) for _1, _2 in ncbi_gene_map])  # [(pathway_id, ncbi_gene_id)]
-            kegg_sets = relation_list_to_multimap(link_map)  #  {pathway_id -> [ncbi_gene_ids]}
+            link_map = relation_join(
+                link_map, [(_2, _1) for _1, _2 in ncbi_gene_map]
+            )  # [(pathway_id, ncbi_gene_id)]
+            kegg_sets = relation_list_to_multimap(
+                link_map
+            )  #  {pathway_id -> [ncbi_gene_ids]}
             # map kegg gene ids to ncbi_gene_ids.
             kegg_sets = geneset.GeneSets(
-                sets=[geneset.GeneSet(gs_id=ddi, genes=set(genes)) for ddi, genes in kegg_sets.items()]
+                sets=[
+                    geneset.GeneSet(gs_id=ddi, genes=set(genes))
+                    for ddi, genes in kegg_sets.items()
+                ]
             )
-            pathways = pathway_enrichment(kegg_sets, genes, reference, callback=progress)
+            pathways = pathway_enrichment(
+                kegg_sets, genes, reference, callback=progress
+            )
             # Ensure that pathway entries are pre-cached for later use in the
             # list/tree view
             kegg_pathways = kegg.KEGGPathways()
@@ -682,7 +751,13 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
         progress = concurrent.methodinvoke(self, "setProgress", (float,))
 
-        run_func = partial(run_enrichment, self.org.org_code, self.input_genes, self.ref_genes, progress)
+        run_func = partial(
+            run_enrichment,
+            self.org.org_code,
+            self.input_genes,
+            self.ref_genes,
+            progress,
+        )
         self._enrichTask = concurrent.Task(function=run_func)
         self._enrichTask.finished.connect(self._onEnrichTaskFinished)
         self._executor.submit(self._enrichTask)
@@ -705,7 +780,9 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         else:
             self.warning(0)
 
-        self.infoLabel.setText("{} unique gene names on input\n".format(len(set(self.input_genes))))
+        self.infoLabel.setText(
+            "{} unique gene names on input\n".format(len(set(self.input_genes)))
+        )
 
         self.UpdateListView()
 
@@ -726,9 +803,11 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
         if self.use_attr_names:
             for variable in self.data.domain.attributes:
-                self.input_genes.append(str(variable.attributes.get(self.gene_id_attribute, '?')))
+                self.input_genes.append(
+                    str(variable.attributes.get(self.gene_id_attribute, '?'))
+                )
         else:
-            genes, _ = self.data.get_column_view(self.gene_id_column)
+            genes = self.data.get_column(self.gene_id_column)
             self.input_genes = [str(g) for g in genes]
 
         if len(self.input_genes) <= 0:
@@ -742,9 +821,11 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
 
         if self.ref_use_attr_names:
             for variable in self.ref_data.domain.attributes:
-                self.ref_genes.append(str(variable.attributes.get(self.ref_gene_id_attribute, '?')))
+                self.ref_genes.append(
+                    str(variable.attributes.get(self.ref_gene_id_attribute, '?'))
+                )
         else:
-            genes, _ = self.ref_data.get_column_view(self.ref_gene_id_column)
+            genes = self.ref_data.get_column(self.ref_gene_id_column)
             self.ref_genes = [str(g) for g in genes]
 
     def selectAll(self):
@@ -755,7 +836,10 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
         scene = self.pathwayView.scene()
         with disconnected(scene.selectionChanged, self._onSelectionChanged):
             for item in scene.items():
-                if item.flags() & QGraphicsItem.ItemIsSelectable and not item.isSelected():
+                if (
+                    item.flags() & QGraphicsItem.ItemIsSelectable
+                    and not item.isSelected()
+                ):
                     item.setSelected(True)
                     changed = True
         if changed:
@@ -768,7 +852,9 @@ class OWKEGGPathwayBrowser(widget.OWWidget):
     def commit(self):
         if self.data:
             selectedItems = self.pathwayView.scene().selectedItems()
-            selectedGenes = reduce(set.union, [item.marked_objects for item in selectedItems], set())
+            selectedGenes = reduce(
+                set.union, [item.marked_objects for item in selectedItems], set()
+            )
             # map kegg_ids back to ncbi_gene_id
             backmap = [(_2, _1) for _1, _2 in self.ncbi_gene_map]
             selectedGenes = set(flatten(relation_map(backmap, selectedGenes)))
@@ -848,7 +934,10 @@ def pathway_enrichment(genesets, genes, reference, prob=None, callback=None):
     # FDR correction
     p_values = statistics.FDR(p_values)
 
-    return {_id: (genes, p_val, len(ref)) for (_id, genes, ref), p_val in zip(result_sets, p_values)}
+    return {
+        _id: (genes, p_val, len(ref))
+        for (_id, genes, ref), p_val in zip(result_sets, p_values)
+    }
 
 
 @contextmanager

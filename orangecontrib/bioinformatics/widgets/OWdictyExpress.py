@@ -23,7 +23,10 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
     GENE_ID_ATTRIBUTE,
     GENE_AS_ATTRIBUTE_NAME,
 )
-from orangecontrib.bioinformatics.widgets.components.resolwe import SignIn, get_credential_manager
+from orangecontrib.bioinformatics.widgets.components.resolwe import (
+    SignIn,
+    get_credential_manager,
+)
 
 Labels = [
     (" ", " "),
@@ -37,7 +40,6 @@ Labels = [
 
 
 class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
-
     name = "dictyExpress"
     description = "Time-course gene expression data"
     icon = "../widgets/icons/OWdictyExpress.svg"
@@ -81,21 +83,35 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
         self.server_info = gui.label(box, self, '')
 
         box = gui.widgetBox(box, orientation=Qt.Horizontal)
-        self.sign_in_btn = gui.button(box, self, 'Sign In', callback=self.sign_in, autoDefault=False)
-        self.sign_out_btn = gui.button(box, self, 'Sign Out', callback=self.sign_out, autoDefault=False)
+        self.sign_in_btn = gui.button(
+            box, self, 'Sign In', callback=self.sign_in, autoDefault=False
+        )
+        self.sign_out_btn = gui.button(
+            box, self, 'Sign Out', callback=self.sign_out, autoDefault=False
+        )
 
         box = gui.widgetBox(self.controlArea, "Output")
         gui.radioButtonsInBox(
-            box, self, "gene_as_attr_name", ["Genes in rows", "Genes in columns"], callback=self.invalidate
+            box,
+            self,
+            "gene_as_attr_name",
+            ["Genes in rows", "Genes in columns"],
+            callback=self.invalidate,
         )
 
         self.clear_cache_btn = gui.button(
-            self.controlArea, self, "Clear cache", autoDefault=False, callback=self.clear_cache
+            self.controlArea,
+            self,
+            "Clear cache",
+            autoDefault=False,
+            callback=self.clear_cache,
         )
 
         gui.rubber(self.controlArea)
 
-        self.commit_button = gui.auto_commit(self.controlArea, self, "auto_commit", "&Commit", box=False)
+        self.commit_button = gui.auto_commit(
+            self.controlArea, self, "auto_commit", "&Commit", box=False
+        )
 
         # Experiment Section
 
@@ -106,16 +122,28 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
         self.mainArea.layout().addWidget(label)
 
         self.filter = gui.lineEdit(
-            self.mainArea, self, "searchString", "Filter:", callbackOnType=True, callback=self.search_update
+            self.mainArea,
+            self,
+            "searchString",
+            "Filter:",
+            callbackOnType=True,
+            callback=self.search_update,
         )
 
         self.experimentsWidget = QTreeWidget(
-            alternatingRowColors=True, rootIsDecorated=False, uniformRowHeights=True, sortingEnabled=True
+            alternatingRowColors=True,
+            rootIsDecorated=False,
+            uniformRowHeights=True,
+            sortingEnabled=True,
         )
 
-        self.experimentsWidget.setItemDelegateForColumn(0, gui.IndicatorItemDelegate(self, role=Qt.DisplayRole))
+        self.experimentsWidget.setItemDelegateForColumn(
+            0, gui.IndicatorItemDelegate(self, role=Qt.DisplayRole)
+        )
 
-        self.experimentsWidget.selectionModel().selectionChanged.connect(self.on_selection_changed)
+        self.experimentsWidget.selectionModel().selectionChanged.connect(
+            self.on_selection_changed
+        )
 
         self.experimentsWidget.setHeaderLabels(self.headerLabels)
         self.mainArea.layout().addWidget(self.experimentsWidget)
@@ -148,7 +176,9 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
             if dialog.resolwe_instance is not None:
                 self.res = dialog.resolwe_instance
             else:
-                self.res = connect(**self.genapi_pub_auth, server_type=resolwe.GENESIS_PLATFORM)
+                self.res = connect(
+                    **self.genapi_pub_auth, server_type=resolwe.GENESIS_PLATFORM
+                )
 
         if not silent and dialog.exec_():
             self.res = dialog.resolwe_instance
@@ -209,7 +239,9 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
             self.start(self.res.fetch_etc_objects)
 
     def load_tree_items(self, list_of_exp):
-        self.items = [CustomTreeItem(self.experimentsWidget, item) for item in list_of_exp]
+        self.items = [
+            CustomTreeItem(self.experimentsWidget, item) for item in list_of_exp
+        ]
 
         for i in range(len(self.headerLabels)):
             self.experimentsWidget.resizeColumnToContents(i)
@@ -241,7 +273,9 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
 
         if not bool(self.gene_as_attr_name):
             if 'Gene' in data.domain:
-                data = gene_matcher.match_table_column(data, 'Gene', StringVariable(ENTREZ_ID))
+                data = gene_matcher.match_table_column(
+                    data, 'Gene', StringVariable(ENTREZ_ID)
+                )
             data.attributes[GENE_ID_COLUMN] = ENTREZ_ID
         else:
             data = gene_matcher.match_table_attributes(data)
@@ -266,13 +300,16 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
 
         selected_item = selected_items[0]
         self.selected_item = selected_item.gen_data_id
-        self.start(self.res.download_etc_data, selected_item.gen_data_id, table_name=selected_item.data_name)
+        self.start(
+            self.res.download_etc_data,
+            selected_item.gen_data_id,
+            table_name=selected_item.data_name,
+        )
 
     def set_cached_indicator(self):
         cached = self.res.get_cached_ids()
 
         for item in self.items:
-
             if item.gen_data_id in cached:
                 item.setData(0, Qt.DisplayRole, " ")
             else:
@@ -281,13 +318,17 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
 
 class CustomTreeItem(QTreeWidgetItem):
     def __init__(self, parent, gen_data):
-        super(CustomTreeItem, self).__init__(parent)  # Init super class (QtGui.QTreeWidgetItem )
+        super(CustomTreeItem, self).__init__(
+            parent
+        )  # Init super class (QtGui.QTreeWidgetItem )
 
         self._gen_data = gen_data  # GenData object
         self.set_rows(self._gen_data.annotation)  # set rows in QTreeWidget
 
     def __contains__(self, text):
-        return any(text.upper() in str(self.text(i)).upper() for i in range(self.columnCount()))
+        return any(
+            text.upper() in str(self.text(i)).upper() for i in range(self.columnCount())
+        )
 
     @property
     def gen_data_id(self):
@@ -308,7 +349,7 @@ class CustomTreeItem(QTreeWidgetItem):
         for index, label in enumerate(Labels):
             if index > 0:
                 try:
-                    if type(row[label[0]]["value"]) == list:
+                    if isinstance(type(row[label[0]]["value"]), list):
                         self.setText(index, row[label[0]]["value"][0]["name"])
                     else:
                         self.setText(index, row[label[0]]["value"])

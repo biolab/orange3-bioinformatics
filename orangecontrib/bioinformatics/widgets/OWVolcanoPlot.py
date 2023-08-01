@@ -3,11 +3,20 @@ import numpy as np
 from Orange.widgets import gui, settings
 from Orange.widgets.widget import Msg
 from Orange.widgets.settings import SettingProvider
-from Orange.widgets.visualize.owscatterplot import OWScatterPlotBase, OWDataProjectionWidget
+from Orange.widgets.visualize.owscatterplot import (
+    OWScatterPlotBase,
+    OWDataProjectionWidget,
+)
 
-from orangecontrib.bioinformatics.utils.statistics import score_t_test, score_fold_change
+from orangecontrib.bioinformatics.utils.statistics import (
+    score_t_test,
+    score_fold_change,
+)
 from orangecontrib.bioinformatics.widgets.utils.gui import label_selection
-from orangecontrib.bioinformatics.widgets.utils.data import GENE_ID_COLUMN, GENE_AS_ATTRIBUTE_NAME
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    GENE_ID_COLUMN,
+    GENE_AS_ATTRIBUTE_NAME,
+)
 
 
 class VolcanoGraph(OWScatterPlotBase):
@@ -25,17 +34,26 @@ class OWVolcanoPlot(OWDataProjectionWidget):
 
     class Warning(OWDataProjectionWidget.Warning):
         insufficient_data = Msg(
-            'Insufficient data to compute statistics.' 'More than one measurement per class should be provided '
+            'Insufficient data to compute statistics.'
+            'More than one measurement per class should be provided '
         )
 
         gene_enrichment = Msg('{}, {}.')
-        no_selected_gene_sets = Msg('No gene set selected, select them from Gene Sets box.')
+        no_selected_gene_sets = Msg(
+            'No gene set selected, select them from Gene Sets box.'
+        )
 
     class Error(OWDataProjectionWidget.Error):
         exclude_error = Msg('Target labels most exclude/include at least one value.')
-        negative_values = Msg('Negative values in the input. The inputs cannot be in ratio scale.')
-        data_not_annotated = Msg('The input date is not annotated as expexted. Please refer to documentation.')
-        gene_column_id_missing = Msg('Can not identify genes column. Please refer to documentation.')
+        negative_values = Msg(
+            'Negative values in the input. The inputs cannot be in ratio scale.'
+        )
+        data_not_annotated = Msg(
+            'The input date is not annotated as expexted. Please refer to documentation.'
+        )
+        gene_column_id_missing = Msg(
+            'Can not identify genes column. Please refer to documentation.'
+        )
 
     GRAPH_CLASS = VolcanoGraph
     graph = SettingProvider(VolcanoGraph)
@@ -51,7 +69,9 @@ class OWVolcanoPlot(OWDataProjectionWidget):
         box = gui.vBox(self.controlArea, "Target Labels")
         self.group_selection_widget = label_selection.LabelSelectionWidget()
         self.group_selection_widget.groupChanged.connect(self.on_target_values_changed)
-        self.group_selection_widget.groupSelectionChanged.connect(self.on_target_values_changed)
+        self.group_selection_widget.groupSelectionChanged.connect(
+            self.on_target_values_changed
+        )
         box.layout().addWidget(self.group_selection_widget)
 
         super()._add_controls()
@@ -97,13 +117,19 @@ class OWVolcanoPlot(OWDataProjectionWidget):
 
     def setup_plot(self):
         super().setup_plot()
-        for axis, var in (("bottom", 'log<sub>2</sub> (ratio)'), ("left", '-log<sub>10</sub> (P_value)')):
+        for axis, var in (
+            ("bottom", 'log<sub>2</sub> (ratio)'),
+            ("left", '-log<sub>10</sub> (P_value)'),
+        ):
             self.graph.set_axis_title(axis, var)
 
     def on_target_values_changed(self, index):
         # Save the current selection to persistent settings
         self.current_group_index = index
-        selected_indices = [ind.row() for ind in self.group_selection_widget.currentGroupSelection().indexes()]
+        selected_indices = [
+            ind.row()
+            for ind in self.group_selection_widget.currentGroupSelection().indexes()
+        ]
 
         if self.current_group_index != -1 and selected_indices:
             self.stored_selections[self.current_group_index] = selected_indices
@@ -118,7 +144,9 @@ class OWVolcanoPlot(OWDataProjectionWidget):
 
         if self.data:
             if not self.stored_selections:
-                self.stored_selections = [[0] for _ in self.group_selection_widget.targets]
+                self.stored_selections = [
+                    [0] for _ in self.group_selection_widget.targets
+                ]
             self.group_selection_widget.set_selection()
 
     def check_data(self):
@@ -126,7 +154,9 @@ class OWVolcanoPlot(OWDataProjectionWidget):
         use_attr_names = self.data.attributes.get(GENE_AS_ATTRIBUTE_NAME, None)
         gene_id_column = self.data.attributes.get(GENE_ID_COLUMN, None)
 
-        if self.data is not None and (len(self.data) == 0 or len(self.data.domain) == 0):
+        if self.data is not None and (
+            len(self.data) == 0 or len(self.data.domain) == 0
+        ):
             self.data = None
 
         if use_attr_names is None:

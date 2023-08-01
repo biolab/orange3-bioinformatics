@@ -47,7 +47,6 @@ def run(
     mapped_genes = []
 
     for gene_set in sorted(gene_sets):
-
         step += 1
         if step % (steps / 10) == 0:
             state.set_progress_value(100 * step / steps)
@@ -247,9 +246,7 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
                 for variable in self.input_data.domain.attributes
             }
         else:
-            return {
-                str(g) for g in self.input_data.get_column_view(self.gene_location)[0]
-            }
+            return {str(g) for g in self.input_data.get_column(self.gene_location)}
 
     def on_partial_result(self, _):
         pass

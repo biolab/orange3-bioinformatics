@@ -7,9 +7,22 @@ from xml.sax.saxutils import escape
 import numpy as np
 
 from AnyQt.QtGui import QStandardItem, QStandardItemModel
-from AnyQt.QtCore import Qt, QSize, QItemSelection, QItemSelectionModel, QPersistentModelIndex
+from AnyQt.QtCore import (
+    Qt,
+    QSize,
+    QItemSelection,
+    QItemSelectionModel,
+    QPersistentModelIndex,
+)
 from AnyQt.QtCore import pyqtSignal as Signal
-from AnyQt.QtWidgets import QWidget, QComboBox, QGroupBox, QListView, QSizePolicy, QVBoxLayout
+from AnyQt.QtWidgets import (
+    QWidget,
+    QComboBox,
+    QGroupBox,
+    QListView,
+    QSizePolicy,
+    QVBoxLayout,
+)
 
 from Orange.data import Variable, StringVariable, DiscreteVariable, ContinuousVariable
 from Orange.widgets import gui
@@ -52,7 +65,10 @@ def variable_labels_tooltip(var):
 
 
 def discrete_variable_tooltip(var):
-    text = "<b>%s</b><br/>Discrete with %i values: " % (escape(var.name), len(var.values))
+    text = "<b>%s</b><br/>Discrete with %i values: " % (
+        escape(var.name),
+        len(var.values),
+    )
     text += ", ".join("%r" % escape(v) for v in var.values)
     text += variable_labels_tooltip(var)
     return text
@@ -141,22 +157,26 @@ def standarditem_from_rowgroup(rowgroup):
 
 
 def group_selection_mask(data, group, indices):
-    """ Return the selection masks for the group.
-    """
+    """Return the selection masks for the group."""
     if isinstance(group, ColumnGroup):
         selected = [group.values[i] for i in indices]
         target = {(group.key, value) for value in selected}
-        _i = [bool(set(var.attributes.items()).intersection(target)) for var in data.domain.attributes]
+        _i = [
+            bool(set(var.attributes.items()).intersection(target))
+            for var in data.domain.attributes
+        ]
         return np.array(_i, dtype=bool)
     elif isinstance(group, RowGroup):
         target = set(indices)
-        x, _ = data.get_column_view(group.var)
+        x = data.get_column(group.var)
         _i = np.zeros_like(x, dtype=bool)
         for i in target:
             _i |= x == i
         return _i
     else:
-        raise TypeError("ColumnGroup or RowGroup expected, got {}".format(type(group).__name__))
+        raise TypeError(
+            "ColumnGroup or RowGroup expected, got {}".format(type(group).__name__)
+        )
 
 
 class LabelSelectionWidget(QWidget):
@@ -242,8 +262,7 @@ class LabelSelectionWidget(QWidget):
         return group, selection
 
     def set_data(self, parent, data):
-        """ Initialize widget state after receiving new data.
-        """
+        """Initialize widget state after receiving new data."""
         self.__parent = parent
         # self.__currentIndex = parent.current_group_index
         if data is not None:
@@ -261,11 +280,12 @@ class LabelSelectionWidget(QWidget):
             self.setModel(None)
 
     def clear(self):
-        """ Clear the widget/model (same as ``setModel(None)``).
-        """
+        """Clear the widget/model (same as ``setModel(None)``)."""
         if self.__model is not None:
             self.values_view.selectionModel().clearSelection()
-            self.values_view.selectionModel().selectionChanged.disconnect(self.__onSelectionChanged)
+            self.values_view.selectionModel().selectionChanged.disconnect(
+                self.__onSelectionChanged
+            )
 
             self.values_view.setModel(None)
             self.labels_combo.setModel(QStandardItemModel(self.labels_combo))
@@ -295,7 +315,9 @@ class LabelSelectionWidget(QWidget):
         self.values_view.setModel(model)
         self.values_view.setRootIndex(model.index(0, 0))
 
-        self.values_view.selectionModel().selectionChanged.connect(self.__onSelectionChanged)
+        self.values_view.selectionModel().selectionChanged.connect(
+            self.__onSelectionChanged
+        )
         # will emit the currentIndexChanged (if the model is not empty)
         self.labels_combo.setModel(model)
 
@@ -350,7 +372,7 @@ class LabelSelectionWidget(QWidget):
                     if parent == self.__model.index(parent.row(), parent.column()):
                         pind[parent.row()].append(QPersistentModelIndex(index))
                     else:
-                        warnings.warn("Die Die Die")
+                        warnings.warn("Die Die Die", stacklevel=2)
                 else:
                     # top level index
                     pass
@@ -404,7 +426,9 @@ class LabelSelectionWidget(QWidget):
     def __storeSelection(self, groupind, indices):
         # Store current values selection for the current group
         groupind = self.__currentIndex
-        indices = [QPersistentModelIndex(ind) for ind in self.values_view.selectedIndexes()]
+        indices = [
+            QPersistentModelIndex(ind) for ind in self.values_view.selectedIndexes()
+        ]
         self.__selections[groupind] = indices
 
     def __restoreSelection(self):
@@ -422,7 +446,9 @@ class LabelSelectionWidget(QWidget):
         selection = QItemSelection()
         for ind in indices:
             selection.select(ind, ind)
-        self.values_view.selectionModel().select(selection, QItemSelectionModel.ClearAndSelect)
+        self.values_view.selectionModel().select(
+            selection, QItemSelectionModel.ClearAndSelect
+        )
 
     def sizeHint(self):
         """Reimplemented from QWidget.sizeHint"""

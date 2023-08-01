@@ -231,7 +231,6 @@ class InfiniteLine(pg.InfiniteLine):
 
 
 def hypergeometric_test_score(*args, **kwargs):
-
     expression_treshold = kwargs.get('treshold', None)
     scores, _ = score_hypergeometric_test(*args, expression_treshold)
     return scores

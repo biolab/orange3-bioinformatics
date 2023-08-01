@@ -57,7 +57,9 @@ def dataset_all_info():
 
 def dataset_download(gds_id, samples=None, transpose=False, callback=None):
     file_name = '{}.tab'.format(gds_id)
-    file_path = local_files.localpath_download(file_name, extract=True, callback=callback)
+    file_path = local_files.localpath_download(
+        file_name, extract=True, callback=callback
+    )
 
     table = Table(file_path)
     title = table.name
@@ -68,36 +70,48 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
         callback()
 
     if samples is not None:
-        filters = [table_filter.FilterStringList(sample, sample_types) for sample, sample_types in samples.items()]
+        filters = [
+            table_filter.FilterStringList(sample, sample_types)
+            for sample, sample_types in samples.items()
+        ]
         table = table_filter.Values(filters)(table)
 
         column_values = []
         for meta_var in samples.keys():
-            column_values.append(table.get_column_view(table.domain[meta_var])[0])
+            column_values.append(table.get_column(table.domain[meta_var]))
 
         class_values = list(map('|'.join, zip(*column_values)))
 
         _class_values = list(set(class_values))
         map_class_values = {value: key for (key, value) in enumerate(_class_values)}
         class_var = DiscreteVariable(name='class', values=_class_values)
-        _domain = Domain(table.domain.attributes, table.domain.class_vars + (class_var,), table.domain.metas)
+        _domain = Domain(
+            table.domain.attributes,
+            table.domain.class_vars + (class_var,),
+            table.domain.metas,
+        )
 
         table = table.transform(_domain)
         with table.unlocked(table.Y):
-            col, _ = table.get_column_view(class_var)
+            col = table.get_column(class_var)
             col[:] = [map_class_values[class_val] for class_val in class_values]
 
     if transpose:
-        table = Table.transpose(table, feature_names_column='sample_id', meta_attr_name='genes')
+        table = Table.transpose(
+            table, feature_names_column='sample_id', meta_attr_name='genes'
+        )
 
-        # When transposing a table, variable.attributes get picked up as numerical values instead of strings.
-        # We need to convert from Continuous to StringVariable
+        # When transposing a table, variable.attributes get picked up as
+        # numerical values instead of strings. We need to convert from Continuous
+        # to StringVariable
         _genes = [
             [str(int(gene)) if not np.isnan(gene) else '?']
-            for gene in table.get_column_view('Entrez ID')[0].astype(np.float64)
+            for gene in table.get_column('Entrez ID').astype(np.float64)
         ]
         new_var = StringVariable('Entrez ID')
-        metas = [var for var in table.domain.metas if var.name != 'Entrez ID'] + [new_var]
+        metas = [var for var in table.domain.metas if var.name != 'Entrez ID'] + [
+            new_var
+        ]
         new_domain = Domain(table.domain.attributes, table.domain.class_vars, metas)
         table = table.transform(new_domain)
         with table.unlocked(table.metas):
@@ -106,11 +120,19 @@ def dataset_download(gds_id, samples=None, transpose=False, callback=None):
         # table name is lost after transpose
         table.name = title
 
-        table_annotations[TableAnnotation.gene_as_attr_name] = not gds_info[TableAnnotation.gene_as_attr_name]
-        table_annotations[TableAnnotation.gene_id_column] = gds_info[TableAnnotation.gene_id_attribute]
+        table_annotations[TableAnnotation.gene_as_attr_name] = not gds_info[
+            TableAnnotation.gene_as_attr_name
+        ]
+        table_annotations[TableAnnotation.gene_id_column] = gds_info[
+            TableAnnotation.gene_id_attribute
+        ]
     else:
-        table_annotations[TableAnnotation.gene_as_attr_name] = gds_info[TableAnnotation.gene_as_attr_name]
-        table_annotations[TableAnnotation.gene_id_attribute] = gds_info[TableAnnotation.gene_id_attribute]
+        table_annotations[TableAnnotation.gene_as_attr_name] = gds_info[
+            TableAnnotation.gene_as_attr_name
+        ]
+        table_annotations[TableAnnotation.gene_id_attribute] = gds_info[
+            TableAnnotation.gene_id_attribute
+        ]
 
     if callback:
         callback()

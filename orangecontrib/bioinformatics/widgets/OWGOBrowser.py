@@ -33,13 +33,25 @@ from AnyQt.QtWidgets import (
 
 import Orange.data
 from Orange.widgets import gui, widget, settings
-from Orange.widgets.utils.concurrent import Task, FutureWatcher, ThreadExecutor, methodinvoke
+from Orange.widgets.utils.concurrent import (
+    Task,
+    FutureWatcher,
+    ThreadExecutor,
+    methodinvoke,
+)
 
 from orangecontrib.bioinformatics import go
 from orangecontrib.bioinformatics.ncbi import gene, taxonomy
 from orangecontrib.bioinformatics.utils import statistics, serverfiles
-from orangecontrib.bioinformatics.go.config import DOMAIN, FILENAME_ONTOLOGY, FILENAME_ANNOTATION
-from orangecontrib.bioinformatics.widgets.utils.data import TableAnnotation, check_table_annotation
+from orangecontrib.bioinformatics.go.config import (
+    DOMAIN,
+    FILENAME_ONTOLOGY,
+    FILENAME_ANNOTATION,
+)
+from orangecontrib.bioinformatics.widgets.utils.data import (
+    TableAnnotation,
+    check_table_annotation,
+)
 
 
 class EnsureDownloaded(Task):
@@ -116,11 +128,19 @@ class OWGOBrowser(widget.OWWidget):
     priority = 60
 
     inputs = [
-        ("Cluster Data", Orange.data.Table, "set_dataset", widget.Single + widget.Default),
+        (
+            "Cluster Data",
+            Orange.data.Table,
+            "set_dataset",
+            widget.Single + widget.Default,
+        ),
         ("Reference Data", Orange.data.Table, "set_reference_dataset"),
     ]
 
-    outputs = [("Data on Selected Genes", Orange.data.Table), ("Enrichment Report", Orange.data.Table)]
+    outputs = [
+        ("Data on Selected Genes", Orange.data.Table),
+        ("Enrichment Report", Orange.data.Table),
+    ]
 
     settingsHandler = settings.DomainContextHandler()
 
@@ -141,7 +161,8 @@ class OWGOBrowser(widget.OWWidget):
 
     class Error(widget.OWWidget.Error):
         serverfiles_unavailable = widget.Msg(
-            'Can not locate annotation files, ' 'please check your connection and try again.'
+            'Can not locate annotation files, '
+            'please check your connection and try again.'
         )
 
     def __init__(self, parent=None):
@@ -184,7 +205,10 @@ class OWGOBrowser(widget.OWWidget):
             self,
             "use_reference_dataset",
             ["Entire genome", "Reference set (input)"],
-            tooltips=["Use entire genome for reference", "Use genes from Referece Examples input signal as reference"],
+            tooltips=[
+                "Use entire genome for reference",
+                "Use genes from Referece Examples input signal as reference",
+            ],
             box="Reference",
             callback=self.__invalidate,
         )
@@ -250,7 +274,12 @@ class OWGOBrowser(widget.OWWidget):
 
         # use filter_by_p_value for FDR, as it was the default in prior versions
         gui.checkBox(
-            box, self, "filter_by_p_value", "FDR", callback=self.filter_and_display_graph, tooltip="Filter by term FDR"
+            box,
+            self,
+            "filter_by_p_value",
+            "FDR",
+            callback=self.filter_and_display_graph,
+            tooltip="Filter by term FDR",
         )
         gui.doubleSpin(
             gui.indentedBox(box),
@@ -273,13 +302,22 @@ class OWGOBrowser(widget.OWWidget):
             self,
             "prob_func",
             ["Binomial", "Hypergeometric"],
-            tooltips=["Use binomial distribution test", "Use hypergeometric distribution test"],
+            tooltips=[
+                "Use binomial distribution test",
+                "Use hypergeometric distribution test",
+            ],
             callback=self.__invalidate,
         )  # TODO: only update the p values
-        box = gui.widgetBox(self.filterTab, "Evidence codes in annotation", addSpace=True)
+        box = gui.widgetBox(
+            self.filterTab, "Evidence codes in annotation", addSpace=True
+        )
         self.evidenceCheckBoxDict = {}
         for etype in go.evidence_types_ordered:
-            ecb = QCheckBox(etype, toolTip=go.evidence_types[etype], checked=self.use_evidence_type[etype])
+            ecb = QCheckBox(
+                etype,
+                toolTip=go.evidence_types[etype],
+                checked=self.use_evidence_type[etype],
+            )
             ecb.toggled.connect(self.__on_evidence_changed)
             box.layout().addWidget(ecb)
             self.evidenceCheckBoxDict[etype] = ecb
@@ -300,7 +338,11 @@ class OWGOBrowser(widget.OWWidget):
             box,
             self,
             "selection_disjoint",
-            btnLabels=["All selected genes", "Term-specific genes", "Common term genes"],
+            btnLabels=[
+                "All selected genes",
+                "Term-specific genes",
+                "Common term genes",
+            ],
             tooltips=[
                 "Outputs genes annotated to all selected GO terms",
                 "Outputs genes that appear in only one of selected GO terms",
@@ -310,7 +352,15 @@ class OWGOBrowser(widget.OWWidget):
         )
 
         # ListView for DAG, and table for significant GOIDs
-        self.DAGcolumns = ['GO term', 'Cluster', 'Reference', 'p-value', 'FDR', 'Genes', 'Enrichment']
+        self.DAGcolumns = [
+            'GO term',
+            'Cluster',
+            'Reference',
+            'p-value',
+            'FDR',
+            'Genes',
+            'Enrichment',
+        ]
 
         self.splitter = QSplitter(Qt.Vertical, self.mainArea)
         self.mainArea.layout().addWidget(self.splitter)
@@ -324,7 +374,9 @@ class OWGOBrowser(widget.OWWidget):
 
         self.listView.header().setSectionsClickable(True)
         self.listView.header().setSortIndicatorShown(True)
-        self.listView.header().setSortIndicator(self.DAGcolumns.index('p-value'), Qt.AscendingOrder)
+        self.listView.header().setSortIndicator(
+            self.DAGcolumns.index('p-value'), Qt.AscendingOrder
+        )
         self.listView.setSortingEnabled(True)
         self.listView.setItemDelegateForColumn(6, EnrichmentColumnItemDelegate(self))
         self.listView.setRootIsDecorated(True)
@@ -337,7 +389,9 @@ class OWGOBrowser(widget.OWWidget):
         self.sigTerms.setHeaderLabels(self.DAGcolumns)
         self.sigTerms.setSortingEnabled(True)
         self.sigTerms.setSelectionMode(QTreeView.ExtendedSelection)
-        self.sigTerms.header().setSortIndicator(self.DAGcolumns.index('p-value'), Qt.AscendingOrder)
+        self.sigTerms.header().setSortIndicator(
+            self.DAGcolumns.index('p-value'), Qt.AscendingOrder
+        )
         self.sigTerms.setItemDelegateForColumn(6, EnrichmentColumnItemDelegate(self))
 
         self.sigTerms.itemSelectionChanged.connect(self.table_selection_changed)
@@ -368,8 +422,12 @@ class OWGOBrowser(widget.OWWidget):
         self.available_annotations = [
             AnnotationSlot(
                 taxid=AnnotationSlot.parse_tax_id(annotation_file),
-                name=taxonomy.common_taxid_to_name(AnnotationSlot.parse_tax_id(annotation_file)),
-                filename=FILENAME_ANNOTATION.format(AnnotationSlot.parse_tax_id(annotation_file)),
+                name=taxonomy.common_taxid_to_name(
+                    AnnotationSlot.parse_tax_id(annotation_file)
+                ),
+                filename=FILENAME_ANNOTATION.format(
+                    AnnotationSlot.parse_tax_id(annotation_file)
+                ),
             )
             for _, annotation_file in set(remote_files + serverfiles.listfiles(DOMAIN))
             if annotation_file != FILENAME_ONTOLOGY
@@ -404,7 +462,9 @@ class OWGOBrowser(widget.OWWidget):
             self.tax_id = data.attributes[TableAnnotation.tax_id]
             self.use_attr_names = data.attributes[TableAnnotation.gene_as_attr_name]
             if self.use_attr_names:
-                self.gene_id_attribute = data.attributes[TableAnnotation.gene_id_attribute]
+                self.gene_id_attribute = data.attributes[
+                    TableAnnotation.gene_id_attribute
+                ]
             else:
                 self.gene_id_column = data.attributes[TableAnnotation.gene_id_column]
             self.annotation_index = None
@@ -429,9 +489,13 @@ class OWGOBrowser(widget.OWWidget):
             self.ref_tax_id = data.attributes[TableAnnotation.tax_id]
             self.ref_use_attr_names = data.attributes[TableAnnotation.gene_as_attr_name]
             if self.ref_use_attr_names:
-                self.ref_gene_id_attribute = data.attributes[TableAnnotation.gene_id_attribute]
+                self.ref_gene_id_attribute = data.attributes[
+                    TableAnnotation.gene_id_attribute
+                ]
             else:
-                self.ref_gene_id_column = data.attributes[TableAnnotation.gene_id_column]
+                self.ref_gene_id_column = data.attributes[
+                    TableAnnotation.gene_id_column
+                ]
 
         self.referenceRadioBox.buttons[1].setDisabled(not bool(data))
         self.referenceRadioBox.buttons[1].setText("Reference set")
@@ -481,9 +545,11 @@ class OWGOBrowser(widget.OWWidget):
 
         if self.ref_use_attr_names:
             for variable in self.input_data.domain.attributes:
-                self.ref_genes.append(str(variable.attributes.get(self.ref_gene_id_attribute, '?')))
+                self.ref_genes.append(
+                    str(variable.attributes.get(self.ref_gene_id_attribute, '?'))
+                )
         else:
-            genes, _ = self.ref_data.get_column_view(self.ref_gene_id_column)
+            genes = self.ref_data.get_column(self.ref_gene_id_column)
             self.ref_genes = [str(g) for g in genes]
 
     def __get_input_genes(self):
@@ -491,17 +557,18 @@ class OWGOBrowser(widget.OWWidget):
 
         if self.use_attr_names:
             for variable in self.input_data.domain.attributes:
-                self.input_genes.append(str(variable.attributes.get(self.gene_id_attribute, '?')))
+                self.input_genes.append(
+                    str(variable.attributes.get(self.gene_id_attribute, '?'))
+                )
         else:
-            genes, _ = self.input_data.get_column_view(self.gene_id_column)
+            genes = self.input_data.get_column(self.gene_id_column)
             self.input_genes = [str(g) for g in genes]
 
     def filter_annotated_genes(self, genes):
         matchedgenes = self.annotations.get_gene_names_translator(genes).values()
         return matchedgenes, [gene for gene in genes if gene not in matchedgenes]
 
-    def __start_download(self, files_list):
-        # type: (List[Tuple[str, str]]) -> None
+    def __start_download(self, files_list: List[Tuple[str, str]]) -> None:
         task = EnsureDownloaded(files_list)
         task.progress.connect(self._progress_bar_set)
 
@@ -518,7 +585,6 @@ class OWGOBrowser(widget.OWWidget):
 
     @Slot(Future)
     def __download_finish(self, result):
-        # type: (Future[None]) -> None
         assert QThread.currentThread() is self.thread()
         assert result.done()
         self.setBlocking(False)
@@ -587,7 +653,10 @@ class OWGOBrowser(widget.OWWidget):
             for etype in go.evidence_types_ordered:
                 ecb = self.evidenceCheckBoxDict[etype]
                 ecb.setEnabled(bool(count[etype]))
-                ecb.setText(etype + ": %i annots(%i genes)" % (count[etype], len(gene_sets[etype])))
+                ecb.setText(
+                    etype
+                    + ": %i annots(%i genes)" % (count[etype], len(gene_sets[etype]))
+                )
 
     def enrichment(self):
         assert self.input_data is not None
@@ -601,16 +670,21 @@ class OWGOBrowser(widget.OWWidget):
 
         self.__get_input_genes()
         self.input_genes = set(self.input_genes)
-        self.known_input_genes = self.annotations.get_genes_with_known_annotation(self.input_genes)
+        self.known_input_genes = self.annotations.get_genes_with_known_annotation(
+            self.input_genes
+        )
 
-        # self.clusterGenes = clusterGenes = self.annotations.map_to_ncbi_id(self.input_genes).values()
+        # self.clusterGenes = clusterGenes = \
+        #   self.annotations.map_to_ncbi_id(self.input_genes).values()
 
         self.infoLabel.setText(
             "%i unique genes on input\n%i (%.1f%%) genes with known annotations"
             % (
                 len(self.input_genes),
                 len(self.known_input_genes),
-                100.0 * len(self.known_input_genes) / len(self.input_genes) if len(self.input_genes) else 0.0,
+                100.0 * len(self.known_input_genes) / len(self.input_genes)
+                if len(self.input_genes)
+                else 0.0,
             )
         )
 
@@ -629,11 +703,15 @@ class OWGOBrowser(widget.OWWidget):
                 self.referenceRadioBox.buttons[1].setText("Reference set")
                 self.referenceRadioBox.buttons[1].setDisabled(True)
                 self.information(
-                    2, "Unable to extract gene names from reference dataset. " "Using entire genome for reference"
+                    2,
+                    "Unable to extract gene names from reference dataset. "
+                    "Using entire genome for reference",
                 )
                 self.use_reference_dataset = 0
             else:
-                self.referenceRadioBox.buttons[1].setText("Reference set ({} genes)".format(ref_count))
+                self.referenceRadioBox.buttons[1].setText(
+                    "Reference set ({} genes)".format(ref_count)
+                )
                 self.referenceRadioBox.buttons[1].setDisabled(False)
                 self.information(2)
         else:
@@ -674,8 +752,7 @@ class OWGOBrowser(widget.OWWidget):
             f.set_result({})
             self.__on_enrichment_done(f)
 
-    def __on_enrichment_done(self, results):
-        # type: (Future[Dict[str, tuple]]) -> None
+    def __on_enrichment_done(self, results: Future[Dict[str, tuple]]) -> None:
         self.progressBarFinished(processEvents=False)
         self.setBlocking(False)
         self.setStatusMessage("")
@@ -686,7 +763,7 @@ class OWGOBrowser(widget.OWWidget):
 
         self.__state = State.Ready
         try:
-            results = results.result()  # type: Dict[str, tuple]
+            results: Dict[str, tuple] = results.result()
         except Exception as ex:
             results = {}
             error = str(ex)
@@ -723,7 +800,9 @@ class OWGOBrowser(widget.OWWidget):
 
         for term in self.terms:
             self.treeStructDict[term] = TreeNode(self.terms[term], children[term])
-            if not self.ontology[term].related and not getattr(self.ontology[term], "is_obsolete", False):
+            if not self.ontology[term].related and not getattr(
+                self.ontology[term], "is_obsolete", False
+            ):
                 self.treeStructRootKey = term
 
         self.set_graph(terms)
@@ -741,9 +820,13 @@ class OWGOBrowser(widget.OWWidget):
                 Orange.data.StringVariable("GO Term Id"),
                 Orange.data.StringVariable("GO Term Name"),
                 Orange.data.ContinuousVariable("Cluster Frequency"),
-                Orange.data.ContinuousVariable("Genes in Cluster", number_of_decimals=0),
+                Orange.data.ContinuousVariable(
+                    "Genes in Cluster", number_of_decimals=0
+                ),
                 Orange.data.ContinuousVariable("Reference Frequency"),
-                Orange.data.ContinuousVariable("Genes in Reference", number_of_decimals=0),
+                Orange.data.ContinuousVariable(
+                    "Genes in Reference", number_of_decimals=0
+                ),
                 Orange.data.ContinuousVariable("p-value"),
                 Orange.data.ContinuousVariable("FDR"),
                 Orange.data.ContinuousVariable("Enrichment"),
@@ -790,9 +873,16 @@ class OWGOBrowser(widget.OWWidget):
         if self.filter_by_p_value_nofdr:
             graph = go.filter_by_p_value(graph, self.max_p_value_no_fdr)
         if self.filter_by_p_value:  # FDR
-            graph = dict(filter(lambda item: item[1][3] <= self.max_p_value, graph.items()))
+            graph = dict(
+                filter(lambda item: item[1][3] <= self.max_p_value, graph.items())
+            )
         if self.filter_by_num_of_instances:
-            graph = dict(filter(lambda item: len(item[1][0]) >= self.min_num_of_instances, graph.items()))
+            graph = dict(
+                filter(
+                    lambda item: len(item[1][0]) >= self.min_num_of_instances,
+                    graph.items(),
+                )
+            )
         return graph
 
     def filter_and_display_graph(self):
@@ -830,7 +920,9 @@ class OWGOBrowser(widget.OWWidget):
                 # TODO: find out why this happens
                 return 0
 
-        max_fold_enrichment = max([enrichment(term) for term in self.graph.values()] or [1])
+        max_fold_enrichment = max(
+            [enrichment(term) for term in self.graph.values()] or [1]
+        )
 
         def add_node(term, parent, parent_display_node):
             if (parent, term) in from_parent_dict:
@@ -866,7 +958,7 @@ class OWGOBrowser(widget.OWWidget):
         self.sigTableTermsSorted = [t[0] for t in terms]
 
         self.sigTerms.clear()
-        for i, (t_id, (genes, p_value, ref_count, fdr)) in enumerate(terms):
+        for _, (t_id, (genes, p_value, ref_count, fdr)) in enumerate(terms):
             item = GOTreeWidgetItem(
                 self.ontology[t_id],
                 (genes, p_value, ref_count, fdr),
@@ -903,7 +995,10 @@ class OWGOBrowser(widget.OWWidget):
 
         self.selectionChanging = 1
         self.selectedTerms = []
-        selected_ids = {self.sigTerms.itemFromIndex(index).goId for index in self.sigTerms.selectedIndexes()}
+        selected_ids = {
+            self.sigTerms.itemFromIndex(index).goId
+            for index in self.sigTerms.selectedIndexes()
+        }
 
         for i in range(self.sigTerms.topLevelItemCount()):
             item = self.sigTerms.topLevelItem(i)
@@ -927,13 +1022,19 @@ class OWGOBrowser(widget.OWWidget):
         self.commit()
 
     def commit(self):
-        if self.input_data is None or self.originalGraph is None or self.annotations is None:
+        if (
+            self.input_data is None
+            or self.originalGraph is None
+            or self.annotations is None
+        ):
             return
         if self.__state & State.Stale:
             return
 
         terms = set(self.selectedTerms)
-        genes = reduce(operator.ior, (set(self.graph[term][0]) for term in terms), set())
+        genes = reduce(
+            operator.ior, (set(self.graph[term][0]) for term in terms), set()
+        )
 
         evidences = []
         for etype in go.evidence_types_ordered:
@@ -941,7 +1042,9 @@ class OWGOBrowser(widget.OWWidget):
                 evidences.append(etype)
 
         all_terms = self.annotations.get_annotated_terms(
-            genes, direct_annotation_only=self.selection_direct_annotation, evidence_codes=evidences
+            genes,
+            direct_annotation_only=self.selection_direct_annotation,
+            evidence_codes=evidences,
         )
 
         if self.selection_disjoint > 0:
@@ -950,19 +1053,30 @@ class OWGOBrowser(widget.OWWidget):
                 for g in all_terms.get(term, []):
                     count[g] += 1
             ccount = 1 if self.selection_disjoint == 1 else len(self.selectedTerms)
-            selected_genes = [gene for gene, c in count.items() if c == ccount and gene in genes]
+            selected_genes = [
+                gene for gene, c in count.items() if c == ccount and gene in genes
+            ]
         else:
-            selected_genes = reduce(operator.ior, (set(all_terms.get(term, [])) for term in self.selectedTerms), set())
+            selected_genes = reduce(
+                operator.ior,
+                (set(all_terms.get(term, [])) for term in self.selectedTerms),
+                set(),
+            )
 
         if self.use_attr_names:
             selected = [
                 column
                 for column in self.input_data.domain.attributes
                 if self.gene_id_attribute in column.attributes
-                and str(column.attributes[self.gene_id_attribute]) in set(selected_genes)
+                and str(column.attributes[self.gene_id_attribute])
+                in set(selected_genes)
             ]
 
-            domain = Orange.data.Domain(selected, self.input_data.domain.class_vars, self.input_data.domain.metas)
+            domain = Orange.data.Domain(
+                selected,
+                self.input_data.domain.class_vars,
+                self.input_data.domain.metas,
+            )
             new_data = self.input_data.from_table(domain, self.input_data)
             self.send("Data on Selected Genes", new_data)
 
@@ -985,7 +1099,11 @@ class OWGOBrowser(widget.OWWidget):
         dialog.setModal(False)
         dialog.setLayout(QVBoxLayout())
         label = QLabel(dialog)
-        label.setText("Ontology:\n" + self.ontology.header if self.ontology else "Ontology not loaded!")
+        label.setText(
+            "Ontology:\n" + self.ontology.header
+            if self.ontology
+            else "Ontology not loaded!"
+        )
         dialog.layout().addWidget(label)
 
         label = QLabel(dialog)
@@ -1013,7 +1131,15 @@ def fmtpdet(score):
 
 
 class GOTreeWidgetItem(QTreeWidgetItem):
-    def __init__(self, term, enrichment_result, n_cluster_genes, n_ref_genes, max_fold_enrichment, parent):
+    def __init__(
+        self,
+        term,
+        enrichment_result,
+        n_cluster_genes,
+        n_ref_genes,
+        max_fold_enrichment,
+        parent,
+    ):
         super().__init__(parent)
         self.term = term
         self.enrichmentResult = enrichment_result
@@ -1025,7 +1151,9 @@ class GOTreeWidgetItem(QTreeWidgetItem):
 
         querymappedcount = len(querymapped)
         if refmappedcount > 0 and n_ref_genes > 0 and n_cluster_genes > 0:
-            enrichment = (querymappedcount / refmappedcount) * (n_ref_genes / n_cluster_genes)
+            enrichment = (querymappedcount / refmappedcount) * (
+                n_ref_genes / n_cluster_genes
+            )
         else:
             enrichment = numpy.nan
 
@@ -1034,10 +1162,15 @@ class GOTreeWidgetItem(QTreeWidgetItem):
         self.setText(0, term.name)
 
         fmt = "%" + str(-int(math.log(max(n_cluster_genes, 1)))) + "i (%.2f%%)"
-        self.setText(1, fmt % (querymappedcount, 100.0 * querymappedcount / (n_cluster_genes or 1)))
+        self.setText(
+            1,
+            fmt % (querymappedcount, 100.0 * querymappedcount / (n_cluster_genes or 1)),
+        )
 
         fmt = "%" + str(-int(math.log(max(n_ref_genes, 1)))) + "i (%.2f%%)"
-        self.setText(2, fmt % (refmappedcount, 100.0 * refmappedcount / (n_ref_genes or 1)))
+        self.setText(
+            2, fmt % (refmappedcount, 100.0 * refmappedcount / (n_ref_genes or 1))
+        )
 
         self.setText(3, fmtp(pvalue))
         self.setToolTip(3, fmtpdet(pvalue))
@@ -1079,7 +1212,10 @@ class EnrichmentColumnItemDelegate(QItemDelegate):
             painter.save()
             painter.setBrush(QBrush(Qt.blue, Qt.SolidPattern))
             painter.drawRect(
-                option.rect.x(), option.rect.y(), int(value * (option.rect.width() - 1)), option.rect.height() - 1
+                option.rect.x(),
+                option.rect.y(),
+                int(value * (option.rect.width() - 1)),
+                option.rect.height() - 1,
             )
             painter.restore()
         else:

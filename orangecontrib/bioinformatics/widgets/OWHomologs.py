@@ -70,7 +70,9 @@ class OWHomologs(widget.OWWidget):
         self.target_organism.addItems(self.taxonomy_names)
         self.target_organism.activated[int].connect(self.target_organism_change)
 
-        gui.auto_commit(self.controlArea, self, "auto_commit", "Commit", "Commit Automatically")
+        gui.auto_commit(
+            self.controlArea, self, "auto_commit", "Commit", "Commit Automatically"
+        )
 
         self.info.set_input_summary("0")
         self.info.set_output_summary("0")
@@ -100,7 +102,10 @@ class OWHomologs(widget.OWWidget):
                     self.Warning.mising_gene_as_attribute_name()
                     self.data = None
                     return
-                if self.data.attributes[TableAnnotation.gene_id_column] not in self.data.domain:
+                if (
+                    self.data.attributes[TableAnnotation.gene_id_column]
+                    not in self.data.domain
+                ):
                     self.Warning.missing_gene_id()
                     self.data = None
                     return
@@ -116,7 +121,9 @@ class OWHomologs(widget.OWWidget):
         self.source_tax = data.attributes[TableAnnotation.tax_id]
         taxonomy = common_taxid_to_name(self.source_tax)
         self.target_organism.clear()
-        self.target_organism.addItems([tax_name for tax_name in self.taxonomy_names if tax_name != taxonomy])
+        self.target_organism.addItems(
+            [tax_name for tax_name in self.taxonomy_names if tax_name != taxonomy]
+        )
 
         if taxonomy == self.selected_organism:
             self.combo_box_id = -1
@@ -139,7 +146,9 @@ class OWHomologs(widget.OWWidget):
 
         self.info_gene_type.setText(f"Organism: {taxonomy}")
         data_len = (
-            len(data.domain.attributes) if self.data.attributes[TableAnnotation.gene_as_attr_name] else len(data)
+            len(data.domain.attributes)
+            if self.data.attributes[TableAnnotation.gene_as_attr_name]
+            else len(data)
         )
         self.info_gene.setText(f"Number of genes: {data_len}")
         self.info.set_input_summary(f"{data_len}")
@@ -169,7 +178,10 @@ class OWHomologs(widget.OWWidget):
                 table = self.data.transform(domain)
 
                 gene_loc = table.attributes[TableAnnotation.gene_id_attribute]
-                genes = [str(attr.attributes.get(gene_loc, None)) for attr in table.domain.attributes]
+                genes = [
+                    str(attr.attributes.get(gene_loc, None))
+                    for attr in table.domain.attributes
+                ]
                 homologs = self.find_homologs(genes)
 
                 for homolog, col in zip(homologs, table.domain.attributes):
@@ -179,7 +191,11 @@ class OWHomologs(widget.OWWidget):
 
                 table = table.from_table(
                     Domain(
-                        [col for col in table.domain.attributes if HOMOLOG_ID in col.attributes],
+                        [
+                            col
+                            for col in table.domain.attributes
+                            if HOMOLOG_ID in col.attributes
+                        ],
                         table.domain.class_vars,
                         table.domain.metas,
                     ),
@@ -187,7 +203,9 @@ class OWHomologs(widget.OWWidget):
                 )
                 out_table = table if len(table.domain.attributes) > 0 else None
             else:
-                genes, _ = self.data.get_column_view(self.data.attributes[TableAnnotation.gene_id_column])
+                genes = self.data.get_column(
+                    self.data.attributes[TableAnnotation.gene_id_column]
+                )
 
                 homologs = self.find_homologs(genes)
                 homolog = StringVariable(HOMOLOG_SYMBOL)
@@ -200,13 +218,13 @@ class OWHomologs(widget.OWWidget):
 
                 table = self.data.transform(domain)
                 with table.unlocked(table.metas):
-                    col, _ = table.get_column_view(homolog)
+                    col = table.get_column(homolog)
                     col[:] = [g.symbol if g else "?" for g in homologs]
-                    col, _ = table.get_column_view(homolog_id)
+                    col = table.get_column(homolog_id)
                     col[:] = [g.gene_id if g else "?" for g in homologs]
 
                 # note: filter out rows with unknown homologs
-                table = table[table.get_column_view(homolog_id)[0] != "?"]
+                table = table[table.get_column(homolog_id) != "?"]
 
                 out_table = table if len(table) > 0 else None
 
