@@ -24,3 +24,5 @@ Example
 From the GEO Data Sets widget, we selected *Breast cancer and docetaxel treatment* ([GDS360](https://pubmed.ncbi.nlm.nih.gov/15718313/)) data set with 14 treatment resistant and 10 treatment sensitive tumors. We annotated the genes using the **Genes** widget and selected the relevant gene sets using the **Gene Sets** widget. Finally, we used the **Single Sample Scoring** widget and the **Data Table** widget to observe the enrichment scores associated with the selected gene sets.
 
 ![](images/single_sample_scoring/Single-Sample-Scoring-Example.png)
+
+A workflow that implements this widget can be accessed [here](https://download.biolab.si/download/files/workflows/orange/bioinformatics_gene_sets.ows).

@@ -40,6 +40,8 @@ We can use the **Marker Genes** in a combination with many other widgets. For ex
 
 ![](images/marker_genes/Marker-Genes-example.png)
 
+A workflow that implements this widget can be accessed [here](https://download.biolab.si/download/files/workflows/orange/bioinformatics_annotator.ows).
+
 [1]:https://academic.oup.com/nar/article/47/D1/D721/5115823
 [2]:http://download.biolab.si/datasets/bioinformatics/marker_genes/
 [3]:https://pubmed.ncbi.nlm.nih.gov/21410935/

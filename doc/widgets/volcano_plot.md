@@ -35,6 +35,6 @@ A combination of the two are those genes that are statistically significant.
 
 Example
 -------
-From the GEO Data Sets widget, we select *Breast cancer and docetaxel treatment* (GDS360) with 14 treatment resistant and 10 treatment sensitive tumors. We select *Genes in rows* as output. Then we use the **Volcano plot** widget to select the most interesting genes. We observe the selected data subset in a **Data Table**. The table shows selected genes with the additional log2 (ratio) and -log10 (P_value) labels.
+From the GEO Data Sets widget, we select *Breast cancer and docetaxel treatment* (GDS360) with 14 treatment resistant and 10 treatment sensitive tumors. We select *Genes in rows* as output. Then we use the **Volcano plot** widget to select the most interesting genes. We observe the selected data subset in a **Data Table**. The table shows selected genes with the additional log2 (ratio) and -log10 (P_value) columns. To visualize the difference in expression of each selected gene, we first transpose the data using **Transpose** widget and then use the **Box Plot** widget. This workflow can be accessed [here](https://download.biolab.si/download/files/workflows/orange/bioinformatics_volcano_plot.ows).
 
 ![](images/volcano_plot/Volcano-Plot-Example.png)

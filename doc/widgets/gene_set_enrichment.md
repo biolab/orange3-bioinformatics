@@ -26,8 +26,10 @@ Enrich gene sets.
 Example
 -------
 
-From **GEO Data Sets** widget we select the [GDS3900](https://pubmed.ncbi.nlm.nih.gov/21410935/) data set *Fear conditioning effect on hybrid mouse diversity panel*. The analysis focuses on the whole hippocampus and striatum from Hybrid Mouse Diversity Panel (HMDP) males exposed to a fear conditioning procedure. Next, we feed this data into the **Gene Set Enrichment** widget, where we specify *Mus musculus* as the *Organism* and select the Gene Ontology gene sets. After filtering the results, we proceed to connect the widget to the **Data Table** to inspect the *Enrichment report*.
+From **GEO Data Sets** widget we select the [GDS3900](https://pubmed.ncbi.nlm.nih.gov/21410935/) data set *Fear conditioning effect on hybrid mouse diversity panel*. The analysis focuses on the whole hippocampus and striatum from Hybrid Mouse Diversity Panel (HMDP) males exposed to a fear conditioning procedure. Next, we feed this data into the **Gene Set Enrichment** widget, where we specify *Mus musculus* as the *Organism* and select the Gene Ontology gene sets. After filtering the results, we proceed to connect the widget to the **Data Table** to inspect the *Enrichment report*. This workflow can be accessed [here](https://download.biolab.si/download/files/workflows/orange/bioinformatics_gsea.ows).
 
 
 
 ![](images/gene_set_enrichment/Gene-Set-Enrichment-Example.png)
+
+

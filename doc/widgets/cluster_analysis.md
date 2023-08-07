@@ -33,3 +33,5 @@ Example
 From the **GEO Data Sets** widget we select the [GDS360](https://pubmed.ncbi.nlm.nih.gov/15718313/) data set for gene expression in breast cancer core biopsies taken from patients found to be resistant (14 samples) or sensitive (10 samples) to docetaxel treatment. Next we feed the data to the **Cluster Analysis** widget and set our parameters and gene sets to compare. We set the thresholds to filter the results and connect the widget to the **t-SNE** widget to visualize the results and to the **Data Table** widget to inspect the results.
 
 ![](images/cluster_analysis/Cluster-Analysis-Example.png)
+
+This workflow can be accessed [here](https://download.biolab.si/download/files/workflows/orange/bioinformatics_cluster_analysis.ows).

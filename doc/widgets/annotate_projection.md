@@ -79,7 +79,7 @@ genes with cell types to the *Annotator* widget. The data table receives
 the output of the Annotator widget and shows items selected in the plot.
 The widget shows clustered cells projected to the two-dimensional plane.
 Clusters labels show annotation with the most common label in the
-cluster.
+cluster. This workflow can be accessed [here](https://download.biolab.si/download/files/workflows/orange/bioinformatics_annotator.ows).
 
 ![](images/annotate_projection/annotator-example.png)
 
