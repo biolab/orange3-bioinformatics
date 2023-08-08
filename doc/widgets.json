@@ -7,98 +7,140 @@
     "doc": "widgets/databases_update.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWDatabasesUpdate.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "update",
+     "database"
+    ]
    },
    {
     "text": "GEO Data Sets",
     "doc": "widgets/geo_data_sets.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGEODatasets.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "geo",
+     "database"
+    ]
    },
    {
     "text": "dictyExpress",
     "doc": "widgets/dicty_express.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWdictyExpress.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "dictyexpress",
+     "database"
+    ]
    },
    {
     "text": "Genialis Expressions",
     "doc": null,
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGenialisExpressions.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "genialis",
+     "database"
+    ]
    },
    {
     "text": "Genes",
     "doc": "widgets/genes.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGeneInfo.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "genes"
+    ]
    },
    {
     "text": "Differential Expression",
     "doc": "widgets/differential_expression.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWDifferentialExpression.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "differential",
+     "expression"
+    ]
    },
    {
     "text": "GO Browser",
     "doc": "widgets/go_browser.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGOBrowser.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "go",
+     "gene ontology"
+    ]
    },
    {
     "text": "KEGG Pathways",
     "doc": "widgets/kegg_pathways.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWKEGGPathwayBrowser.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "pathway",
+     "kegg"
+    ]
    },
    {
     "text": "Gene Set Enrichment",
     "doc": "widgets/gene_set_enrichment.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGeneSets.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "gsea",
+     "enrichment"
+    ]
    },
    {
     "text": "Gene Sets",
-    "doc": null,
+    "doc": "widgets/gene_sets.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWGeneSets.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "gene sets",
+     "genes"
+    ]
    },
    {
     "text": "Cluster Analysis",
     "doc": "widgets/cluster_analysis.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWClusterAnalysis.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "cluster",
+     "analysis",
+     "enrichment"
+    ]
    },
    {
     "text": "Volcano Plot",
     "doc": "widgets/volcano_plot.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWVolcanoPlot.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "volcano",
+     "plot"
+    ]
    },
    {
     "text": "Homologs",
-    "doc": null,
+    "doc": "widgets/homologs.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWHomologs.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "homologs",
+     "orthologs",
+     "paralogs"
+    ]
    },
    {
     "text": "Marker Genes",
     "doc": "widgets/marker_genes.md",
     "icon": "../orangecontrib/bioinformatics/widgets/icons/OWMarkerGenes.svg",
     "background": "light-grass",
-    "keywords": []
+    "keywords": [
+     "markers"
+    ]
    },
    {
     "text": "Annotator",
@@ -107,6 +149,16 @@
     "background": "light-grass",
     "keywords": [
      "annotate"
+    ]
+   },
+   {
+    "text": "Single sample scoring",
+    "doc": "widgets/single_sample_scoring.md",
+    "icon": "../orangecontrib/bioinformatics/widgets/icons/OWSingleSampleScoring.svg",
+    "background": "light-grass",
+    "keywords": [
+     "ssgsea",
+     "enrichment"
     ]
    }
   ]
