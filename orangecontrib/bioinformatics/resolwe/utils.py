@@ -58,6 +58,12 @@ def etc_to_table(etc_json, transpose=False):
             remove_redundant_inst=True,
         )
 
+        orange_table.domain = Domain(
+            orange_table.domain.attributes,
+            orange_table.domain.class_vars,
+            [ContinuousVariable('Time')],
+        )
+
     return orange_table
 
 
