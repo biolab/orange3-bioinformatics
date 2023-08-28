@@ -66,7 +66,7 @@ class FilterProxyModel(QSortFilterProxyModel):
         self.__filters = []
 
     def sort(self, *args, **kwargs):
-        return self.sourceModel().sort(*args, **kwargs)
+        super().sort(*args, **kwargs)
 
     def reset_filters(self):
         self.__filters = []
