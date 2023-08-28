@@ -59,9 +59,11 @@ def etc_to_table(etc_json, transpose=False):
         )
 
         old_domain = orange_table.domain
-        new_domain = Domain(old_domain.attributes,
-                            old_domain.class_vars,
-                            [ContinuousVariable(var.name) for var in old_domain.metas])
+        new_domain = Domain(
+            old_domain.attributes,
+            old_domain.class_vars,
+            [ContinuousVariable(var.name) for var in old_domain.metas],
+        )
 
         time_as_floats = orange_table.get_column('Time').astype(int).reshape(-1, 1)
         orange_table = orange_table.transform(new_domain)
