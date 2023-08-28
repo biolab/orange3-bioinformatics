@@ -349,7 +349,7 @@ class CustomTreeItem(QTreeWidgetItem):
         for index, label in enumerate(Labels):
             if index > 0:
                 try:
-                    if isinstance(type(row[label[0]]["value"]), list):
+                    if isinstance(row[label[0]]["value"], list):
                         self.setText(index, row[label[0]]["value"][0]["name"])
                     else:
                         self.setText(index, row[label[0]]["value"])
