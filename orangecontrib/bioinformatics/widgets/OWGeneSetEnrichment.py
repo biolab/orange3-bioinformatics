@@ -478,7 +478,7 @@ class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
         if input_data:
             self.input_data = input_data
             self.gene_info = GeneInfo(self.tax_id)
-            self.gs_selection_component.initialize(self.tax_id)
+            self.gs_selection_component.set_selected_organism_by_tax_id(self.tax_id)
 
     @Inputs.custom_gene_sets
     def handle_custom_gene_sets_input(self, custom_data):
