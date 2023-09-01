@@ -4,10 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.0] - 2023-09-01
+### Changed
+- [#338](https://github.com/biolab/orange3-bioinformatics/pull/338): Bioinformatics add-on now has improved documentation.
+- [#344](https://github.com/biolab/orange3-bioinformatics/pull/344): GEO Data Sets now outputs metas as discrete and not as string variables.
+- [#343](https://github.com/biolab/orange3-bioinformatics/pull/344): OWdictyExpress now outputs 'Time' as continuous and not as string variable.
+
+### Fixed
+- [#340](https://github.com/biolab/orange3-bioinformatics/pull/340): Delaunay attribute vertices was deprecated since Scipy version 0.12.0 in favour of simplices and it was finally removed in version 1.11.0.
+- [#344](https://github.com/biolab/orange3-bioinformatics/pull/344): fixes sorting that did not work when you clicked on the column in Gene Set Enrichment widget.
+
+ 
 ## [4.7.2] - 2023-07-06
 ### Changed
 - [#335](https://github.com/biolab/orange3-bioinformatics/pull/335):  Time is now column name for Dicty express data
-- 
+
 ## [4.7.1] - 2023-02-06
 
 ## [4.7.0] - 2023-02-06
