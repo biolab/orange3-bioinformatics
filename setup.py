@@ -12,7 +12,7 @@ if __name__ == '__main__':
             'point-annotator~=2.0',
             'requests',
             'requests-cache>=0.8.0',
-            'resdk>=13.8.0',
+            'resdk>=20.0.0',
             'genesis-pyapi',
             'single_sample_gsea>=0.2.0',
             # Versions are determined by Orange
