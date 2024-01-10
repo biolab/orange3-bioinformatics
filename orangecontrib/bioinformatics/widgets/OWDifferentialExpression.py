@@ -1306,9 +1306,11 @@ class OWDifferentialExpression(widget.OWWidget):
         remaining = np.flatnonzero(~selected)
 
         domain = self.data.domain
-        if axis == 0:
-            # Select rows
+        if axis == 0:  # Select rows
             score_var = Orange.data.ContinuousVariable(score_name)
+
+            # For the output 'selected genes' we assume that genes are in rows,
+            # so we just output a table with meta attributes.
             domain_selected_genes = Orange.data.Domain(
                 [], metas=domain.metas + (score_var,)
             )
@@ -1329,32 +1331,48 @@ class OWDifferentialExpression(widget.OWWidget):
             remainingdata = data[remaining]
 
             self.send("Selected genes", table_selected_genes[indices])
-        else:
-            gene_ids = self.data.attributes[GENE_ID_ATTRIBUTE]
-            domain_selected_genes = Orange.data.Domain(
-                [],
-                metas=[
-                    Orange.data.StringVariable('genes'),
-                    Orange.data.StringVariable(gene_ids),
-                    Orange.data.ContinuousVariable(score_name),
-                ],
-            )
-            data_selected_genes = []
-
-            # select columns
+        else:  # select columns
             attrs = [copy_variable(var) for var in domain.attributes]
+
+            # For the output 'selected genes' we assume that genes are in columns.
+            table_is_annotated = GENE_AS_ATTRIBUTE_NAME in self.data.attributes
+            metas = []
+
+            if table_is_annotated:
+                gene_id = self.data.attributes[GENE_ID_ATTRIBUTE]
+                metas.append(Orange.data.StringVariable(gene_id))
+
+            metas += [
+                Orange.data.StringVariable('genes'),
+                Orange.data.ContinuousVariable(score_name),
+            ]
+
+            domain_selected_genes = Orange.data.Domain([], metas=metas)
+
+            data_selected_genes = []
             for var, score in zip(attrs, scores):
-                var.attributes[score_name] = str(score)
-                data_selected_genes.append(
-                    [var.name, var.attributes.get(gene_ids, ''), score]
-                )
+                # var.attributes[score_name] = str(score)
+
+                if table_is_annotated:
+                    gene_id = self.data.attributes[GENE_ID_ATTRIBUTE]
+                    data_selected_genes.append(
+                        [var.attributes.get(gene_id, ''), var.name, score]
+                    )
+
+                else:
+                    data_selected_genes.append([var.name, score])
 
             table_selected_genes = Orange.data.Table.from_list(
                 domain_selected_genes, data_selected_genes
             )
-            table_selected_genes.attributes[GENE_AS_ATTRIBUTE_NAME] = False
-            table_selected_genes.attributes[GENE_ID_COLUMN] = gene_ids
-            table_selected_genes.attributes[TAX_ID] = self.data.attributes[TAX_ID]
+            if table_is_annotated:
+                table_selected_genes.attributes[GENE_AS_ATTRIBUTE_NAME] = False
+                table_selected_genes.attributes[GENE_ID_COLUMN] = self.data.attributes[
+                    GENE_ID_ATTRIBUTE
+                ]
+                table_selected_genes.attributes[TAX_ID] = self.data.attributes[TAX_ID]
+
+            self.send("Selected genes", table_selected_genes[indices])
 
             selected_attrs = [attrs[i] for i in indices]
             remaining_attrs = [attrs[i] for i in remaining]
@@ -1366,8 +1384,6 @@ class OWDifferentialExpression(widget.OWWidget):
                 remaining_attrs, domain.class_vars, domain.metas
             )
             remainingdata = self.data.from_table(domain, self.data)
-
-            self.send("Selected genes", table_selected_genes[indices])
 
         self.send("Data subset", subsetdata)
         self.send("Remaining data subset", remainingdata)
