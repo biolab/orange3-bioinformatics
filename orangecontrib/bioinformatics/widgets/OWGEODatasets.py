@@ -1,12 +1,13 @@
 """ Gene Expression Omnibus datasets widget """
+
 import sys
 from types import SimpleNamespace
-from typing import Any, Optional, DefaultDict
+from typing import Any, Union, Optional, DefaultDict
 from collections import defaultdict
 
 import requests
 
-from AnyQt.QtCore import Qt
+from AnyQt.QtCore import Qt, QTimer
 from AnyQt.QtWidgets import (
     QSplitter,
     QTreeWidget,
@@ -63,12 +64,24 @@ def run_download_task(
         nonlocal current_iter
         current_iter += 1
         state.set_progress_value(100 * (current_iter / max_iter))
+        if state.is_interruption_requested():
+            raise KeyboardInterrupt
 
     state.set_status("Downloading...")
     res.gds_dataset = dataset_download(
         gds_id, samples, transpose=transpose, callback=callback
     )
     return res
+
+
+class GDSInfoResult(SimpleNamespace):
+    gds_info: Optional[GDSInfo]
+
+
+def run_gds_info_task(state: TaskState):
+    state.set_status("Fetching index...")
+    gds_info = GDSInfo()
+    return GDSInfoResult(gds_info=gds_info)
 
 
 class GEODatasetsModel(TableModel):
@@ -108,9 +121,9 @@ class GEODatasetsModel(TableModel):
             TableModel.Column(
                 title(""),
                 {
-                    Qt.DisplayRole: lambda row: " "
-                    if is_cached(items[row]["name"])
-                    else "",
+                    Qt.DisplayRole: lambda row: (
+                        " " if is_cached(items[row]["name"]) else ""
+                    ),
                     Qt.UserRole: lambda row: items[row],
                 },
             ),
@@ -211,6 +224,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
     class Error(OWWidget.Error):
         no_connection = Msg("Widget can't connect to serverfiles.")
+        error = Msg("{}")
 
     class Outputs:
         gds_data = Output("Expression Data", Table)
@@ -232,14 +246,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     def __init__(self):
         OWWidget.__init__(self)
         ConcurrentWidgetMixin.__init__(self)
-
-        try:
-            self.gds_info: Optional[GDSInfo] = GDSInfo()
-        except requests.exceptions.ConnectionError:
-            self.gds_info = {}
-            self.Error.no_connection()
-            return
-
+        self.gds_info: Optional[GDSInfo] = None
         self.gds_data: Optional[Table] = None
         self.__updating_filter = False
 
@@ -291,7 +298,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self.table_view.verticalHeader().setVisible(False)
         self.table_view.viewport().setMouseTracking(True)
 
-        self.table_model = GEODatasetsModel(self.gds_info)
+        self.table_model = GEODatasetsModel({})
         self.proxy_model = FilterProxyModel()
         self.proxy_model.setSourceModel(self.table_model)
         self.table_view.setModel(self.proxy_model)
@@ -343,7 +350,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         )
         self._apply_filter()
 
-        self.commit()
+        self.start(run_gds_info_task)
 
     def _splitter_moved(self, *args):
         self.splitter_settings = [bytes(sp.saveState()) for sp in self.splitters]
@@ -452,7 +459,7 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
 
     def _run(self):
         self.Warning.using_local_files.clear()
-        if self.selected_gds is not None:
+        if self.gds_info and self.selected_gds is not None:
             self.gds_data = None
             self.start(
                 run_download_task,
@@ -541,16 +548,28 @@ class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
         self._run()
 
     def on_exception(self, ex: Exception):
-        self.Warning.using_local_files()
+        if isinstance(ex, requests.exceptions.ConnectionError):
+            self.Warning.using_local_files()
+        else:
+            self.Error.error("", exc_info=ex)
 
-    def on_done(self, result: Result):
-        assert isinstance(result.gds_dataset, Table)
-        self.gds_data = result.gds_dataset
+    def on_done(self, result: Union[GDSInfoResult, Result]):
+        self.Error.error.clear()
+        if isinstance(result, GDSInfoResult):
+            self.gds_info = result.gds_info
+            self.table_model = GEODatasetsModel(result.gds_info)
+            self.proxy_model.setSourceModel(self.table_model)
+            self.table_view.resizeColumnsToContents()
+            self._set_selection()
+            QTimer.singleShot(0, lambda: self.unconditional_commit())
+        else:
+            assert isinstance(result.gds_dataset, Table)
+            self.gds_data = result.gds_dataset
 
-        if self.gds_info:
-            self.table_model.update_cache_indicator()
+            if self.gds_info:
+                self.table_model.update_cache_indicator()
 
-        self.Outputs.gds_data.send(self.gds_data)
+            self.Outputs.gds_data.send(self.gds_data)
 
     def on_partial_result(self, result: Any) -> None:
         pass
