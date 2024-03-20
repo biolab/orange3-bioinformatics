@@ -1,13 +1,13 @@
 """ Gene Expression Omnibus datasets widget """
+
 import sys
 from types import SimpleNamespace
-from typing import Any, Optional, DefaultDict, Union
+from typing import Any, Union, Optional, DefaultDict
 from collections import defaultdict
 
 import requests
 
 from AnyQt.QtCore import Qt, QTimer
-
 from AnyQt.QtWidgets import (
     QSplitter,
     QTreeWidget,
@@ -121,9 +121,9 @@ class GEODatasetsModel(TableModel):
             TableModel.Column(
                 title(""),
                 {
-                    Qt.DisplayRole: lambda row: " "
-                    if is_cached(items[row]["name"])
-                    else "",
+                    Qt.DisplayRole: lambda row: (
+                        " " if is_cached(items[row]["name"]) else ""
+                    ),
                     Qt.UserRole: lambda row: items[row],
                 },
             ),
