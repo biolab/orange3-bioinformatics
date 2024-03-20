@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.2] - 2024-03-20
+### Changed
+- [#319](https://github.com/biolab/orange3-bioinformatics/pull/319): GEO Datasets: Move GDSInfo initialization in a worker thread
+
 ## [4.8.1] - 2024-01-10
 ### Changed
 - [#345](https://github.com/biolab/orange3-bioinformatics/pull/345): Raise the required resdk package version
