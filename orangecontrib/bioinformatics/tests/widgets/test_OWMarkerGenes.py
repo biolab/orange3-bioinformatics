@@ -306,7 +306,8 @@ class TestOWMarkerGenes(WidgetTest):
         When more available unittest will be changed.
         """
         self.assertListEqual(
-            ["CellMarker", "DictyBase", "Panglao"], list(self.widget.available_sources.keys())
+            ["CellMarker", "DictyBase", "Panglao"],
+            list(self.widget.available_sources.keys()),
         )
 
     def test_source_changed(self):

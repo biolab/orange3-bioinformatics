@@ -1,4 +1,5 @@
 """ OWMarkerGenes """
+
 from typing import List, Tuple, Iterable, Optional
 from functools import partial
 
@@ -44,7 +45,11 @@ SERVER_FILES_DOMAIN = 'marker_genes'
 GROUP_BY_ITEMS = ["Cell Type", "Function", "Milestones", "Regulon cluster"]
 FILTER_COLUMNS_DEFAULT = ["Name", "Entrez ID"]
 NUM_LINES_TEXT = 5
-MAP_GROUP_TO_TAX_ID = {'Human': '9606', 'Mouse': '10090', "Dictyostelium discoideum": '44689'}
+MAP_GROUP_TO_TAX_ID = {
+    'Human': '9606',
+    'Mouse': '10090',
+    "Dictyostelium discoideum": '44689',
+}
 
 
 class TreeItem(object):
@@ -854,7 +859,7 @@ class OWMarkerGenes(widget.OWWidget):
     selected_genes = settings.ContextSetting([])
 
     settings_version = 2
-    
+
     available_groups = GROUP_BY_ITEMS
     _available_groups = None
 
@@ -1021,12 +1026,16 @@ class OWMarkerGenes(widget.OWWidget):
                 self.organism_index = min(
                     max(self.organism_index, 0), len(group_values) - 1
                 )
-                
-            self.available_groups = [item for item in GROUP_BY_ITEMS if any(meta.name == item for meta in domain.metas)]
-            
+
+            self.available_groups = [
+                item
+                for item in GROUP_BY_ITEMS
+                if any(meta.name == item for meta in domain.metas)
+            ]
+
             self.group_by_cb.clear()
             self.group_by_cb.addItems(self.available_groups)
-            self.group_by_cb.setCurrentIndex(self.selected_root_attribute)  
+            self.group_by_cb.setCurrentIndex(self.selected_root_attribute)
 
             self._set_group_index(self.organism_index)
 
@@ -1079,7 +1088,10 @@ class OWMarkerGenes(widget.OWWidget):
         data_not_selected, data_selected = self._filter_data_group(self.data)
 
         if self._available_groups:
-            if self._available_groups[self._selected_root_attribute] not in self.available_groups:
+            if (
+                self._available_groups[self._selected_root_attribute]
+                not in self.available_groups
+            ):
                 self.selected_root_attribute = 0
 
         # add model to available markers view
