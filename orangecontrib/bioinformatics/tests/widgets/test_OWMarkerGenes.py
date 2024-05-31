@@ -306,7 +306,7 @@ class TestOWMarkerGenes(WidgetTest):
         When more available unittest will be changed.
         """
         self.assertListEqual(
-            ["CellMarker", "Panglao"], list(self.widget.available_sources.keys())
+            ["CellMarker", "DictyBase", "Panglao"], list(self.widget.available_sources.keys())
         )
 
     def test_source_changed(self):
@@ -319,7 +319,7 @@ class TestOWMarkerGenes(WidgetTest):
         self.assertEqual(len(self.panglao), len(self.widget.data))
 
         # Panglao data
-        simulate.combobox_activate_index(self.widget.controls.source_index, 1)
+        simulate.combobox_activate_index(self.widget.controls.source_index, 2)
         self.assertEqual("CellMarker", self.widget.db_source_cb.currentText())
         self.assertTrue(isinstance(self.widget.data, Table))
         self.assertEqual(len(self.cell_markers), len(self.widget.data))
@@ -363,7 +363,7 @@ class TestOWMarkerGenes(WidgetTest):
             len(np.unique(cell_types[~human_rows])), len(model.rootItem.childItems)
         )
 
-        simulate.combobox_activate_index(self.widget.controls.source_index, 1)
+        simulate.combobox_activate_index(self.widget.controls.source_index, 2)
         simulate.combobox_activate_index(self.widget.controls.organism_index, 0)
         self.assertEqual("CellMarker", self.widget.db_source_cb.currentText())
         self.assertEqual("Human", self.widget.group_cb.currentText())
@@ -379,7 +379,7 @@ class TestOWMarkerGenes(WidgetTest):
             len(np.unique(cell_types[human_rows])), len(model.rootItem.childItems)
         )
 
-        simulate.combobox_activate_index(self.widget.controls.source_index, 1)
+        simulate.combobox_activate_index(self.widget.controls.source_index, 2)
         simulate.combobox_activate_index(self.widget.controls.organism_index, 1)
         self.assertEqual("CellMarker", self.widget.db_source_cb.currentText())
         self.assertEqual("Mouse", self.widget.group_cb.currentText())
