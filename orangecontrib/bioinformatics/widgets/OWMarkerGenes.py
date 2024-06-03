@@ -1,4 +1,5 @@
 """ OWMarkerGenes """
+
 from typing import List, Tuple, Iterable, Optional
 from functools import partial
 
@@ -41,10 +42,14 @@ from orangecontrib.bioinformatics.widgets.utils.settings import (
 )
 
 SERVER_FILES_DOMAIN = 'marker_genes'
-GROUP_BY_ITEMS = ["Cell Type", "Function"]
+GROUP_BY_ITEMS = ["Cell Type", "Function", "Milestones", "Regulon cluster"]
 FILTER_COLUMNS_DEFAULT = ["Name", "Entrez ID"]
 NUM_LINES_TEXT = 5
-MAP_GROUP_TO_TAX_ID = {'Human': '9606', 'Mouse': '10090'}
+MAP_GROUP_TO_TAX_ID = {
+    'Human': '9606',
+    'Mouse': '10090',
+    "Dictyostelium discoideum": '44689',
+}
 
 
 class TreeItem(object):
@@ -655,10 +660,11 @@ class TreeModel(QAbstractItemModel):
         names = data_table.get_column("Name")
         types = data_table.get_column(parent_column)
         for n, pt, row in zip(names, types, data_table):
-            if pt not in parents_dict:
-                parents_dict[pt] = TreeItem(pt, True, None, parent)
+            if pt != "?":
+                if pt not in parents_dict:
+                    parents_dict[pt] = TreeItem(pt, True, None, parent)
 
-            TreeItem(n, False, row, parents_dict[pt])
+                TreeItem(n, False, row, parents_dict[pt])
 
     def set_expanded(self, index: QModelIndex, expanded: bool) -> None:
         """
@@ -854,8 +860,12 @@ class OWMarkerGenes(widget.OWWidget):
 
     settings_version = 2
 
+    available_groups = GROUP_BY_ITEMS
+    _available_groups = None
+
     _data = None
     _available_sources = None
+    _selected_root_attribute = None
 
     def __init__(self) -> None:
         super().__init__()
@@ -937,7 +947,6 @@ class OWMarkerGenes(widget.OWWidget):
             box,
             self,
             'selected_root_attribute',
-            items=GROUP_BY_ITEMS,
             callback=self._setup,
         )
 
@@ -1018,6 +1027,16 @@ class OWMarkerGenes(widget.OWWidget):
                     max(self.organism_index, 0), len(group_values) - 1
                 )
 
+            self.available_groups = [
+                item
+                for item in GROUP_BY_ITEMS
+                if any(meta.name == item for meta in domain.metas)
+            ]
+
+            self.group_by_cb.clear()
+            self.group_by_cb.addItems(self.available_groups)
+            self.group_by_cb.setCurrentIndex(self.selected_root_attribute)
+
             self._set_group_index(self.organism_index)
 
     def _load_data(self) -> None:
@@ -1068,8 +1087,15 @@ class OWMarkerGenes(widget.OWWidget):
         self.openContext((self.selected_organism, self.selected_source))
         data_not_selected, data_selected = self._filter_data_group(self.data)
 
+        if self._available_groups:
+            if (
+                self._available_groups[self._selected_root_attribute]
+                not in self.available_groups
+            ):
+                self.selected_root_attribute = 0
+
         # add model to available markers view
-        group_by = GROUP_BY_ITEMS[self.selected_root_attribute]
+        group_by = self.available_groups[self.selected_root_attribute]
         tree_model = TreeModel(data_not_selected, group_by)
         proxy_model = FilterProxyModel(self.filter_line_edit)
         proxy_model.setSourceModel(tree_model)
@@ -1096,6 +1122,8 @@ class OWMarkerGenes(widget.OWWidget):
 
         # update output and messages
         self._selected_markers_changed()
+        self._selected_root_attribute = self.selected_root_attribute
+        self._available_groups = self.available_groups
 
     def _filter_data_group(self, data: Table) -> Tuple[Table, Tuple]:
         """
@@ -1126,7 +1154,7 @@ class OWMarkerGenes(widget.OWWidget):
         # divide data based on selected_genes variable (context)
         unique_gene_names = np.core.defchararray.add(
             data.get_column("Entrez ID").astype(str),
-            data.get_column("Cell Type").astype(str),
+            data.get_column(self.available_groups[0]).astype(str),
         )
         mask = np.isin(unique_gene_names, self.selected_genes)
         data_not_selected = data[~mask]
@@ -1184,7 +1212,7 @@ class OWMarkerGenes(widget.OWWidget):
         """
         rows = self.selected_markers_view.model().sourceModel().rootItem.get_data_rows()
         self.selected_genes = [
-            row["Entrez ID"].value + row["Cell Type"].value for row in rows
+            row["Entrez ID"].value + row[self.available_groups[0]].value for row in rows
         ]
         self.commit()
 

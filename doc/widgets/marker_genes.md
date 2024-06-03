@@ -19,6 +19,12 @@ Database sources:
  - CellMarker
   
   	<cite>[CellMarker: a manually curated resource of cell markers in human and mouse.][1] Nucleic Acids Research. 2018.</cite>
+
+</br>
+
+ - DictyBase
+
+ 	<cite>Fey, P., Dodson, R., Basu, S., Chisholm, R. L., One Stop Shop for Everything Dictyostelium: dictyBase and the Dicty Stock Center. Dictyostelium discoideum Protocols. Methods Mol. Biol. 983:59-92, edited by Ludwig Eichinger and Francisco Rivero.</cite>
  
 
 Data is preprocessed in Orange readable format and it is hosted [here.][2] One can use [Databases update](databases_update.md)
