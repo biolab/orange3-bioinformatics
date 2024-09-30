@@ -37,7 +37,7 @@ from Orange.widgets.settings import (
 )
 from Orange.widgets.utils.signals import Input, Output
 
-from orangecontrib.bioinformatics.geneset.utils import GeneSetException
+from orangecontrib.bioinformatics.geneset import GeneSets
 from orangecontrib.bioinformatics.cluster_analysis import (
     DISPLAY_GENE_SETS_COUNT,
     Cluster,
@@ -48,8 +48,8 @@ from orangecontrib.bioinformatics.utils.statistics import score_hypergeometric_t
 from orangecontrib.bioinformatics.widgets.utils.gui import (
     HTMLDelegate,
     GeneScoringWidget,
-    GeneSetsSelection,
 )
+from orangecontrib.bioinformatics.widgets.components import GeneSetSelection
 from orangecontrib.bioinformatics.widgets.utils.data import (
     TAX_ID,
     GENE_ID_COLUMN,
@@ -108,6 +108,9 @@ class OWClusterAnalysis(OWWidget):
             'Organism in input data and custom gene sets does not match'
         )
         cluster_batch_conflict = Msg('Cluster and batch must not be the same variable')
+        custom_gene_sets_table_format = Msg(
+            'Custom gene sets data must have genes represented as rows.'
+        )
 
     settingsHandler = ClusterAnalysisContextHandler()
     cluster_indicators = ContextSetting([])
@@ -216,31 +219,14 @@ class OWClusterAnalysis(OWWidget):
         self.gene_scoring.set_method_design_area('scoring_method_design')
         self.gene_scoring.set_test_type('scoring_test_type')
 
-        # Gene Sets widget
-        gene_sets_box = widgetBox(self.controlArea, "Gene Sets")
-        self.gs_widget = GeneSetsSelection(
-            gene_sets_box, self, 'stored_gene_sets_selection'
+        box = vBox(self.controlArea, True, margin=0)
+        self.gs_selection_component: GeneSetSelection = GeneSetSelection(self, box)
+        self.gs_selection_component.selection_changed.connect(
+            self._on_selection_changed
         )
-        self.gs_widget.hierarchy_tree_widget.itemClicked.connect(
-            self.__gene_sets_enrichment
-        )
-
-        # custom gene sets area
-        box = vBox(self.controlArea, "Custom Gene Sets")
-
-        if self.custom_gene_set_indicator not in self.feature_model:
-            self.custom_gene_set_indicator = None
-
-        self.gs_label_combobox = comboBox(
-            box,
-            self,
-            "custom_gene_set_indicator",
-            sendSelectedValue=True,
-            model=self.feature_model,
-            callback=self.handle_custom_gene_sets,
-        )
-        self.gs_label_combobox.setDisabled(True)
-
+        self.gs_selection_component.sample_column_combo.hide()
+        self.gs_selection_component.sample_column_combo.parent().hide()
+        self.gs_selection_component._update_tree_widget()
         # main area
         splitter = QSplitter(Qt.Horizontal, self.mainArea)
         self.mainArea.layout().addWidget(splitter)
@@ -548,8 +534,8 @@ class OWClusterAnalysis(OWWidget):
     def __gene_sets_enrichment(self):
         if self.input_data:
             self.Warning.no_selected_gene_sets.clear()
-            all_sets = self.gs_widget.get_hierarchies()
-            selected_sets = self.gs_widget.get_hierarchies(only_selected=True)
+            selected_sets = self.gs_selection_component.selection
+            all_sets = self.gs_selection_component.gene_sets.hierarchies()
 
             if len(selected_sets) == 0 and len(all_sets) > 0:
                 self.Warning.no_selected_gene_sets()
@@ -560,7 +546,7 @@ class OWClusterAnalysis(OWWidget):
 
             try:
                 self.cluster_info_model.gene_sets_enrichment(
-                    self.gs_widget.gs_object, selected_sets, ref_genes
+                    self.gs_selection_component.gene_sets, selected_sets, ref_genes
                 )
             except Exception as e:
                 # TODO: possible exceptions?
@@ -590,6 +576,34 @@ class OWClusterAnalysis(OWWidget):
     def batch_indicator_changed(self):
         self.invalidate(cluster_init=False)
 
+    def _on_selection_changed(self):
+        if not self.input_data or not self.gs_selection_component:
+            return
+        self.num_of_custom_sets = self.gs_selection_component.num_of_custom_sets
+
+        selected_sets = self.gs_selection_component.selection
+        all_sets = self.gs_selection_component.gene_sets.hierarchies()
+
+        self.Warning.no_selected_gene_sets.clear()
+        if not selected_sets and all_sets:
+            self.Warning.no_selected_gene_sets()
+
+        self.stored_gene_sets_selection = tuple(selected_sets)
+        ref_genes = set(self.input_genes_ids)
+
+        if not self.cluster_info_model or len(ref_genes) == 0:
+            return
+        try:
+            self.cluster_info_model.gene_sets_enrichment(
+                self.gs_selection_component.gene_sets, selected_sets, ref_genes
+            )
+        except Exception as e:
+            raise e
+
+        self.filter_gene_sets()
+        self.__update_info_box()
+        self.cluster_info_view.resizeRowsToContents()
+
     @Inputs.data_table
     def handle_input(self, data):
         self.closeContext()
@@ -606,8 +620,6 @@ class OWClusterAnalysis(OWWidget):
         self.gene_id_attribute = None
         self.clusters = None
 
-        self.gs_widget.clear()
-        self.gs_widget.clear_gene_sets()
         self.cluster_info_view.setModel(None)
 
         self.cluster_indicators = []
@@ -648,6 +660,9 @@ class OWClusterAnalysis(OWWidget):
                 GENE_ID_ATTRIBUTE, None
             )
 
+            self.gs_selection_component.set_selected_organism_by_tax_id(self.tax_id)
+            self.gs_selection_component._load_gene_sets()
+
             if not self.cluster_indicator_model:
                 self.Error.no_cluster_indicator()
                 return
@@ -657,21 +672,17 @@ class OWClusterAnalysis(OWWidget):
 
             self.openContext(self.input_data.domain)
 
-            self.gs_widget.load_gene_sets(self.tax_id)
             if self.cluster_indicator_model and len(self.cluster_indicators) < 1:
                 self.cluster_indicators = [self.cluster_indicator_model[0]]
             if self.batch_indicator_model and self.batch_indicator is None:
                 self.batch_indicator = self.batch_indicator_model[0]
-
             self.invalidate()
-
-            if self.custom_data:
-                self.refresh_custom_gene_sets()
-                self._handle_future_model()
-                self.handle_custom_gene_sets()
+        else:
+            self.gs_selection_component._gene_sets = GeneSets()
+        self.handle_custom_gene_sets()
 
     @Inputs.custom_sets
-    def handle_custom_input(self, data):
+    def handle_custom_input(self, custom_data):
         self.Error.clear()
         self.Warning.clear()
         self.closeContext()
@@ -682,9 +693,8 @@ class OWClusterAnalysis(OWWidget):
         self.custom_gene_id_column = None
         self.num_of_custom_sets = None
         self.feature_model.set_domain(None)
-
-        if data:
-            self.custom_data = data
+        if custom_data:
+            self.custom_data = custom_data
             self.feature_model.set_domain(self.custom_data.domain)
             self.custom_tax_id = str(self.custom_data.attributes.get(TAX_ID, None))
             self.custom_use_attr_names = self.custom_data.attributes.get(
@@ -696,15 +706,14 @@ class OWClusterAnalysis(OWWidget):
             self.custom_gene_id_column = self.custom_data.attributes.get(
                 GENE_ID_COLUMN, None
             )
-
-            self._handle_future_model()
-
-        if self.input_data:
-            self.openContext(self.input_data.domain)
-
-        self.gs_label_combobox.setDisabled(True)
-        self.refresh_custom_gene_sets()
+            self.gs_selection_component.initialize_custom_gene_sets(custom_data)
+            self.num_of_custom_sets = self.gs_selection_component.num_of_custom_sets
+        else:
+            self.stored_gene_sets_selection = ()
+            self.gs_selection_component.selection = []
+            self.gs_selection_component.initialize_custom_gene_sets(None)
         self.handle_custom_gene_sets(select_customs_flag=True)
+        self.__update_info_box()
 
     def __check_organism_mismatch(self):
         """Check if organisms from different inputs match.
@@ -729,49 +738,21 @@ class OWClusterAnalysis(OWWidget):
         if self.custom_gene_set_indicator:
             if self.custom_data is not None and self.custom_gene_id_column is not None:
                 if self.__check_organism_mismatch():
-                    self.gs_label_combobox.setDisabled(True)
+                    self.gs_selection_component.initialize_custom_gene_sets(None)
                     self.Error.organism_mismatch()
-                    self.gs_widget.update_gs_hierarchy()
                     self.__gene_sets_enrichment()
                     return
-
-                if isinstance(self.custom_gene_set_indicator, DiscreteVariable):
-                    labels = self.custom_gene_set_indicator.values
-                    gene_sets_names = [
-                        labels[int(idx)]
-                        for idx in self.custom_data.get_column(
-                            self.custom_gene_set_indicator
-                        )
-                    ]
-                else:
-                    gene_sets_names = self.custom_data.get_column(
-                        self.custom_gene_set_indicator
-                    )
-
-                self.num_of_custom_sets = len(set(gene_sets_names))
-                gene_names = self.custom_data.get_column(self.custom_gene_id_column)
-                hierarchy_title = (
-                    self.custom_data.name if self.custom_data.name else 'Custom sets',
-                )
-                try:
-                    self.gs_widget.add_custom_sets(
-                        gene_sets_names,
-                        gene_names,
-                        hierarchy_title=hierarchy_title,
-                        select_customs_flag=select_customs_flag,
-                    )
-                except GeneSetException:
-                    pass
-                self.gs_label_combobox.setDisabled(False)
             else:
-                self.gs_widget.update_gs_hierarchy()
-
+                self.gs_selection_component._update_tree_widget()
         self.__gene_sets_enrichment()
         self.__update_info_box()
 
     def refresh_custom_gene_sets(self):
-        self.gs_widget.clear_custom_sets()
-        # self.gs_widget.update_gs_hierarchy()
+        self.gs_selection_component._gene_sets.delete_sets_by_hierarchy(
+            self.gs_selection_component.custom_gene_set_hierarchy
+        )
+        self.gs_selection_component.custom_gene_set_hierarchy = None
+        self.gs_selection_component._update_tree_widget()
 
     def gene_scores_output(self, selected_clusters):
         metas = [
@@ -873,6 +854,8 @@ class OWClusterAnalysis(OWWidget):
             ]
 
         if not self.input_data:
+            self.Outputs.gene_scores.send(None)
+            self.Outputs.gene_set_scores.send(None)
             self.Outputs.selected_data.send(None)
             return
 
