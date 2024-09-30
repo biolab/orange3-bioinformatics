@@ -1,4 +1,5 @@
 """ GUI utils for widgets """
+
 from numbers import Real, Integral
 from collections import namedtuple
 
@@ -135,7 +136,7 @@ class HTMLDelegate(QStyledItemDelegate):
         doc.setHtml(gene_obj.to_html())
         doc.setTextWidth(options.rect.width() - 10)
 
-        return QSize(doc.idealWidth(), doc.size().height())
+        return QSize(int(doc.idealWidth()), int(doc.size().height()))
 
     def paint(self, painter, option, index):
         options = QStyleOptionViewItem(option)
