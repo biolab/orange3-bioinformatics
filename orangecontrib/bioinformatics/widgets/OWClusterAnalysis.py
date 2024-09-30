@@ -1,4 +1,5 @@
 """ OWClusterAnalysis """
+
 import sys
 import itertools
 
@@ -58,16 +59,16 @@ from orangecontrib.bioinformatics.widgets.utils.data import (
 
 
 class ClusterAnalysisContextHandler(PerfectDomainContextHandler):
-    def encode_setting(self, context, setting, value):
+    def encode_setting(self, context, setting, value, *args):
         if setting.name == 'cluster_indicators':
             value = [(var.name, 100 + vartype(var)) for var in value]
-        return super().encode_setting(context, setting, value)
+        return super().encode_setting(context, setting, value, *args)
 
-    def decode_setting(self, setting, value, domain=None):
+    def decode_setting(self, setting, value, domain=None, *args):
         return (
             [domain[var[0]] for var in value]
             if setting.name == 'cluster_indicators'
-            else super().decode_setting(setting, value, domain)
+            else super().decode_setting(setting, value, domain, *args)
         )
 
 
@@ -386,7 +387,7 @@ class OWClusterAnalysis(OWWidget):
         row_profile = None
         new_cluster_values = []
         var_index_lookup = {
-            val: idx
+            (var.name, str(val)): idx
             for var in self.cluster_indicators
             for idx, val in enumerate(var.values)
         }
@@ -396,7 +397,12 @@ class OWClusterAnalysis(OWWidget):
         )
         for comb in cart_prod:
             new_cluster_values.append(', '.join(list(comb)))
-            self.new_cluster_profile.append([var_index_lookup[val] for val in comb])
+            self.new_cluster_profile.append(
+                [
+                    var_index_lookup[(var.name, str(val))]
+                    for var, val in zip(self.cluster_indicators, comb)
+                ]
+            )
 
         row_profile_lookup = {
             tuple(profile): indx
@@ -418,13 +424,15 @@ class OWClusterAnalysis(OWWidget):
         ca_ind = DiscreteVariable.make(
             cluster_indicator_name,
             values=list(new_cluster_values),
-            ordered=True,
         )
-
         domain = Domain(
             self.input_data.domain.attributes,
             self.input_data.domain.class_vars,
-            self.input_data.domain.metas + (ca_ind,),
+            (
+                self.input_data.domain.metas[:-1] + (ca_ind,)
+                if ca_ind in self.input_data.domain
+                else self.input_data.domain.metas + (ca_ind,)
+            ),
         )
 
         table = self.input_data.transform(domain)
@@ -511,6 +519,8 @@ class OWClusterAnalysis(OWWidget):
 
             # call sizeHint function
             self.cluster_info_view.resizeRowsToContents()
+
+            self.commit()
 
     def __gene_enrichment(self):
         design = bool(
@@ -856,7 +866,13 @@ class OWClusterAnalysis(OWWidget):
         selected_cluster_indexes = set()
         selected_cluster_genes = set()
 
-        if not self.input_data or not selected_rows:
+        if self.input_data and not selected_rows:
+            selected_rows = [
+                self.cluster_info_model.index(row, 0)
+                for row in range(self.cluster_info_model.rowCount())
+            ]
+
+        if not self.input_data:
             self.Outputs.selected_data.send(None)
             return
 
