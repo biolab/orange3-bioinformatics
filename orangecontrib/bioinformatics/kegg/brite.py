@@ -18,7 +18,7 @@ except ImportError:
 
 class BriteEntry(object):
     _search_re = {
-        "ids": re.compile('(?P<ids>\[.*:.*\])'),
+        "ids": re.compile(r'(?P<ids>\[.*:.*\])'),
         "title": re.compile(r'(<[Bb]>)?(?P<title>\b[a-zA-Z0-9_/\s,;:.+=\-\[\]{}\(\)]+?)(?(1)</[Bb]>)$'),
         "links": re.compile('(?P<links><a href=".+?">.*?</a>)'),
     }
