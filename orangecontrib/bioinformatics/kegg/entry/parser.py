@@ -3,6 +3,7 @@ A parser for DBGET database entries
 
 """
 from __future__ import print_function
+import itertools
 
 from six import StringIO
 
@@ -62,7 +63,10 @@ class DBGETEntryParser(object):
         section_title = None
         subsection_title = None
         textline_start = None
-
+        # Skip leading newline
+        stream = itertools.dropwhile(
+            lambda line: line in ("\r\n", "\n"), stream
+        )
         for line in stream:
             startswith = line.startswith
             # TODO: Reorder by frequency (for faster fallthrough)
