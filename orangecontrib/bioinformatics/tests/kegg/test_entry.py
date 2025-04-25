@@ -22,20 +22,25 @@ class Entry(DBEntry):
 
 
 class TestEntry(unittest.TestCase):
+    ENTRIES = (
+        TEST_ENTRY,
+        f"\n{TEST_ENTRY}",
+    )
     def test_entry(self):
         """
         Test basic DBEntry class.
         """
-        entry = Entry(TEST_ENTRY)
-        self.assertEqual(entry.entry_key, "test_id")
-        self.assertEqual(entry.ENTRY.TITLE, "ENTRY")
-        self.assertEqual(str(entry), TEST_ENTRY[:-4])
+        for content in self.ENTRIES:
+            entry = Entry(content)
+            self.assertEqual(entry.entry_key, "test_id")
+            self.assertEqual(entry.ENTRY.TITLE, "ENTRY")
+            self.assertEqual(str(entry), TEST_ENTRY[:-4])
 
 
 class TestParser(unittest.TestCase):
     def test_parser(self):
         parse = parser.DBGETEntryParser()
-        stream = StringIO(TEST_ENTRY)
+
 
         expected = [
             (parse.ENTRY_START, None, None),
@@ -52,7 +57,10 @@ class TestParser(unittest.TestCase):
             (parse.SECTION_END, "DESCRIPTION", None),
             (parse.ENTRY_END, None, None),
         ]
-        self.assertSequenceEqual(list(parse.parse(stream)), expected)
+
+        for content in TestEntry.ENTRIES:
+            stream = StringIO(content)
+            self.assertSequenceEqual(list(parse.parse(stream)), expected)
 
 
 if __name__ == '__main__':
