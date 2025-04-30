@@ -12,7 +12,7 @@ from AnyQt.QtCore import Qt, QRectF, QObject
 
 from Orange.data import Table, Domain, DiscreteVariable, ContinuousVariable
 from Orange.widgets import gui, report
-from Orange.data.util import array_equal
+from Orange.data.util import array_equal, get_unique_names
 from Orange.data.filter import Values, FilterString
 from Orange.widgets.widget import Msg, Input
 from Orange.widgets.settings import Setting, ContextSetting, SettingProvider
@@ -974,8 +974,11 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         return Domain(attributes, class_vars, metas)
 
     def __add_data_source_column(self, data):
+        name_ref, name_sec = self.reference_data.name, self.secondary_data.name
+        if name_ref == name_sec:
+            name_ref, name_sec = f"{name_ref} (reference)", f"{name_sec} (secondary)"
         source_attr = DiscreteVariable(
-            "Data Source", values=[self.reference_data.name, self.secondary_data.name]
+            get_unique_names(data.domain, "Data Source"), values=[name_ref, name_sec]
         )
         domain = data.domain
         metas = chain(domain.metas, [source_attr])
