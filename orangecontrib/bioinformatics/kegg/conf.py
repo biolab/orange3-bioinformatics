@@ -40,7 +40,7 @@ env["kegg_dir"] = kegg_dir
 parser = configparser.ConfigParser(env)
 
 
-parser.readfp(StringIO(default), "default")
+parser.read_file(StringIO(default), "default")
 
 # TODO: global settings rc file
 parser.read([os.path.expanduser("~/.obiKEGG/rc.cfg")])
