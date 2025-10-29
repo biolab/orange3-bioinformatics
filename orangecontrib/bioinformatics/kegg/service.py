@@ -5,7 +5,7 @@ from __future__ import absolute_import
 
 from . import conf
 
-REST_API = "http://rest.kegg.jp/"
+REST_API = "https://rest.kegg.jp/"
 
 
 def slumber_service():
