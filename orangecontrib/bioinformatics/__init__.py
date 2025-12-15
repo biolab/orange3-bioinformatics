@@ -1,9 +1,9 @@
 """ Bioinformatics add-on for Orange3 """
 
-from pkg_resources import DistributionNotFound, get_distribution
+from importlib.metadata import distribution, PackageNotFoundError
 
 try:
-    __version__ = get_distribution('orange3-bioinformatics').version
-except DistributionNotFound:
+    __version__ = distribution('orange3-bioinformatics').version
+except PackageNotFoundError:
     # package is not installed
     pass
