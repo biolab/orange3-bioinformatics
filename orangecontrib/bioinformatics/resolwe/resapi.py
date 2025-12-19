@@ -1,10 +1,15 @@
 """ ResolweAPI """
-from typing import Dict, List
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Dict, List
 from urllib.parse import urljoin
 
 import requests
 from resdk import Resolwe
-from resdk.resources.data import Data, Collection
+from resdk.resources.data import Data
+
+if TYPE_CHECKING:
+    from resdk.resources.collection import Collection
 
 DEFAULT_URL: str = 'https://app.genialis.com'
 RESOLWE_URLS: List[str] = [DEFAULT_URL, 'https://imaps.genialis.com', 'https://bcm.genialis.com']
