@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.5] - 2026-02-17
+### Changed
+- [#356](https://github.com/biolab/orange3-bioinformatics/pull/356): Remove `pkg_resources` usage and update oldest test environment to Orange3 3.38.
+
+### Fixed
+- [#350](https://github.com/biolab/orange3-bioinformatics/pull/350): Fix cluster analysis example image name.
+- [#354](https://github.com/biolab/orange3-bioinformatics/pull/354): OWAnnotateProjection ensures unique variable names and values.
+- [#353](https://github.com/biolab/orange3-bioinformatics/pull/353): KEGG compatibility fixes for Python 3.12 and parser/API handling.
+
+## [4.8.4] - 2024-09-30
+### Changed
+- [#349](https://github.com/biolab/orange3-bioinformatics/pull/349): Cluster Analysis now uses the GeneSetSelection component for custom gene set selection.
+
+### Fixed
+- [#349](https://github.com/biolab/orange3-bioinformatics/pull/349): Fix QSize and settings decoding errors in Cluster Analysis.
+
+## [4.8.3] - 2024-06-03
+### Added
+- [#348](https://github.com/biolab/orange3-bioinformatics/pull/348): Marker Genes adds DictyBase support.
+
+### Changed
+- [#348](https://github.com/biolab/orange3-bioinformatics/pull/348): Update Marker Genes documentation.
+
+### Fixed
+- [#348](https://github.com/biolab/orange3-bioinformatics/pull/348): Fix Marker Genes unit tests.
+
 ## [4.8.2] - 2024-03-20
 ### Changed
 - [#319](https://github.com/biolab/orange3-bioinformatics/pull/319): GEO Datasets: Move GDSInfo initialization in a worker thread
