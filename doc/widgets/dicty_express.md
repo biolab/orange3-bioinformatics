@@ -1,7 +1,7 @@
 dictyExpress
 ============
 
-Gives access to [dictyExpress](https://dictyexpress.research.bcm.edu)
+Gives access to [dictyExpress](https://app.dictyexpress.org/bcm/)
 databases.
 
 **Inputs**
@@ -11,7 +11,7 @@ databases.
 - Data: Selected experiment (time-course gene expression data).
 
 
-**dictyExpress** widget gives a direct access to the [dictyExpress](https://dictyexpress.research.bcm.edu) database. It allows you to download the data from selected experiments in *Dictyostelium* by Baylor College of Medicine. The widget requires internet connection to work.
+**dictyExpress** widget gives a direct access to the [dictyExpress](https://app.dictyexpress.org/bcm/) database. It allows you to download the data from selected experiments in *Dictyostelium* by Baylor College of Medicine. The widget requires internet connection to work.
 
 ![](images/dicty_express/dictyExpress-stamped.png)
 

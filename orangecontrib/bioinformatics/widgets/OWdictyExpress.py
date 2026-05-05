@@ -67,7 +67,7 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
 
         self._res: Optional[genapi.GenAPI] = None
         self.organism = '44689'
-        self.server = 'https://dictyexpress.research.bcm.edu'
+        self.server = genapi.DEFAULT_URL
         self.headerLabels = [x[1] for x in Labels]
         self.searchString = ""
         self.items = []
@@ -176,9 +176,12 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
             if dialog.resolwe_instance is not None:
                 self.res = dialog.resolwe_instance
             else:
-                self.res = connect(
-                    **self.genapi_pub_auth, server_type=resolwe.GENESIS_PLATFORM
-                )
+                try:
+                    self.res = connect(
+                        **self.genapi_pub_auth, server_type=resolwe.GENESIS_PLATFORM
+                    )
+                except resolwe.ResolweAuthError as ex:
+                    self.on_exception(ex)
 
         if not silent and dialog.exec_():
             self.res = dialog.resolwe_instance
@@ -189,7 +192,10 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
         del cm.username
         del cm.password
         # Use public credentials when user signs out
-        self.res = connect(**self.genapi_pub_auth, server_type=resolwe.GENESIS_PLATFORM)
+        try:
+            self.res = connect(**self.genapi_pub_auth, server_type=resolwe.GENESIS_PLATFORM)
+        except resolwe.ResolweAuthError as ex:
+            self.on_exception(ex)
 
     def update_user_status(self):
         cm = get_credential_manager(resolwe.GENESIS_PLATFORM)
@@ -204,7 +210,7 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
             self.sign_out_btn.setEnabled(False)
 
         self.user_info.setText(user_info)
-        self.server_info.setText(f'Server: {self.res._gen.url[8:]}')
+        self.server_info.setText(f'Server: {self.res.url[8:]}')
 
     def clear_cache(self):
         resolwe.GenAPI.clear_cache()
@@ -225,6 +231,11 @@ class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
     def on_exception(self, ex):
         if isinstance(ex, ConnectionError) or isinstance(ex, ValueError):
             self.Error.unreachable_host()
+        elif isinstance(ex, resolwe.ResolweAuthError):
+            if ex.args and 'Invalid credentials' in ex.args[0]:
+                self.Error.invalid_credentials()
+            else:
+                self.Error.unreachable_host()
 
         print(ex)
 
