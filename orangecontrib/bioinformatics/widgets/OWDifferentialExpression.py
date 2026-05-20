@@ -293,9 +293,9 @@ class Histogram(pg.PlotWidget):
 
         self.__data = (hist, bins)
         if self.__histcurve is None:
-            self.__histcurve = pg.PlotCurveItem(x=bins, y=hist, stepMode=True)
+            self.__histcurve = pg.PlotCurveItem(x=bins, y=hist, stepMode="center")
         else:
-            self.__histcurve.setData(x=bins, y=hist, stepMode=True)
+            self.__histcurve.setData(x=bins, y=hist, stepMode="center")
 
         self.__update()
 
@@ -312,8 +312,8 @@ class Histogram(pg.PlotWidget):
             self.__data = None
 
         if curveitem is not None:
-            if not curveitem.opts["stepMode"]:
-                raise ValueError("The curve must have `stepMode == True`")
+            if curveitem.opts["stepMode"] != "center":
+                raise ValueError("The curve must have `stepMode == 'center'`")
             self.addItem(curveitem)
             self.__histcurve = curveitem
             self.__data = (curveitem.yData, curveitem.xData)
@@ -436,14 +436,14 @@ class Histogram(pg.PlotWidget):
         self.__taillow.setVisible(self.__mode & Histogram.Low)
         if self.__min > edges[0]:
             datalow = histogram_cut(hist, edges, edges[0], self.__min)
-            self.__taillow.setData(*datalow, fillLevel=0, stepMode=True)
+            self.__taillow.setData(*datalow, fillLevel=0, stepMode="center")
         else:
             self.__taillow.clear()
 
         self.__tailhigh.setVisible(self.__mode & Histogram.High)
         if self.__max < edges[-1]:
             datahigh = histogram_cut(hist, edges, self.__max, edges[-1])
-            self.__tailhigh.setData(*datahigh, fillLevel=0, stepMode=True)
+            self.__tailhigh.setData(*datahigh, fillLevel=0, stepMode="center")
         else:
             self.__tailhigh.clear()
 
@@ -1046,7 +1046,7 @@ class OWDifferentialExpression(widget.OWWidget):
         nbins = int(max(np.ceil(np.sqrt(len(validscores))), 20))
         freq, edges = np.histogram(validscores, bins=nbins)
         self.histogram.setHistogramCurve(
-            pg.PlotCurveItem(x=edges, y=freq, stepMode=True, pen=pg.mkPen("b", width=2))
+            pg.PlotCurveItem(x=edges, y=freq, stepMode="center", pen=pg.mkPen("b", width=2))
         )
 
         if nulldist is not None:
@@ -1057,7 +1057,7 @@ class OWDifferentialExpression(widget.OWWidget):
             nullfreq, _ = np.histogram(validnulldist, bins=nullbins)
             nullfreq = nullfreq * (freq.sum() / nullfreq.sum())
             nullitem = pg.PlotCurveItem(
-                x=nullbins, y=nullfreq, stepMode=True, pen=pg.mkPen((50, 50, 50, 100))
+                x=nullbins, y=nullfreq, stepMode="center", pen=pg.mkPen((50, 50, 50, 100))
             )
             # Ensure it stacks behind the main curve
             nullitem.setZValue(nullitem.zValue() - 10)
