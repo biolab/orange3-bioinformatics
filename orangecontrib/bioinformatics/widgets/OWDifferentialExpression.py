@@ -957,6 +957,7 @@ class OWDifferentialExpression(widget.OWWidget):
                 state.advance(100 / (nperm + 1))
 
         self.progressBarInit()
+        self.setBlocking(True)
         set_scores = concurrent.methodinvoke(
             self, "__set_score_results", (concurrent.Future,)
         )
@@ -984,6 +985,7 @@ class OWDifferentialExpression(widget.OWWidget):
     @Slot(concurrent.Future)
     def __set_score_results(self, scores):
         # set score results from a Future
+        self.setBlocking(False)
         self.error(1)
         self.warning(10)
         if scores is self.__scores_future:
@@ -1007,6 +1009,7 @@ class OWDifferentialExpression(widget.OWWidget):
             self.__scores_future.cancel()
             self.__scores_state.cancelled = True
             self.__scores_state = self.__scores_future = None
+            self.setBlocking(False)
 
     def set_scores(self, scores, null_scores=None, warning=None):
         self.scores = scores
