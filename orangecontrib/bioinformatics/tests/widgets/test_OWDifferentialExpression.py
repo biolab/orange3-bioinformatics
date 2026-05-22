@@ -3,7 +3,29 @@ import unittest
 import numpy as np
 import scipy.stats
 
-from orangecontrib.bioinformatics.widgets.OWDifferentialExpression import f_oneway
+from Orange.data import Table
+from Orange.widgets.tests.base import WidgetTest
+from orangecontrib.bioinformatics.widgets.OWDifferentialExpression import (
+    OWDifferentialExpression, f_oneway
+)
+
+
+class TestOWDifferentialExpression(WidgetTest):
+    def setUp(self):
+        super().setUp()
+        self.widget = self.create_widget(
+            OWDifferentialExpression, stored_settings={
+                "auto_commit": True
+            }
+        )
+
+    def test_widget(self):
+        data = Table("brown-selected")
+        self.send_signal(self.widget.Inputs.data, data)
+        self.wait_until_finished()
+        self.widget.select_n_best()
+        out = self.get_output(self.widget.Outputs.data_subset)
+        self.assertEqual(len(out.domain.attributes), self.widget.n_best)
 
 
 class TestFOneWay(unittest.TestCase):

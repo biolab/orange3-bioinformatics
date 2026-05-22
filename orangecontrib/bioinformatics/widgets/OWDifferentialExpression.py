@@ -13,6 +13,7 @@ from AnyQt.QtCore import pyqtSlot as Slot
 from AnyQt.QtCore import pyqtSignal as Signal
 
 import Orange.data
+from Orange.data import Table
 from Orange.widgets import gui, report, widget, settings
 from Orange.preprocess import transformation
 from Orange.widgets.utils import concurrent
@@ -293,9 +294,9 @@ class Histogram(pg.PlotWidget):
 
         self.__data = (hist, bins)
         if self.__histcurve is None:
-            self.__histcurve = pg.PlotCurveItem(x=bins, y=hist, stepMode=True)
+            self.__histcurve = pg.PlotCurveItem(x=bins, y=hist, stepMode="center")
         else:
-            self.__histcurve.setData(x=bins, y=hist, stepMode=True)
+            self.__histcurve.setData(x=bins, y=hist, stepMode="center")
 
         self.__update()
 
@@ -312,8 +313,8 @@ class Histogram(pg.PlotWidget):
             self.__data = None
 
         if curveitem is not None:
-            if not curveitem.opts["stepMode"]:
-                raise ValueError("The curve must have `stepMode == True`")
+            if curveitem.opts["stepMode"] != "center":
+                raise ValueError("The curve must have `stepMode == 'center'`")
             self.addItem(curveitem)
             self.__histcurve = curveitem
             self.__data = (curveitem.yData, curveitem.xData)
@@ -436,14 +437,14 @@ class Histogram(pg.PlotWidget):
         self.__taillow.setVisible(self.__mode & Histogram.Low)
         if self.__min > edges[0]:
             datalow = histogram_cut(hist, edges, edges[0], self.__min)
-            self.__taillow.setData(*datalow, fillLevel=0, stepMode=True)
+            self.__taillow.setData(*datalow, fillLevel=0, stepMode="center")
         else:
             self.__taillow.clear()
 
         self.__tailhigh.setVisible(self.__mode & Histogram.High)
         if self.__max < edges[-1]:
             datahigh = histogram_cut(hist, edges, self.__max, edges[-1])
-            self.__tailhigh.setData(*datahigh, fillLevel=0, stepMode=True)
+            self.__tailhigh.setData(*datahigh, fillLevel=0, stepMode="center")
         else:
             self.__tailhigh.clear()
 
@@ -535,12 +536,13 @@ class OWDifferentialExpression(widget.OWWidget):
     icon = "../widgets/icons/OWDifferentialExpression.svg"
     priority = 50
 
-    inputs = [("Data", Orange.data.Table, "set_data")]
-    outputs = [
-        ("Data subset", Orange.data.Table, widget.Default),
-        ("Remaining data subset", Orange.data.Table),
-        ("Selected genes", Orange.data.Table),
-    ]
+    class Inputs:
+        data = widget.Input("Data", Table)
+
+    class Outputs:
+        data_subset = widget.Output("Data subset", Table, default=True)
+        remaining_data_subset = widget.Output("Remaining data subset", Table)
+        selected_genes = widget.Output("Selected genes", Table)
 
     #: Selection types
     LowTail, HighTail, TwoTail = 1, 2, 3
@@ -799,6 +801,7 @@ class OWDifferentialExpression(widget.OWWidget):
         selected_indices = [ind.row() for ind in selection.indexes()]
         return grp, selected_indices
 
+    @Inputs.data
     def set_data(self, data):
         self.closeContext()
 
@@ -957,6 +960,7 @@ class OWDifferentialExpression(widget.OWWidget):
                 state.advance(100 / (nperm + 1))
 
         self.progressBarInit()
+        self.setBlocking(True)
         set_scores = concurrent.methodinvoke(
             self, "__set_score_results", (concurrent.Future,)
         )
@@ -984,6 +988,7 @@ class OWDifferentialExpression(widget.OWWidget):
     @Slot(concurrent.Future)
     def __set_score_results(self, scores):
         # set score results from a Future
+        self.setBlocking(False)
         self.error(1)
         self.warning(10)
         if scores is self.__scores_future:
@@ -1007,6 +1012,7 @@ class OWDifferentialExpression(widget.OWWidget):
             self.__scores_future.cancel()
             self.__scores_state.cancelled = True
             self.__scores_state = self.__scores_future = None
+            self.setBlocking(False)
 
     def set_scores(self, scores, null_scores=None, warning=None):
         self.scores = scores
@@ -1046,7 +1052,7 @@ class OWDifferentialExpression(widget.OWWidget):
         nbins = int(max(np.ceil(np.sqrt(len(validscores))), 20))
         freq, edges = np.histogram(validscores, bins=nbins)
         self.histogram.setHistogramCurve(
-            pg.PlotCurveItem(x=edges, y=freq, stepMode=True, pen=pg.mkPen("b", width=2))
+            pg.PlotCurveItem(x=edges, y=freq, stepMode="center", pen=pg.mkPen("b", width=2))
         )
 
         if nulldist is not None:
@@ -1057,7 +1063,7 @@ class OWDifferentialExpression(widget.OWWidget):
             nullfreq, _ = np.histogram(validnulldist, bins=nullbins)
             nullfreq = nullfreq * (freq.sum() / nullfreq.sum())
             nullitem = pg.PlotCurveItem(
-                x=nullbins, y=nullfreq, stepMode=True, pen=pg.mkPen((50, 50, 50, 100))
+                x=nullbins, y=nullfreq, stepMode="center", pen=pg.mkPen((50, 50, 50, 100))
             )
             # Ensure it stacks behind the main curve
             nullitem.setZValue(nullitem.zValue() - 10)
@@ -1330,7 +1336,7 @@ class OWDifferentialExpression(widget.OWWidget):
             subsetdata = data[indices]
             remainingdata = data[remaining]
 
-            self.send("Selected genes", table_selected_genes[indices])
+            self.Outputs.selected_genes.send(table_selected_genes[indices])
         else:  # select columns
             attrs = [copy_variable(var) for var in domain.attributes]
 
@@ -1372,7 +1378,7 @@ class OWDifferentialExpression(widget.OWWidget):
                 ]
                 table_selected_genes.attributes[TAX_ID] = self.data.attributes[TAX_ID]
 
-            self.send("Selected genes", table_selected_genes[indices])
+            self.Outputs.selected_genes.send(table_selected_genes[indices])
 
             selected_attrs = [attrs[i] for i in indices]
             remaining_attrs = [attrs[i] for i in remaining]
@@ -1385,8 +1391,8 @@ class OWDifferentialExpression(widget.OWWidget):
             )
             remainingdata = self.data.from_table(domain, self.data)
 
-        self.send("Data subset", subsetdata)
-        self.send("Remaining data subset", remainingdata)
+        self.Outputs.data_subset.send(subsetdata)
+        self.Outputs.remaining_data_subset.send(remainingdata)
 
     def send_report(self):
         self.report_plot()
