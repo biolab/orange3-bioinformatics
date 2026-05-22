@@ -13,6 +13,7 @@ from AnyQt.QtCore import pyqtSlot as Slot
 from AnyQt.QtCore import pyqtSignal as Signal
 
 import Orange.data
+from Orange.data import Table
 from Orange.widgets import gui, report, widget, settings
 from Orange.preprocess import transformation
 from Orange.widgets.utils import concurrent
@@ -535,12 +536,13 @@ class OWDifferentialExpression(widget.OWWidget):
     icon = "../widgets/icons/OWDifferentialExpression.svg"
     priority = 50
 
-    inputs = [("Data", Orange.data.Table, "set_data")]
-    outputs = [
-        ("Data subset", Orange.data.Table, widget.Default),
-        ("Remaining data subset", Orange.data.Table),
-        ("Selected genes", Orange.data.Table),
-    ]
+    class Inputs:
+        data = widget.Input("Data", Table)
+
+    class Outputs:
+        data_subset = widget.Output("Data subset", Table, default=True)
+        remaining_data_subset = widget.Output("Remaining data subset", Table)
+        selected_genes = widget.Output("Selected genes", Table)
 
     #: Selection types
     LowTail, HighTail, TwoTail = 1, 2, 3
@@ -799,6 +801,7 @@ class OWDifferentialExpression(widget.OWWidget):
         selected_indices = [ind.row() for ind in selection.indexes()]
         return grp, selected_indices
 
+    @Inputs.data
     def set_data(self, data):
         self.closeContext()
 
@@ -1333,7 +1336,7 @@ class OWDifferentialExpression(widget.OWWidget):
             subsetdata = data[indices]
             remainingdata = data[remaining]
 
-            self.send("Selected genes", table_selected_genes[indices])
+            self.Outputs.selected_genes.send(table_selected_genes[indices])
         else:  # select columns
             attrs = [copy_variable(var) for var in domain.attributes]
 
@@ -1375,7 +1378,7 @@ class OWDifferentialExpression(widget.OWWidget):
                 ]
                 table_selected_genes.attributes[TAX_ID] = self.data.attributes[TAX_ID]
 
-            self.send("Selected genes", table_selected_genes[indices])
+            self.Outputs.selected_genes.send(table_selected_genes[indices])
 
             selected_attrs = [attrs[i] for i in indices]
             remaining_attrs = [attrs[i] for i in remaining]
@@ -1388,8 +1391,8 @@ class OWDifferentialExpression(widget.OWWidget):
             )
             remainingdata = self.data.from_table(domain, self.data)
 
-        self.send("Data subset", subsetdata)
-        self.send("Remaining data subset", remainingdata)
+        self.Outputs.data_subset.send(subsetdata)
+        self.Outputs.remaining_data_subset.send(remainingdata)
 
     def send_report(self):
         self.report_plot()

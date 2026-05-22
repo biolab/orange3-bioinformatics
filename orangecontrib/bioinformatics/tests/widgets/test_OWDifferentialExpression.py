@@ -21,11 +21,12 @@ class TestOWDifferentialExpression(WidgetTest):
 
     def test_widget(self):
         data = Table("brown-selected")
-        self.send_signal("Data", data)
+        self.send_signal(self.widget.Inputs.data, data)
         self.wait_until_finished()
         self.widget.select_n_best()
-        out = self.get_output("Data subset")
+        out = self.get_output(self.widget.Outputs.data_subset)
         self.assertEqual(len(out.domain.attributes), self.widget.n_best)
+
 
 class TestFOneWay(unittest.TestCase):
     def test_f_oneway(self):
