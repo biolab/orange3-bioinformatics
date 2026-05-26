@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.7] - 2026-05-26
+### Fixed
+- [#358](https://github.com/biolab/orange3-bioinformatics/pull/358): Differential Expression: Fix error due to deprecated/removed parameter use
+
+## [4.8.6] - 2026-02-17
+### Fixed
+- [#357](https://github.com/biolab/orange3-bioinformatics/pull/357): DictyExpress: Change API to app.dictyexpress.org.
+
 ## [4.8.5] - 2026-02-17
 ### Changed
 - [#356](https://github.com/biolab/orange3-bioinformatics/pull/356): Remove `pkg_resources` usage and update oldest test environment to Orange3 3.38.
