@@ -692,7 +692,7 @@ class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
         self.Warning.missing_tax_id.clear()
         self.Error.no_continuous_vars.clear()
         self.Error.not_enough_inst.clear()
-        if self.data:
+        if self.data is not None:
             if len(self.data) < 2:
                 self.Error.not_enough_inst()
                 self.data = None
