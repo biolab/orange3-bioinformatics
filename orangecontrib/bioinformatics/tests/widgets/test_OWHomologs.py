@@ -79,6 +79,22 @@ class TestOWMHomologs(WidgetTest):
 
         self.assertListEqual(mouse_ids, self.expected_results)
 
+    def test_unknown_gene_id(self):
+        self.widget.auto_commit = False
+        self.widget.target_organism_change(self.widget.taxonomy_ids.index("10090"))
+
+        data = self.genes_rows.copy()
+        with data.unlocked():
+            data.metas[1, 1] = "?"
+        self.send_signal(self.widget.Inputs.data, data)
+        self.widget.auto_commit = True
+        self.widget.commit()
+
+        out_data = self.get_output(self.widget.Outputs.genes, self.widget)
+        self.assertEqual(len(out_data), len(data) - 1)
+        mouse_ids = list(out_data.get_column(HOMOLOG_ID))
+        self.assertListEqual(mouse_ids, [self.expected_results[0], *self.expected_results[2:]])
+
 
 if __name__ == '__main__':
     unittest.main()
