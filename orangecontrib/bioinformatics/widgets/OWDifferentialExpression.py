@@ -7,7 +7,7 @@ import pyqtgraph as pg
 import scipy.stats
 import scipy.special
 
-from AnyQt.QtGui import QPen, QStandardItemModel
+from AnyQt.QtGui import QPen, QStandardItemModel, QPalette, QColor
 from AnyQt.QtCore import Qt, QSize, QLineF, QRectF
 from AnyQt.QtCore import pyqtSlot as Slot
 from AnyQt.QtCore import pyqtSignal as Signal
@@ -626,7 +626,7 @@ class OWDifferentialExpression(widget.OWWidget):
             OWDifferentialExpression.TwoTail: test_two_tail,
         }
 
-        self.histogram = Histogram(enableMouse=False, enableMenu=False, background="w")
+        self.histogram = Histogram(enableMouse=False, enableMenu=False)
         self.histogram.enableAutoRange(enable=False)
         self.histogram.getPlotItem().hideButtons()  # hide auto range button
         self.histogram.getViewBox().setMouseEnabled(False, False)
@@ -1043,6 +1043,7 @@ class OWDifferentialExpression(widget.OWWidget):
         nulldist (P, N) array optional
             The scores obtained under P permutations of labels.
         """
+        foreground_color = self.palette().color(QPalette.Text)
         score_name, side, test_type, _ = self.Scores[scoreindex]
         low, high = self.thresholds.get(score_name, (-np.inf, np.inf))
 
@@ -1062,8 +1063,10 @@ class OWDifferentialExpression(widget.OWWidget):
             nullbins = edges  # XXX: extend to the full range of nulldist
             nullfreq, _ = np.histogram(validnulldist, bins=nullbins)
             nullfreq = nullfreq * (freq.sum() / nullfreq.sum())
+            color = QColor(foreground_color)
+            color.setAlpha(100)
             nullitem = pg.PlotCurveItem(
-                x=nullbins, y=nullfreq, stepMode="center", pen=pg.mkPen((50, 50, 50, 100))
+                x=nullbins, y=nullfreq, stepMode="center", pen=pg.mkPen(color)
             )
             # Ensure it stacks behind the main curve
             nullitem.setZValue(nullitem.zValue() - 10)
@@ -1108,11 +1111,14 @@ class OWDifferentialExpression(widget.OWWidget):
             left = ", ".join(str(v) for v in values if v not in selected_values)
             right = ", ".join(str(v) for v in selected_values)
 
-            labelitem = pg.TextItem(left, color=(40, 40, 40))
+
+            color = QColor(foreground_color)
+            color.setAlphaF(0.9)
+            labelitem = pg.TextItem(left, color=color)
             labelitem.setPos(x1, y1)
             self.histogram.addItem(labelitem)
 
-            labelitem = pg.TextItem(right, color=(40, 40, 40))
+            labelitem = pg.TextItem(right, color=color)
             labelitem.setPos(x2, y2)
             self.histogram.addItem(labelitem)
 
