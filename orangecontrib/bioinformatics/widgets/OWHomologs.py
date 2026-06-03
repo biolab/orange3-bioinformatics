@@ -1,4 +1,3 @@
-""" OWMarkerGenes """
 import sys
 from typing import List, Union, Optional
 
@@ -45,6 +44,7 @@ class OWHomologs(widget.OWWidget):
         mising_gene_id_attribute = Msg(ERROR_ON_MISSING_ANNOTATION)
 
     want_main_area = False
+    resizing_enabled = False
 
     auto_commit = Setting(True)
     selected_organism: str = Setting('')
@@ -73,9 +73,6 @@ class OWHomologs(widget.OWWidget):
         gui.auto_commit(
             self.controlArea, self, "auto_commit", "Commit", "Commit Automatically"
         )
-
-        self.info.set_input_summary("0")
-        self.info.set_output_summary("0")
 
     @Inputs.data
     def set_data(self, data: Table) -> None:
@@ -110,8 +107,6 @@ class OWHomologs(widget.OWWidget):
                     self.data = None
                     return
         else:
-            self.info.set_input_summary("0")
-            self.info.set_output_summary("0")
             self.info_gene.clear()
             self.info_gene_type.setText("No data on input.")
             self.Outputs.genes.send(None)
@@ -151,15 +146,13 @@ class OWHomologs(widget.OWWidget):
             else len(data)
         )
         self.info_gene.setText(f"Number of genes: {data_len}")
-        self.info.set_input_summary(f"{data_len}")
-
         self.commit()
 
     def find_homologs(self, genes: List[Union[str, Gene]]) -> List[Optional[Gene]]:
         gm = GeneMatcher(self.source_tax)
         gm.genes = genes
 
-        homologs = [g.homolog_gene(taxonomy_id=self.target_tax) for g in gm.genes]
+        homologs = [g.homolog_gene(taxonomy_id=self.target_tax) if g.gene_id else None for g in gm.genes]
         homologs = load_gene_summary(self.target_tax, homologs)
 
         return homologs
@@ -228,14 +221,9 @@ class OWHomologs(widget.OWWidget):
 
                 out_table = table if len(table) > 0 else None
 
-            self.info.set_output_summary(f"{len(out_table) if out_table else 0}")
-
             self.Outputs.genes.send(out_table)
         else:
             self.Outputs.genes.send(None)
-
-    def closeEvent(self, event):
-        super().closeEvent(event)
 
     def sizeHint(self):
         return super().sizeHint().expandedTo(QSize(200, 200))
