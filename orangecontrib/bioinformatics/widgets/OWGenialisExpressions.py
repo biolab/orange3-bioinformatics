@@ -213,7 +213,7 @@ class OWGenialisExpressions(widget.OWWidget, ConcurrentWidgetMixin):
     priority = 30
     want_main_area = True
     want_control_area = True
-    icon = '../widgets/icons/OWGenialisExpressions.svg'
+    icon = '../widgets/icons/OWGenialisExpressions-symbolic.svg'
 
     pagination_availability = pyqtSignal(bool, bool)
 

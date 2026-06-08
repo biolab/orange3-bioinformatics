@@ -162,7 +162,7 @@ class Header(IntEnum):
 class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
     name = "Gene Set Enrichment"
     description = ""
-    icon = "icons/OWGeneSetEnrichment.svg"
+    icon = "icons/OWGeneSetEnrichment-symbolic.svg"
     priority = 90
     want_main_area = True
 

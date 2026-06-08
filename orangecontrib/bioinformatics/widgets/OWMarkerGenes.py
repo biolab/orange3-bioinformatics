@@ -834,7 +834,7 @@ class TreeView(QTreeView):
 
 class OWMarkerGenes(widget.OWWidget):
     name = "Marker Genes"
-    icon = 'icons/OWMarkerGenes.svg'
+    icon = 'icons/OWMarkerGenes-symbolic.svg'
     priority = 130
 
     replaces = ['orangecontrib.single_cell.widgets.owmarkergenes.OWMarkerGenes']

@@ -533,7 +533,7 @@ def test_middle(array, low, high):
 class OWDifferentialExpression(widget.OWWidget):
     name = "Differential Expression"
     description = "Gene selection by differential expression analysis."
-    icon = "../widgets/icons/OWDifferentialExpression.svg"
+    icon = "../widgets/icons/OWDifferentialExpression-symbolic.svg"
     priority = 50
 
     class Inputs:

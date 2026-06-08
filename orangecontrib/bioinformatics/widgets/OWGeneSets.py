@@ -117,7 +117,7 @@ class GeneSetsModel(TableModel):
 class OWGeneSets(OWWidget, ConcurrentWidgetMixin):
     name = 'Gene Sets'
     description = ""
-    icon = 'icons/OWGeneSets.svg'
+    icon = 'icons/OWGeneSets-symbolic.svg'
     priority = 80
     want_main_area = True
 
