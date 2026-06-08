@@ -124,7 +124,7 @@ class State:
 class OWGOBrowser(widget.OWWidget):
     name = "GO Browser"
     description = "Enrichment analysis for Gene Ontology terms."
-    icon = "../widgets/icons/OWGOBrowser.svg"
+    icon = "../widgets/icons/OWGOBrowser-symbolic.svg"
     priority = 60
 
     inputs = [

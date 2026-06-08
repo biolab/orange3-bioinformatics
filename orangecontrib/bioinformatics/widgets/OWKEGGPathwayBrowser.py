@@ -276,7 +276,7 @@ class PathwayView(QGraphicsView):
 class OWKEGGPathwayBrowser(widget.OWWidget):
     name = "KEGG Pathways"
     description = "Browse KEGG pathways that include an input set of genes."
-    icon = "../widgets/icons/OWKEGGPathwayBrowser.svg"
+    icon = "../widgets/icons/OWKEGGPathwayBrowser-symbolic.svg"
     priority = 70
 
     inputs = [

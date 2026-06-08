@@ -216,7 +216,7 @@ class FilterProxyModel(FilterProxyModel):
 class OWGEODatasets(OWWidget, ConcurrentWidgetMixin):
     name = "GEO Data Sets"
     description = "Access to Gene Expression Omnibus data sets."
-    icon = "icons/OWGEODatasets.svg"
+    icon = "icons/OWGEODatasets-symbolic.svg"
     priority = 10
 
     class Warning(OWWidget.Warning):

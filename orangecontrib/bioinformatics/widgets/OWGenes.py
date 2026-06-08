@@ -245,7 +245,7 @@ class UnknownGeneInfoModel(itemmodels.PyListModel):
 class OWGenes(OWWidget, ConcurrentWidgetMixin):
     name = "Genes"
     description = "Tool for working with genes"
-    icon = "../widgets/icons/OWGeneInfo.svg"
+    icon = "../widgets/icons/OWGeneInfo-symbolic.svg"
     priority = 40
     want_main_area = True
 

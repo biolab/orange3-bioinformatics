@@ -333,7 +333,7 @@ class StatisticalTest(IntEnum):
 class OWAnnotateProjection(OWDataProjectionWidget, ConcurrentWidgetMixin):
     name = "Annotator"
     description = "Annotates projection clusters."
-    icon = "icons/OWAnnotateProjection.svg"
+    icon = "icons/OWAnnotateProjection-symbolic.svg"
     priority = 140
     keywords = ["annotate"]
 

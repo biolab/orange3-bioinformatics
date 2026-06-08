@@ -78,7 +78,7 @@ class OWClusterAnalysis(OWWidget):
         "The widget displays differentially expressed genes that characterize the cluster, "
         "and corresponding gene terms that describe differentially expressed genes"
     )
-    icon = "../widgets/icons/OWClusterAnalysis.svg"
+    icon = "../widgets/icons/OWClusterAnalysis-symbolic.svg"
     priority = 110
 
     class Inputs:

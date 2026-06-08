@@ -189,7 +189,7 @@ def download_server_file(fs, index, progress_callback):
 class OWDatabasesUpdate(OWWidget):
     name = "Databases Update"
     description = "Update local systems biology databases."
-    icon = "../widgets/icons/OWDatabasesUpdate.svg"
+    icon = "../widgets/icons/OWDatabasesUpdate-symbolic.svg"
     priority = 1
 
     inputs = []

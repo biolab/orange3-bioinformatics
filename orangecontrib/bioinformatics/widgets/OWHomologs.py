@@ -27,7 +27,7 @@ HOMOLOG_ID = "Homolog ID"
 
 class OWHomologs(widget.OWWidget):
     name = "Homologs"
-    icon = 'icons/OWHomologs.svg'
+    icon = 'icons/OWHomologs-symbolic.svg'
     priority = 120
 
     class Outputs:

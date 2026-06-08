@@ -42,7 +42,7 @@ Labels = [
 class OWdictyExpress(OWWidget, ConcurrentWidgetMixin):
     name = "dictyExpress"
     description = "Time-course gene expression data"
-    icon = "../widgets/icons/OWdictyExpress.svg"
+    icon = "../widgets/icons/OWdictyExpress-symbolic.svg"
     want_main_area = True
     priority = 20
 

@@ -29,7 +29,7 @@ class VolcanoGraph(OWScatterPlotBase):
 class OWVolcanoPlot(OWDataProjectionWidget):
     name = "Volcano Plot"
     description = "Plots fold change vs. p-value."
-    icon = "icons/OWVolcanoPlot.svg"
+    icon = "icons/OWVolcanoPlot-symbolic.svg"
     priority = 100
 
     class Warning(OWDataProjectionWidget.Warning):
